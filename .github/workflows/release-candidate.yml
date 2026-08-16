@@ -47,6 +47,8 @@ jobs:
         run: python3 scripts/check_repository_hygiene.py
       - name: Verify lock and create environment
         run: uv sync --locked --all-extras --dev --python "3.13"
+      - name: Create output directories
+        run: mkdir -p test-results artifacts
       - name: Compile Python source
         run: uv run --frozen python -m compileall -q cloud_engine pi_gateway scripts tools
       - name: Run gateway tests

@@ -52,6 +52,8 @@ jobs:
           cache-dependency-glob: uv.lock
       - name: Verify lock and create environment
         run: uv sync --locked --all-extras --dev --python "${{ matrix.python-version }}"
+      - name: Create test-report directory
+        run: mkdir -p test-results
       - name: Compile Python source
         run: uv run --frozen python -m compileall -q cloud_engine pi_gateway scripts tools
       - name: Run gateway baseline tests
@@ -94,6 +96,8 @@ jobs:
           cache-dependency-glob: uv.lock
       - name: Verify lock and create environment
         run: uv sync --locked --all-extras --dev --python "3.13"
+      - name: Create test-report directory
+        run: mkdir -p test-results
       - name: Run named integrity regressions
         working-directory: cloud_engine
         run: >-
