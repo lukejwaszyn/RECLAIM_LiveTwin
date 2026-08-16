@@ -60,9 +60,11 @@ jobs:
         working-directory: cloud_engine
         run: ../.venv/bin/python -m pytest tests -q --junitxml=../test-results/cloud.xml
       - name: Build deterministic candidate and manifest
+        env:
+          CANDIDATE_VERSION: ${{ inputs.version }}
         run: >-
           .venv/bin/python tools/build_release_candidate.py
-          --version "${{ inputs.version }}"
+          --version "$CANDIDATE_VERSION"
           --test-report test-results/gateway.xml
           --test-report test-results/cloud.xml
       - name: Upload unsigned, non-promotable candidate
