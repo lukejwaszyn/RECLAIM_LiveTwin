@@ -1,0 +1,40 @@
+# RECLAIM Edge Gateway config — copy to /etc/reclaim-edge/config.yaml and edit.
+# Secrets live here (mode 600), never in code.
+
+src: reclaim-crio-01
+# Leave run_id blank to generate a new UUID when the gateway starts. Set it only
+# when resuming a deliberately controlled run.
+run_id: ""
+mode: live
+schema_version: reclaim.telemetry.v1
+
+# Seam A — cRIO -> Pi (trusted LAN, plaintext TCP)
+listen_host: 0.0.0.0
+listen_port: 9070
+
+# Seam B — Pi -> cloud
+# transport: console | https | mqtts
+transport: console            # start here for E0 (no cloud needed)
+cloud_url: https://vm.example/ingest
+mqtt_host: vm.example
+mqtt_port: 8883
+mqtt_topic: reclaim/telemetry
+auth_token: ""                # bearer token (https) / password (mqtts)
+tls_ca: ""                    # path to CA bundle, or empty for system store
+verify_tls: true
+
+# buffer (store-and-forward)
+buffer_path: /var/lib/reclaim-edge/queue.db
+buffer_max_frames: 500000
+
+# runtime
+publish_batch: 50
+publish_interval_s: 0.5
+health_interval_s: 10.0
+# drop a silent cRIO connection after this many seconds (half-open TCP guard);
+# set to several telemetry periods. 0 disables.
+conn_idle_timeout_s: 30.0
+
+# Preserve the real LabVIEW raw channel names for cloud-side labview_map.py.
+# Turn on only when fields contains the complete raw cRIO schema.
+strict_fields: false

@@ -1,0 +1,72 @@
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Candidate semantic version (for example, v0.1.0-rc.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  UV_VERSION: "0.11.21"
+
+jobs:
+  build:
+    name: Verify and build unsigned candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require protected main source
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Release candidates may only be built from main."
+          exit 1
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Set up locked environment tool
+        uses: astral-sh/setup-uv@19a0b38226f7b4528b76eddba08d257a4641dee4 # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Verify repository hygiene
+        run: python3 scripts/check_repository_hygiene.py
+      - name: Verify lock and create environment
+        run: uv sync --locked --all-extras --dev --python "3.13"
+      - name: Compile Python source
+        run: uv run --frozen python -m compileall -q cloud_engine pi_gateway scripts tools
+      - name: Run gateway tests
+        working-directory: pi_gateway
+        env:
+          PYTHONPATH: .
+        run: ../.venv/bin/python -m pytest tests -q --junitxml=../test-results/gateway.xml
+      - name: Run complete cloud-engine suite
+        working-directory: cloud_engine
+        run: ../.venv/bin/python -m pytest tests -q --junitxml=../test-results/cloud.xml
+      - name: Build deterministic candidate and manifest
+        run: >-
+          .venv/bin/python tools/build_release_candidate.py
+          --version "${{ inputs.version }}"
+          --test-report test-results/gateway.xml
+          --test-report test-results/cloud.xml
+      - name: Upload unsigned, non-promotable candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reclaim-livetwin-${{ inputs.version }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

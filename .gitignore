@@ -1,0 +1,61 @@
+# RECLAIM Live Twin — keep the repo to prod code + supporting docs only.
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+test-results/
+artifacts/
+.uv-cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime state — must never be committed (ingest identity, queues, logs, secrets)
+ingest_state*.json
+*.db
+*.sqlite*
+*.log
+reclaim-ingest.env
+/etc/reclaim/*
+
+# Local configuration and credentials. Checked-in examples remain allowed.
+.env
+.env.*
+!.env.example
+!*.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Handoff/build archives are not source lineage.
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*~
+*.swp
+*.orig
+*.bak

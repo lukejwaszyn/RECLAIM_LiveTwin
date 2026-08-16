@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  UV_VERSION: "0.11.21"
+
+jobs:
+  repository-hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Scan tracked repository content
+        run: python3 scripts/check_repository_hygiene.py
+
+  baseline:
+    name: Baseline / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Set up locked environment tool
+        uses: astral-sh/setup-uv@19a0b38226f7b4528b76eddba08d257a4641dee4 # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Verify lock and create environment
+        run: uv sync --locked --all-extras --dev --python "${{ matrix.python-version }}"
+      - name: Compile Python source
+        run: uv run --frozen python -m compileall -q cloud_engine pi_gateway scripts tools
+      - name: Run gateway baseline tests
+        working-directory: pi_gateway
+        env:
+          PYTHONPATH: .
+        run: ../.venv/bin/python -m pytest tests -q --junitxml=../test-results/gateway-${{ matrix.python-version }}.xml
+      - name: Run inherited cloud-engine baseline tests
+        working-directory: cloud_engine
+        run: >-
+          ../.venv/bin/python -m pytest tests -q
+          --ignore=tests/test_rt03_rt05_integrity.py
+          --junitxml=../test-results/cloud-baseline-${{ matrix.python-version }}.xml
+      - name: Upload baseline test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: baseline-test-results-${{ matrix.python-version }}
+          path: test-results/*.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  rt03-rt05-integrity:
+    name: Safety gate / RT-03 + RT-05
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Set up locked environment tool
+        uses: astral-sh/setup-uv@19a0b38226f7b4528b76eddba08d257a4641dee4 # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Verify lock and create environment
+        run: uv sync --locked --all-extras --dev --python "3.13"
+      - name: Run named integrity regressions
+        working-directory: cloud_engine
+        run: >-
+          ../.venv/bin/python -m pytest tests/test_rt03_rt05_integrity.py -q
+          --junitxml=../test-results/rt03-rt05.xml
+      - name: Upload integrity test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rt03-rt05-test-results
+          path: test-results/rt03-rt05.xml
+          if-no-files-found: error
+          retention-days: 30

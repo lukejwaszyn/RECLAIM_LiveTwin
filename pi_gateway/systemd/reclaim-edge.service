@@ -1,0 +1,29 @@
+[Unit]
+Description=RECLAIM Edge Gateway (cRIO -> cloud telemetry, Pi 3B+ flight computer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reclaim
+Group=reclaim
+# Real config lives in /etc/reclaim-edge/ (mode 600, owned by reclaim) — never
+# run the shipped example file (review fix H6a).
+Environment=RECLAIM_EDGE_CONFIG=/etc/reclaim-edge/config.yaml
+WorkingDirectory=/home/reclaim/pi_gateway
+ExecStart=/home/reclaim/pi_gateway/venv/bin/python -m reclaim_edge.main
+Restart=always
+RestartSec=3
+# harden
+NoNewPrivileges=true
+ProtectSystem=strict
+# StateDirectory makes systemd create /var/lib/reclaim-edge with correct
+# ownership BEFORE the sandbox applies — without it, ProtectSystem=strict
+# blocked the buffer's own mkdir and the service crash-looped on first boot
+# (review fix H6b).
+StateDirectory=reclaim-edge
+ReadWritePaths=/var/lib/reclaim-edge
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

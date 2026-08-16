@@ -1,0 +1,79 @@
+# RECLAIM Convene Live Binding
+
+This binding starts clean. Configure exactly one live publisher from the cloud
+dual engine's `/state` endpoint. Do not run the legacy state publisher,
+simulation bridge, CSV importer, or harness publisher against this same
+Convene variable set.
+
+Convene adds `sim_` to received fields. Bind these variables:
+
+| Convene field | Purpose |
+|---|---|
+| `sim_op_state` | authoritative system state for the shared sequential process |
+| `sim_source_op_state` | cRIO sequencer audit value |
+| `sim_active_chamber` | `PL`, `MT`, or `NONE` |
+| `sim_PL_op_state`, `sim_MT_op_state` | chamber-local state |
+| `sim_run_id`, `sim_cycle_id`, `sim_seq`, `sim_ts_source` | traceability and ordering |
+| `sim_mode`, `sim_ingest_status`, `sim_ingest_age_ms` | live-data validity gate |
+| `sim_PL_T_bed_est`, `sim_MT_T_bed_est` | principal predicted temperatures |
+| `sim_PL_advisory_severity`, `sim_MT_advisory_severity` | chamber risk/advisory display |
+
+The primary system dashboard binds `sim_op_state`, not either chamber state.
+It visibly displays `sim_mode`, `sim_run_id`, `sim_seq`, and
+`sim_ingest_age_ms`. If mode is not `live`, status is not `accepted`, or the
+age exceeds the agreed limit, show **DATA NOT LIVE**.
+
+First bind these fields in a separate test view. After a successful shadow run,
+remove legacy writers and promote this binding set to the operator view.
+
+## Convene-native `.stp` visualization
+
+Live 3D visualization is done with Convene's **native visualization tool** — not
+Unreal (the Unreal/Twinmotion path is retired and not carried forward). The tool
+loads a `.stp` (STEP, ISO 10303) CAD model of the system and **binds incoming
+`sim_` variables to specific geometry elements**, so the model animates as the
+plant operates (e.g. chamber temperatures drive color/heat overlays on the
+corresponding bodies, `sim_active_chamber` highlights the live chamber,
+`sim_op_state` drives the stage indicator).
+
+Rules:
+
+1. **Read-only consumer of `/state`.** The visualization reads the same cloud
+   `/state` record (through the tunnel hostname, with `RECLAIM_READ_TOKEN`); it
+   is never a second writer and never talks to the cRIO.
+2. **Bind to the published `sim_` set only**, not raw channels — the `sim_`
+   variables above are the contract surface.
+3. **Same freshness gate as the dashboard.** When `sim_mode` is not `live`,
+   `sim_ingest_status` is not `accepted`, or `sim_ingest_age_ms` exceeds the
+   agreed limit, the view must show **DATA NOT LIVE** rather than freezing on a
+   stale pose.
+4. **Element mapping is a maintained artifact.** Keep the variable→`.stp`-element
+   binding table with the model so a geometry revision can't silently detach a
+   signal from its body.
+
+## Gateway audit machine (laptop as a second Convene machine)
+
+The laptop gateway is additionally registered in Convene as its **own
+machine**, publishing the exact frame it received from LabVIEW and submitted
+to the cloud. Purpose: prove, side by side, that LabVIEW's values, the
+gateway's submitted frame, and the cloud's published state agree — the
+losslessness audit for the whole chain.
+
+Rules:
+
+1. **Separate namespace, no exceptions.** The gateway machine publishes under
+   its own prefix (e.g. `gw_`): `gw_seq`, `gw_ts`, `gw_run_id`,
+   `gw_source_op_state`, `gw_active_chamber`, and the raw channels
+   (`gw_MW_power`, `gw_PL_bottom1`, …). It never writes any `sim_` variable —
+   the cloud engine's publisher remains the single writer of that set.
+2. **Read-only tap, out of the delivery path.** The Convene connection reads
+   the gateway's local `/latest` endpoint (directly or via the status tunnel
+   hostname). It can never block, slow, or reorder the durable queue feeding
+   the cloud.
+3. **The audit view** shows three columns per signal: LabVIEW indicator,
+   `gw_*`, `sim_*`. Matching `gw_seq`/`sim_seq` and equal
+   `gw_source_op_state`/`sim_source_op_state` demonstrate the chain is
+   lossless; the `gw_seq − sim_seq` lag together with `sim_ingest_age_ms` is
+   the live transport-delay readout.
+4. This view is operator-adjacent (verification), not the operator dashboard —
+   the primary view still binds `sim_op_state` and gates on freshness.

@@ -1,0 +1,7 @@
+# RECLAIM predictive-engine — minimal cloud ingest deployment.
+# The POST /ingest path runs use_gp=False, so no scikit-learn GP .joblib is loaded
+# at runtime and no matplotlib is needed. These three are the whole footprint.
+numpy>=1.24
+scipy>=1.10
+scikit-learn>=1.3   # imported by the engine package; light, wheels-only install
+# nptdms>=1.7        # ONLY if replaying logged cRIO .tdms on the VM (not needed for live push)

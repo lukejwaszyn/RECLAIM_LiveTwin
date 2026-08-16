@@ -1,0 +1,6 @@
+# RECLAIM Edge Gateway — runtime deps (all open-source, $0).
+# console/https transports need only pyyaml + requests; mqtts adds paho.
+pyyaml>=6.0
+requests>=2.31          # https transport
+paho-mqtt>=1.6,<2.0     # mqtts transport (optional if using https). Pinned <2.0:
+                        # paho 2.x changed the Client() constructor API (M6).

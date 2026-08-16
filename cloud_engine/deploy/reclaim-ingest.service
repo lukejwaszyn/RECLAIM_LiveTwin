@@ -1,0 +1,34 @@
+# RECLAIM predictive-engine ingest seam — systemd unit for the cloud VM behind
+# the Cloudflare Tunnel.
+# Install:  sudo cp reclaim-ingest.service /etc/systemd/system/
+#           sudo systemctl daemon-reload && sudo systemctl enable --now reclaim-ingest
+# Adjust User=, WorkingDirectory=, and the venv python path to the VM's layout.
+[Unit]
+Description=RECLAIM dual predictive-engine POST /ingest seam
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reclaim
+WorkingDirectory=/opt/reclaim/engine
+# REQUIRED (no leading '-'): a missing secrets file must fail loudly here, not
+# surface later as an auth mystery. The token is read from the environment by
+# the service — NEVER pass it as a CLI argument (visible in `ps` / /proc).
+EnvironmentFile=/etc/reclaim/reclaim-ingest.env
+# Run/sequence identity persists here so a service restart cannot double-step
+# the estimators against the Pi's at-least-once retries (review fix C4).
+StateDirectory=reclaim-ingest
+Environment=RECLAIM_INGEST_STATE=/var/lib/reclaim-ingest/ingest_state.json
+ExecStart=/opt/reclaim/engine/.venv/bin/python push_ingest_dual.py --host 127.0.0.1 --port 8078 --production --max-frame-age-s 15
+Restart=on-failure
+RestartSec=3
+# TLS terminates at the Cloudflare Tunnel (cloudflared) on this VM; bind
+# loopback so the engine port is reachable ONLY through the tunnel. This
+# process still enforces the Pi bearer token (defense in depth).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

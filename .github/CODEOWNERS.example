@@ -1,0 +1,9 @@
+# Rename to CODEOWNERS only after replacing these placeholders with real users/teams.
+/.github/workflows/              @CONTROLS-OWNER @SOFTWARE-OWNER
+/deployment/                    @CONTROLS-OWNER @OPERATIONS-OWNER
+/cloud_engine/deploy/           @CONTROLS-OWNER @OPERATIONS-OWNER
+/pi_gateway/systemd/            @CONTROLS-OWNER @OPERATIONS-OWNER
+/pi_gateway/windows/            @CONTROLS-OWNER @OPERATIONS-OWNER
+/cloud_engine/reclaim_predictive_engine/ @CONTROLS-OWNER @MODEL-OWNER
+/cloud_engine/push_ingest_dual.py @CONTROLS-OWNER @SOFTWARE-OWNER
+/pi_gateway/reclaim_edge/       @CONTROLS-OWNER @GATEWAY-OWNER
