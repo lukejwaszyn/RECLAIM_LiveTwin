@@ -135,6 +135,18 @@ The first two test commands should pass. The named integrity command is expected
 to fail only for the recorded product defects until the next authorized runtime
 remediation phase.
 
+Observed locally on 2026-08-16 with the committed lock:
+
+| Runtime | Gateway baseline | Cloud inherited baseline | RT-03/RT-05 gate |
+|---|---:|---:|---:|
+| Python 3.11.15 | 10 passed | 21 passed | Not repeated; Python 3.13 is the named gate target |
+| Python 3.13.14 | 10 passed | 21 passed | 32 failed, 3 passed for the recorded defects |
+
+The workflow YAML parsed successfully, the lock check passed, repository hygiene
+passed, compilation passed, and rebuilding the same candidate twice produced the
+same archive digest. The generated test candidate remained unsigned and
+non-promotable.
+
 ## Decisions still owned outside this implementation
 
 - GitHub organization/owner, repository name, visibility, billing, and admins.
