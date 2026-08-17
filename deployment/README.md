@@ -4,11 +4,12 @@ This folder holds the deployment and handoff documentation for the RECLAIM Live
 Twin. Every doc carries a **stage/status banner** under its title so you can tell,
 at a glance, which phase of integration it belongs to. This index sorts them.
 
-**Where to start:** for the **current VM engine session**, read
-`VM_ENGINE_HANDOFF.md` first (the full-story, read-first entry point for Stage 1).
-For project-wide context, `HANDOFF.md` (full project story + current pickup) and
-`GATEWAY_GO_LIVE.md` (the authoritative go/no-go punch list). Everything else is
-either a stage-specific brief or a historical record.
+**Where to start:** for the immediate 72-hour demo and backend remediation, read
+`RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md`, then
+`RECLAIM_BACKEND_REMEDIATION_HANDOFF.md`. The implementation-session prompt is
+`ClaudeCode_Backend_Remediation_Prompt.md`. For the **current VM engine session**,
+read `VM_ENGINE_HANDOFF.md` first. For project-wide context, `HANDOFF.md` is the
+full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 
 ## Integration stages
 
@@ -28,6 +29,9 @@ Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 
 | Doc | Role |
 |---|---|
+| `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |
+| `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for RT-03/RT-05 backend fixes. |
+| `ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the focused backend implementation session. |
 | `HANDOFF.md` | Full project story and current pickup point. Authoritative narrative. |
 | `GATEWAY_GO_LIVE.md` | Living go/no-go punch list across all stages. Authoritative status. |
 

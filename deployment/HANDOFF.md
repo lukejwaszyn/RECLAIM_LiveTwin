@@ -3,9 +3,10 @@
 > **Stage:** cross-cutting (current pickup point) · **Status:** LIVING — authoritative
 > project story. Start here. See `deployment/README.md` for the stage-sorted index.
 
-**Written:** 2026-08-15 · **Purpose:** clean pickup for the next working sessions,
-especially the upcoming **cloud VM predictive-engine** session. This is the
-"full story" document; the detailed punch list lives in
+**Written:** 2026-08-15 · **Updated:** 2026-08-16 · **Purpose:** clean pickup for
+the next working sessions. The immediate priority is the **RT-03/RT-05 backend
+remediation and 72-hour demo**, followed by the cloud VM predictive-engine
+session. This is the "full story" document; the detailed punch list lives in
 `deployment/GATEWAY_GO_LIVE.md` and is referenced throughout.
 
 ---
@@ -20,6 +21,22 @@ constraint shapes the whole architecture. The one piece that is **live and
 persistent right now** is the **Convene connected-machine agent**, which runs as
 SYSTEM from boot — see §4, because it is the architectural base for the
 ingress/egress work still to come.
+
+### Immediate 72-hour pickup
+
+The Git repository and GitHub-hosted CI baseline now exist. The inherited
+gateway/cloud tests pass, while the named RT-03/RT-05 integrity gate remains red
+by design until the backend transaction and structural-validation defects are
+fixed. Work in this order:
+
+1. Implement `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` using
+   `deployment/ClaudeCode_Backend_Remediation_Prompt.md`.
+2. Preserve a guaranteed, loopback-only synthetic nominal demo and rehearse the
+   power-outage and lunar-surface scenarios using
+   `deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md`.
+3. Treat live nominal deployment as a stretch path only. It remains NO-GO unless
+   the backend safety gate and every endpoint/operations gate are green by the
+   strategy's `T+48h` decision point.
 
 ---
 
@@ -190,6 +207,9 @@ gateway's `config.windows.yaml` can be finalized and ACL-locked. Only then do th
 |---|---|
 | `deployment/README.md` | **Stage-sorted index** of every deployment doc (start here for orientation) |
 | `deployment/HANDOFF.md` | **This doc** — full story + pickup pointers |
+| `deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Immediate demo critical path, scenario run sheet, endpoint gates, and fallback |
+| `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | RT-03/RT-05 implementation contract and acceptance gates |
+| `deployment/ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the backend implementation session |
 | `deployment/GATEWAY_GO_LIVE.md` | Living go/no-go punch list (authoritative status) |
 | `deployment/VM_ENGINE_HANDOFF.md` | **Stage 1 — read-first** full story + guardrails + acceptance gates for the VM session |
 | `deployment/VM_ENGINE_SESSION_BRIEF.md` | Stage 1 — turnkey brief for the cloud VM engine session |
