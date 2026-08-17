@@ -55,6 +55,7 @@ Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 | Doc | Role |
 |---|---|
 | `CONVENE_GW_MAPPING.md` | `gw_` audit variables → gateway `/latest` jsonPaths (36 vars). Feeds the three-column V&V. |
+| `CONVENE_REINTEGRATION_HANDOFF.md` | Repository-proven cloud/gateway binding contract, isolated rehearsal identities, field gaps, and the explicit external operator checkpoint. |
 
 ### Stage 0 — Base tooling / installers (reference)
 
