@@ -48,6 +48,7 @@ integration rather than production-grade CD.
 
 | Doc | Role |
 |---|---|
+| `LUKE_VM_LOCAL_HANDOFF.md` | **Luke's active owner lane:** local source gate, VM deployment, endpoint acceptance, Adam rendezvous, and Convene cutover. |
 | `VM_ENGINE_HANDOFF.md` | **Read first.** Full story of the endpoint (prior reboot/discrepancy + fix), the DO-NOT-DEBUG-IT-BACK guardrails, and the acceptance gates. |
 | `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session (objective + step outline). |
 | `VM_ENGINE_RUNBOOK.md` | Executable step-by-step: deploy, secrets, systemd unit, quick tunnel, verify, hand back. |
