@@ -58,10 +58,13 @@ RECLAIM Digital Twin. Author: LJW.
 from __future__ import annotations
 
 import argparse
+import copy
 from datetime import datetime, timezone
 import hmac
 import json
 import logging
+import math
+import numbers
 import os
 import tempfile
 import threading
@@ -112,8 +115,10 @@ def _utc_now() -> datetime:
 
 
 def _parse_timestamp(value) -> datetime:
-    if not isinstance(value, str) or not value:
+    if value in (None, ""):
         raise FrameRejected("timestamp_missing", "ts must be an ISO-8601 UTC timestamp")
+    if not isinstance(value, str):
+        raise FrameRejected("timestamp_invalid", "ts must be an ISO-8601 UTC timestamp")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -237,6 +242,7 @@ class IngestIdentityStore:
                 os.unlink(tmp)
             except OSError:
                 pass
+            raise
 
     def last_seq(self, run_id: str, source_id: str) -> int | None:
         return self.seqs.get(f"{run_id}|{source_id}")
@@ -411,10 +417,10 @@ class DualPushEngine:
         if active not in ("PL", "MT", "NONE"):
             raise FrameRejected("chamber_invalid", "active_chamber must be PL, MT, or NONE")
 
-        try:
-            seq = int(frame.get("seq", self.count + 1))
-        except (TypeError, ValueError) as exc:
-            raise FrameRejected("sequence_invalid", "seq must be an integer") from exc
+        seq = frame.get("seq", self.count + 1)
+        if isinstance(seq, bool) or not isinstance(seq, numbers.Integral):
+            raise FrameRejected("sequence_invalid", "seq must be an integer")
+        seq = int(seq)
         if seq < 0:
             raise FrameRejected("sequence_invalid", "seq must be non-negative")
         run_id = str(frame.get("run_id", "legacy"))
@@ -423,6 +429,133 @@ class DualPushEngine:
                 "ts": ts, "cycle_id": str(frame.get("cycle_id", "")),
                 "source_op_state": op, "active_chamber": active,
                 "age_ms": max(0, round(age_s * 1000))}
+
+    @staticmethod
+    def _require_finite_number(value, field: str) -> float:
+        """Return a finite numeric scalar without accepting JSON coercions.
+
+        Physical ranges deliberately do not live here: this is the inference-safe
+        structural boundary only.
+        """
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise FrameRejected("telemetry_invalid", f"{field} must be a numeric scalar")
+        number = float(value)
+        if not math.isfinite(number):
+            raise FrameRejected("telemetry_invalid", f"{field} must be finite")
+        return number
+
+    def _validate_raw_telemetry(self, raw: dict) -> None:
+        if not isinstance(raw, dict):
+            raise FrameRejected("telemetry_invalid", "vars must be an object")
+
+        if labview_map.looks_like_labview(raw):
+            numeric = {
+                *labview_map._PL_BED, *labview_map._MT_BED,
+                "PL_surface_temp", "PL_top_condenser_temp",
+                "PL_bottom_condenser_temp", "PL_chamber_pressure",
+                "PL_output_pressure", "MT_top", "MW_power", "MW_reverse",
+                "MW_freq", "MW_width", "MW_period", "MW_water_temp",
+                "MW_flow_rate",
+            }
+            boolean = {*labview_map._PL_FLAGS, "MW_water_state", "MW_flow_state",
+                       "MW_RF", "MW_status"}
+            for key in numeric & raw.keys():
+                self._require_finite_number(raw[key], key)
+            for key in boolean & raw.keys():
+                if not isinstance(raw[key], bool):
+                    raise FrameRejected("telemetry_invalid", f"{key} must be boolean")
+            return
+
+        # Canonical chamber telemetry. Flat PL bed banks have four sensors and
+        # flat MT banks have one in the approved inference contract. A list bank
+        # remains supported for legacy development input, but every member must
+        # still be a finite scalar.
+        for chamber, expected in (("PL", 4), ("MT", 1)):
+            prefix = f"{chamber}_T_bed_tc"
+            bank = sorted(k for k in raw if k.startswith(prefix))
+            if bank and bank != [f"{prefix}{i}" for i in range(1, expected + 1)]:
+                raise FrameRejected(
+                    "telemetry_invalid",
+                    f"{chamber} bed sensor bank must contain {expected} channels",
+                )
+
+        boolean_suffixes = {
+            "process", "preprocess", "postprocess", "chamber_pump", "purge_pump"
+        }
+        for key, value in raw.items():
+            bare = key[3:] if key.startswith(("PL_", "MT_")) else key
+            if bare in boolean_suffixes:
+                if not isinstance(value, bool):
+                    raise FrameRejected("telemetry_invalid", f"{key} must be boolean")
+                continue
+            if bare in ("T_bed_tcs", "T_wall_tcs"):
+                if not isinstance(value, (list, tuple)) or not value:
+                    raise FrameRejected("telemetry_invalid", f"{key} must be a sensor bank")
+                for index, item in enumerate(value):
+                    self._require_finite_number(item, f"{key}[{index}]")
+                continue
+            # These are the values consumed by ChamberEngine or converted to
+            # scalar pass-through state. Unknown raw fields remain preserved but
+            # do not enter the model and therefore are not assigned invented rules.
+            if (bare.startswith(("T_bed_tc", "T_wall_tc"))
+                    or bare in {"T_bed_meas", "T_bed_surf", "T_wall_meas",
+                                "P_fwd", "P_refl", *_PASSTHROUGH}):
+                self._require_finite_number(value, key)
+
+    def _prepare_telemetry(self, frame: dict, meta: dict) -> dict:
+        """Validate the full consumed payload, then normalize it once.
+
+        No adapter, model, clock, counter, output, command, or identity mutation
+        occurs before this function returns.
+        """
+        raw_value = frame.get("vars", frame)
+        if not isinstance(raw_value, dict):
+            raise FrameRejected("telemetry_invalid", "vars must be an object")
+        raw = dict(raw_value)
+        raw["active"] = meta["active_chamber"]
+        self._validate_raw_telemetry(raw)
+        is_lv = labview_map.looks_like_labview(raw)
+        values, mw_globals, active = labview_map.normalize(raw)
+        # Validate normalized values as a second boundary. This protects future
+        # adapter changes from introducing a prohibited model input.
+        self._validate_raw_telemetry(values)
+        for key, value in mw_globals.items():
+            if isinstance(value, bool):
+                continue
+            self._require_finite_number(value, key)
+        return {"raw": raw, "values": values, "mw_globals": mw_globals,
+                "active": active, "is_labview": is_lv}
+
+    @staticmethod
+    def _clone_service(service: TwinStateService) -> TwinStateService:
+        with service._lock:
+            candidate = TwinStateService(history=service._history.maxlen)
+            candidate._manifest = copy.deepcopy(service._manifest)
+            candidate._latest = copy.deepcopy(service._latest)
+            candidate._history.extend(copy.deepcopy(list(service._history)))
+            candidate.cycle = service.cycle
+        return candidate
+
+    def _candidate(self):
+        candidate = copy.copy(self)
+        candidate.pl = copy.deepcopy(self.pl)
+        candidate.mt = copy.deepcopy(self.mt)
+        candidate.svc = self._clone_service(self.svc)
+        candidate.ident = copy.deepcopy(self.ident)
+        candidate.command = copy.deepcopy(self.command)
+        candidate._last_ts = self._last_ts
+        return candidate
+
+    def _publish_candidate(self, candidate) -> None:
+        """Deterministic, non-throwing post-durability in-memory commit."""
+        self.pl = candidate.pl
+        self.mt = candidate.mt
+        self.svc = candidate.svc
+        self.ident = candidate.ident
+        self.count = candidate.count
+        self.t = candidate.t
+        self._last_ts = candidate._last_ts
+        self.command = candidate.command
 
     # ------------------------------------------------------------------ ingest
     def ingest_line(self, frame: dict) -> dict:
@@ -435,6 +568,7 @@ class DualPushEngine:
         """
         try:
             meta = self._validate_frame(frame)
+            prepared = self._prepare_telemetry(frame, meta)
         except FrameRejected as exc:
             self.last_ingest = {"accepted": False, "duplicate": False,
                                 "reason": exc.code}
@@ -479,13 +613,39 @@ class DualPushEngine:
                 elif seq > last + 1:
                     gap = seq - last - 1
 
-            # ---- adapter + estimators --------------------------------------
-            raw = dict(frame.get("vars", frame))
-            # The explicit envelope selection is authoritative to the adapter (fix C7).
-            raw["active"] = meta["active_chamber"]
-            op = meta["source_op_state"]
+            # ---- isolated accepted-frame candidate ------------------------
             try:
-                combined = self._step_locked(raw, meta, gap, events_extra)
+                candidate = self._candidate()
+
+                # Instance-level fault hooks are used by the integrity tests and
+                # by local fault campaigns. Temporarily exposing only the detached
+                # chamber candidates lets such hooks inspect the candidate graph;
+                # production instances use class methods and never take this path.
+                hooked = "step" in vars(self.pl) or "step" in vars(self.mt)
+                live_pl, live_mt = self.pl, self.mt
+                if hooked:
+                    self.pl, self.mt = candidate.pl, candidate.mt
+                try:
+                    combined = candidate._step_locked(prepared, meta, gap, events_extra)
+                finally:
+                    if hooked:
+                        self.pl, self.mt = live_pl, live_mt
+
+                # Identity belongs to the same candidate. Durable persistence is
+                # the commit point; no live object reference has changed yet.
+                if superseded_from is not None:
+                    candidate.ident.retire(superseded_from)
+                    candidate.ident.seqs = {
+                        k: v for k, v in candidate.ident.seqs.items()
+                        if not k.startswith(superseded_from + "|")
+                    }
+                if candidate.ident.active_run_id is None or superseded_from is not None:
+                    candidate.ident.active_run_id = run_id
+                if gap:
+                    candidate.ident.gap_count += gap
+                    log.warning("sequence gap: %d frame(s) missing before %s|%s seq %d",
+                                gap, run_id, source_id, seq)
+                candidate.ident.commit(run_id, source_id, seq)
             except Exception as exc:
                 # Retryable: identity NOT committed, so the gateway's retry will
                 # re-step cleanly (fix M3 — the frame is not silently lost).
@@ -497,33 +657,23 @@ class DualPushEngine:
                         "message": f"{type(exc).__name__}: {exc}", "final": False,
                         "run_id": run_id, "seq": seq}
 
-            # ---- commit identity only after a successful step --------------
-            if superseded_from is not None:
-                self.ident.retire(superseded_from)
-                # drop retired run's seq keys
-                self.ident.seqs = {k: v for k, v in self.ident.seqs.items()
-                                   if not k.startswith(superseded_from + "|")}
-            if self.ident.active_run_id is None or superseded_from is not None:
-                self.ident.active_run_id = run_id
-            if gap:
-                self.ident.gap_count += gap
-                log.warning("sequence gap: %d frame(s) missing before %s|%s seq %d",
-                            gap, run_id, source_id, seq)
-            self.ident.commit(run_id, source_id, seq)
+            # Persistence succeeded. The remaining commit is a fixed sequence of
+            # plain assignments and cannot call model, publisher, or filesystem code.
+            self._publish_candidate(candidate)
             self.last_ingest = {"accepted": True, "duplicate": False, **meta}
             return {"status": "accepted", "code": None, "message": "",
                     "final": True, "run_id": run_id, "seq": seq,
                     "state": combined}
 
-    def _step_locked(self, raw: dict, meta: dict, gap: int,
+    def _step_locked(self, prepared: dict, meta: dict, gap: int,
                      events_extra: list[tuple[str, str]]) -> dict:
-        """Adapter + both chamber engines + combined record. Caller holds _lock."""
+        """Both chamber candidates + combined record. Caller holds _lock."""
         op = meta["source_op_state"]
-        # Translate the real cRIO/LabVIEW schema (real names, degC, mbar, one shared
-        # SSMG power) into the canonical engine frame. Canonical/legacy frames pass
-        # through untouched.
-        is_lv = labview_map.looks_like_labview(raw)
-        v, mw_globals, active = labview_map.normalize(raw)
+        raw = prepared["raw"]
+        v = prepared["values"]
+        mw_globals = prepared["mw_globals"]
+        active = prepared["active"]
+        is_lv = prepared["is_labview"]
 
         # real dt from source timestamps (fix H1); clamped so a first frame or a
         # timestamp hiccup cannot inject a huge or non-positive integration step.
