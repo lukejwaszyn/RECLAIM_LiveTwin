@@ -1,14 +1,15 @@
 # RECLAIM CI/CD Implementation Baseline
 
 **Date:** 2026-08-16  
-**Status:** Local Git and hosted-CI baseline; no remote or production CD enabled  
+**Status:** Private GitHub remote and hosted CI enabled; production CD disabled
 **Authority:** Advisory only
 
 ## Outcome
 
 This repository now has the source-side pieces needed to begin controlled CI:
 
-- a local Git repository on `main` and a reviewable baseline commit;
+- a local Git repository on `main`, published to the private GitHub repository
+  `lukejwaszyn/RECLAIM_LiveTwin`;
 - tracked-content hygiene rules that exclude secrets, runtime state, caches, and
   the historical handoff ZIP;
 - a universal, hash-bearing `uv.lock` for Python 3.11 through 3.13;
@@ -18,9 +19,9 @@ This repository now has the source-side pieces needed to begin controlled CI:
 - deterministic release-candidate packaging with a digest-bound manifest; and
 - an explicit refusal to call an unsigned candidate production-promotable.
 
-No remote repository was created, no source was pushed, and no workflow was run
-on GitHub. No production host, secret, tunnel, service, task, gateway runtime,
-hardware interlock, or command-authority path was changed.
+The exact local history was pushed to the private remote and GitHub-hosted CI was
+run. No production host, secret, tunnel, service, task, gateway runtime, hardware
+interlock, or command-authority path was changed.
 
 ## CI checks
 
@@ -84,15 +85,18 @@ This is release-candidate scaffolding, not production CD. A checksum protects
 against accidental corruption but is not a trust anchor when obtained beside the
 artifact.
 
-## Private remote setup
+## Private remote
 
-The GitHub organization/owner, repository name, and approved visibility were not
-provided, so no remote was invented. After an owner approves those values:
+The approved remote is:
 
 ```bash
-git remote add origin git@github.com:<approved-owner>/<approved-private-repo>.git
-git push -u origin main
+origin  https://github.com/lukejwaszyn/RECLAIM_LiveTwin.git
 ```
+
+The repository is private, its default branch is `main`, and local `main` tracks
+`origin/main`. The first hosted runs proved that repository hygiene and both
+baseline matrix jobs pass while the RT-03/RT-05 gate fails for the known product
+defects. Branch and tag protection remain an explicit owner decision.
 
 Before accepting pull requests, configure the remote repository as follows:
 
@@ -147,9 +151,14 @@ passed, compilation passed, and rebuilding the same candidate twice produced the
 same archive digest. The generated test candidate remained unsigned and
 non-promotable.
 
+Hosted GitHub Actions reproduced the same boundary: `Repository hygiene`,
+`Baseline / Python 3.11`, and `Baseline / Python 3.13` passed; `Safety gate /
+RT-03 + RT-05` failed as designed. The current action pins produced no runtime
+deprecation warning.
+
 ## Decisions still owned outside this implementation
 
-- GitHub organization/owner, repository name, visibility, billing, and admins.
+- Repository billing, administrative roles, and future organization ownership.
 - Real CODEOWNERS identities and approval counts.
 - Whether commit signing is mandatory and which identity policy is trusted.
 - Release signing mechanism, trusted issuer/key, verifier policy, and signature
