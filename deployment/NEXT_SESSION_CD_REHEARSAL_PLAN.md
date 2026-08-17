@@ -1,333 +1,183 @@
-# RECLAIM Live Twin — 2026-08-17 CD Rehearsal Plan
+# RECLAIM Live Twin — Fast Integration Plan
 
-> **Session objective:** establish a trustworthy three-host operating model and
-> practice repeatable, reversible delivery to the VM and Windows gateway without
-> activating live telemetry, hardware, tunnels, Convene namespaces, or command
-> authority.
->
-> **Starting status:** CI is implemented and the exact local branch commit is
-> green from the last recorded GitHub run. CD is not production-ready. The VM is
-> not a verified deployment target, the Windows gateway contains a manually
-> staged baseline, and the new connector control paths have not yet been recorded
-> as deployment trust boundaries.
+> **Objective:** get the advisory-only Live Twin integrated and demonstration-ready
+> in the next few days. Production-grade CD is out of scope.
 
-## 1. Outcome for the morning
+## Ownership
 
-By lunch, produce five pieces of evidence:
-
-1. A connector trust matrix for the MacBook, VM, and Windows gateway.
-2. A read-only inventory of the VM's actual runtime layout.
-3. A hashed, non-secret inventory of the code already staged on the gateway.
-4. One agreed release-root and rollback convention for each target.
-5. A written GO/NO-GO decision for an **install-only rehearsal** on each target.
-
-The stretch outcome is to place the exact candidate side-by-side on one or both
-targets and prove it starts on loopback with disposable state. It is not a goal
-to switch a live service, install the gateway boot task, connect the cRIO, create
-a tunnel, change firewall rules, publish to Convene, or merge the draft PR.
-
-## 2. Fixed source and current caveats
-
-Use this identity until deliberately superseded:
-
-| Item | Starting value |
+| Owner | Workstream |
 |---|---|
-| Branch | `agent/rt03-rt05-convene-integrity` |
-| Commit | `7a0a94166018762a81de6fb9dc329c189bc067d4` |
-| Draft PR | `#1` |
-| Last recorded CI | all required Python 3.11/3.13 and integrity checks green |
-| Authority | `advisory` only |
-| Live deployment | NO-GO |
+| Luke / MacBook | Repository, pull request, CI, release identity, VM engine, Convene coordination |
+| Adam / lab | Physical RECLAIM system, cRIO, Windows edge gateway, real telemetry validation |
+| Both | End-to-end test, nominal/outage/lunar demonstrations, final evidence |
 
-The GitHub CLI credential was invalid when this plan was written. Repair and
-verify authentication before relying on current PR or Actions state. The local
-candidate manifest under `artifacts/` is also stale: it names source commit
-`374c079...`, not the commit above. Do not put that artifact on either endpoint.
+Adam has direct physical access to RECLAIM and the Windows desktop. He should work
+locally on that machine rather than routing routine lab work through the MacBook.
+Remote-control connectors remain useful for coordination and troubleshooting, but
+they are not the deployment architecture.
 
-## 3. Operating model
+## Guardrails
 
-The MacBook is the release-control workstation. The connector is transport for
-an identified human operator; it is not a CI runner and does not confer release
-approval.
+- Keep all twin output advisory and non-actionable.
+- The existing physical interlocks and LabVIEW sequencer retain sole authority.
+- Do not commit tokens, live URLs, credentials, queue data, or machine-specific
+  configuration.
+- Do not overwrite `C:\RECLAIM\pi_gateway`; preserve it as the submission-era
+  baseline until the new checkout passes its tests.
+- Work on branches and use pull requests; do not develop directly on `main`.
+- Run the gateway from a console first. Install or change its boot task only after
+  the end-to-end path is proven.
 
-```text
-GitHub-hosted CI (no production credentials)
-                  |
-                  v
-        exact candidate + digest
-                  |
-                  v
-MacBook release-control workstation
-          |                    |
-          | connector session  | connector session
-          v                    v
- VM fixed rehearsal       Windows fixed rehearsal
- command surface          command surface
+## Day 1 — Give Adam a clean starting point
+
+### 1. Repository access
+
+Invite Adam to `lukejwaszyn/RECLAIM_LiveTwin` with **Write** permission. Admin
+permission is unnecessary.
+
+Adam then runs:
+
+```powershell
+git config --global user.name "Adam <surname>"
+git config --global user.email "<Adam's GitHub email>"
+New-Item -ItemType Directory -Force C:\RECLAIM\src
+Set-Location C:\RECLAIM\src
+git clone https://github.com/lukejwaszyn/RECLAIM_LiveTwin.git
+Set-Location RECLAIM_LiveTwin
+git switch main
+git pull --ff-only
+git switch -c adam/gateway-integration
 ```
 
-Preferred control direction is MacBook-initiated access to each endpoint. If
-either endpoint can initiate arbitrary remote commands on the MacBook, pause and
-record why that direction is needed, which identity can use it, its privilege,
-audit trail, and revocation mechanism. Do not use the SYSTEM-level Convene agent
-as a general deployment runner.
+If the integrity pull request has not yet merged, use its exact reviewed commit
+instead of assuming `main` contains the new backend contract.
 
-## 4. Roles and control rules
+### 2. Preserve what is already on the gateway
 
-One person may hold several roles, but say the role aloud before each gate:
+Before changing the Windows runtime, capture:
 
-| Role | Responsibility |
-|---|---|
-| Release conductor | Owns commit/digest, checklist, and final stop/go decision |
-| Endpoint operator | Runs only the displayed command on the named host |
-| Safety witness | Confirms no live plant, tunnel, namespace, or active authority is touched |
-| Evidence recorder | Captures redacted output, timestamps, and deviations |
+- hash inventory of files under `C:\RECLAIM\pi_gateway`;
+- Python version and installed packages;
+- paths and file metadata for configuration and `queue.db`, without displaying
+  secrets or copying operational data into Git;
+- listeners on 9070/9080 and any running gateway process;
+- `RECLAIM-EdgeGateway` and `Convene-Agent` scheduled-task definitions.
 
-Rules for the whole session:
+Do not delete, rename, update, or run `git pull` inside the existing directory.
+The new repository checkout under `C:\RECLAIM\src` is the working copy.
 
-- One host and one named session at a time.
-- Display `hostname` and current identity before every endpoint command block.
-- Never paste or record token values, credential files, or environment contents.
-- No generic remote shell may be handed to GitHub Actions.
-- No in-place edits under an existing runtime directory.
-- No service/task switch without a separately announced activation checkpoint.
-- Any unexpected running writer or non-empty queue stops the rehearsal.
+### 3. Prove the clean checkout
 
-## 5. Time-boxed run sheet
+From the cloned repository:
 
-### 08:00–08:20 — Freeze the source and restore observability
-
-On the MacBook:
-
-```bash
-git status --short --branch
-git rev-parse HEAD
-gh auth login -h github.com
-gh auth status
-gh pr view 1 --json isDraft,headRefOid,mergeStateStatus,statusCheckRollup,url
+```powershell
+py -3.13 -m pip install "uv==0.11.21"
+py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
+Set-Location pi_gateway
+$env:PYTHONPATH = "."
+..\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Gate A passes only when:
+Expected result: all gateway tests pass. If dependency installation does not
+match the repository lock/install instructions, stop and reconcile it rather
+than improvising a second environment definition.
 
-- the worktree is understood and unrelated changes are preserved;
-- PR head equals the intended commit;
-- current required checks are visible and green; and
-- the PR remains draft unless a separate review decides otherwise.
+### 4. Bring up the real gateway path
 
-If authentication cannot be restored, continue with endpoint inventory but do
-not create, download, approve, or deploy a candidate.
+Adam owns these physical steps:
 
-### 08:20–08:50 — Inventory the connector trust boundary
+1. Confirm the cRIO and Windows Ethernet addresses.
+2. Confirm the expected raw LabVIEW field names from one real frame.
+3. Run the gateway with console configuration and no boot task.
+4. Verify `/health` and `/latest` on loopback.
+5. Confirm sequence, timestamp, active chamber, operation state, and raw values.
+6. Capture one redacted nominal frame for mapping verification.
 
-Fill one row for every permitted direction, including the new remote-control
-paths:
+Day 1 handback from Adam:
 
-| From | To | Initiator | Account | Effective privilege | Command scope | Audit location | Revoke method | Accepted? |
-|---|---|---|---|---|---|---|---|---|
-| MacBook | VM |  |  |  |  |  |  |  |
-| MacBook | gateway |  |  |  |  |  |  |  |
-| VM | MacBook |  |  |  |  |  |  |  |
-| gateway | MacBook |  |  |  |  |  |  |  |
-| Convene | gateway | outbound poll | Convene identity | SYSTEM | arbitrary shell today | agent/backend logs | account/task disable | unresolved |
+- branch/commit used;
+- gateway test result;
+- actual cRIO field-name list;
+- redacted `/latest` sample;
+- any mapping or configuration deviations;
+- confirmation that no active command path was connected.
 
-For each path, perform only a harmless identity probe: hostname, OS, current
-user, and timestamp. Confirm whether the operator must approve each session and
-whether stdout/stderr are retained. Do not test privilege escalation.
+## Day 1 in parallel — MacBook and VM
 
-Gate B fails if a path has unknown identity, silent/unbounded command execution,
-no useful audit record, no revocation method, or endpoint-to-MacBook control that
-cannot be justified. Restrict or disable that path before using the connector for
-delivery.
+Luke's parallel lane:
 
-### 08:50–09:25 — Read-only VM inventory
+1. Restore GitHub CLI authentication.
+2. Review and merge the integrity PR when checks and review are complete.
+3. Deploy the exact reviewed engine commit to the VM.
+4. Run it on loopback in advisory mode with persistent identity state.
+5. Verify `/health`, `/manifest`, `/state`, `/history`, and authenticated
+   `/ingest` locally.
+6. Establish the demonstration tunnel/hostname and create the separate ingest
+   and read tokens.
+7. Hand Adam only the gateway endpoint and ingest token through the agreed
+   private channel—not through Git, issues, logs, or screenshots.
 
-Record without exposing secrets:
+The VM does not need an automated production installer for this event. Record
+the commit, directory, Python version, configuration path, and restart command so
+the manual deployment is reproducible.
 
-- hostname, OS, Python version, disk space, and clock synchronization;
-- whether `reclaim-ingest` or `cloudflared` exists or is running;
-- service user, unit file, `ExecStart`, `WorkingDirectory`, and environment-file
-  **path only**;
-- listening address/port and process owner;
-- existing release directories and the resolved `current` path, if present;
-- persistent-state path, owner, mode, size, and schema/backup policy—never its
-  contents;
-- the exact code/version currently executing, if anything is running.
+## Day 2 — Connect the two lanes
 
-Proposed VM convention:
+Adam updates the external Windows configuration with the VM ingest endpoint and
+token, then runs the gateway in a console.
 
-```text
-/opt/reclaim/releases/<release-id>/   immutable code + release-local venv
-/opt/reclaim/current                  atomic link to selected release
-/etc/reclaim/                         configuration and secret references
-/var/lib/reclaim-ingest/              persistent state
-/var/log/reclaim/                     receipts and service logs
-```
+Verify in order:
 
-Do not create these paths during inventory. First reconcile the proposed layout
-with the actual unit and filesystem.
+1. A fresh frame is accepted once.
+2. A duplicate does not step the engine twice.
+3. Stale or malformed data is rejected without state mutation.
+4. Gateway queue drains after a temporary network interruption.
+5. VM `/state` matches gateway `/latest` for identity, sequence, timestamp,
+   active chamber, operation state, and mapped process values.
+6. Advisory output returns to the gateway/HMI but remains visibly non-actionable.
+7. Stopping telemetry makes freshness grow and the display fail closed.
 
-### 09:25–10:05 — Preserve the Windows gateway baseline
+Fix real schema/mapping differences in Adam's branch, add or update tests, and
+open a pull request. Keep machine-specific configuration outside the commit.
 
-Treat `C:\RECLAIM\pi_gateway` as a **legacy staged baseline**, not as a release
-that CI can reproduce and not necessarily as a known-good production rollback.
-Capture:
+## Day 2–3 — Convene and demonstration
 
-- hostname, Windows build, current user/privilege, Python 3.13 path and packages;
-- a sorted SHA-256 inventory of source, scripts, and dependency declarations;
-- config file path, ACL, and whether placeholders remain—do not display values;
-- queue file path, schema/version if available, file size, and item counts—do not
-  copy operational contents into Git;
-- scheduled-task definitions and resolved executables for `Convene-Agent` and
-  `RECLAIM-EdgeGateway` if present;
-- listeners/process owners for 9070 and 9080;
-- Convene agent owner, boot persistence, last heartbeat, log growth, and the
-  account set allowed to issue commands;
-- whether any gateway publisher or cRIO receiver is currently active.
+Connect exactly two live consumers:
 
-Proposed Windows convention:
+- one `sim_` publisher reading normalized VM `/state`;
+- one `gw_` audit publisher reading raw gateway `/latest`.
 
-```text
-C:\RECLAIM\releases\<release-id>\     immutable code + release-local venv
-C:\RECLAIM\current\                   junction to selected release
-C:\ProgramData\RECLAIM\config\        protected configuration
-C:\ProgramData\RECLAIM\state\         queue and durable state
-C:\ProgramData\RECLAIM\receipts\      non-secret deployment receipts
-```
+Bind the existing `.stp` model parts to the corresponding operational variables.
+The visualization should make the active chamber, process phase, thermal state,
+power state, advisory, prediction, model trust, and data freshness obvious.
 
-Do not overwrite, rename, delete, or `git pull` inside
-`C:\RECLAIM\pi_gateway`. After hashing, label it with the capture date and leave
-it untouched. A future migration can copy approved configuration and state by an
-explicit compatibility procedure; code is deployed into a new release directory.
+Run and record:
 
-### 10:05–10:30 — Reconcile and make the first decision
+1. Nominal Earth-lab scenario twice.
+2. Five-minute power-outage scenario once.
+3. Lunar-surface scenario once.
+4. Loss-of-data/freshness behavior once.
 
-Compare actual state to the proposed conventions. Write down:
+For every run, retain the commit, run ID, timestamps, expected result, observed
+result, screenshots/video, and deviations. Keep the synthetic services as the
+fallback, clearly labeled as rehearsal data.
 
-- the selected release roots and runtime pointers;
-- which existing unit/task files must eventually change to use `current`;
-- state and queue schema compatibility requirements;
-- what constitutes the previous rollback target on each host;
-- connector risks that must be closed;
-- whether the gateway baseline is only a forensic reference or can pass the
-  console tests needed to become a rehearsal rollback candidate.
+## Definition of done
 
-Decision 1 has only three valid results per endpoint:
+- Adam can clone, branch, test, and open a pull request.
+- The existing gateway baseline remains recoverable and unchanged.
+- Real cRIO telemetry reaches the clean Windows checkout.
+- The gateway publishes accepted frames to the VM.
+- Convene shows raw `gw_` and normalized/predictive `sim_` data with correct
+  provenance and freshness.
+- The `.stp` visualization responds to the bound live variables.
+- Nominal, outage, and lunar scenarios are demonstrated.
+- All recommendations remain advisory; hardware safety authority is unchanged.
 
-| Result | Meaning |
-|---|---|
-| NO-GO | Inventory/trust/safety is incomplete; make no endpoint changes |
-| GO: install only | Candidate may be placed in a new directory; nothing points to it |
-| GO: isolated run | Install-only passed; candidate may run on loopback with disposable state and no external route |
+## Immediate sequence
 
-There is no live-activation option in this session plan.
-
-### 10:30–11:15 — Rebuild proof for the exact source
-
-Only after Gate A passes, rerun the required local verification at the fixed
-commit. Build a fresh candidate from that same tree. Confirm its manifest says:
-
-- the exact source commit;
-- `signed: false`;
-- `production_promotable: false`;
-- `authority: advisory`;
-- unresolved signing, installer, and compatibility blockers.
-
-The unsigned artifact is acceptable only for a controlled install/run rehearsal.
-It cannot be called a production release. Record its SHA-256 digest before any
-transfer and verify that digest again on the endpoint.
-
-### 11:15–12:00 — Endpoint install-only rehearsal
-
-For each endpoint separately, and only with `GO: install only`:
-
-1. Transfer the exact candidate through the approved connector path.
-2. Verify the recorded SHA-256 before extraction.
-3. Extract into a new release directory named with the full commit or unique
-   rehearsal ID.
-4. Refuse extraction if the directory already exists.
-5. Create a release-local environment without reading production secrets.
-6. Run imports and offline tests from the extracted artifact.
-7. Record resolved Python and entrypoint paths.
-8. Write a non-secret receipt; do not create or switch `current`.
-
-Minimum receipt fields:
-
-```text
-timestamp, operator, machine identity, connector/session identity,
-source commit, artifact digest, manifest digest, release directory,
-Python executable/version, checks performed, result, previous target,
-activation attempted=false, rollback attempted=false
-```
-
-### Optional after lunch — Isolated start and rollback mechanics
-
-Proceed only after reviewing the morning evidence and explicitly announcing
-`GO: isolated run` for one endpoint.
-
-- Use console/rehearsal configuration and disposable state.
-- Bind loopback only on an unused rehearsal port.
-- Do not start `cloudflared`, accept a cRIO connection, use production tokens,
-  install a boot task, or bind `sim_`/`gw_`/live Convene fields.
-- Verify health, manifest, state/history contract, process path, authority, and
-  shutdown behavior.
-- Stop the candidate and prove the prior endpoint state is unchanged.
-
-Only after fixed install/switch/health/receipt/rollback scripts exist should a
-later session practice switching `current` in an isolated service or task. A
-manual collection of remote shell commands is not yet CD.
-
-## 6. Immediate stop conditions
-
-Stop the affected endpoint at once if any of these is true:
-
-- connector direction, identity, privilege, audit, or revocation is unknown;
-- a credential/token value appears in captured output;
-- the endpoint is connected to an active chamber, cRIO, live tunnel, or live
-  Convene namespace;
-- active chamber is not `NONE`, independent power-safe state is unverified, or a
-  gateway queue is non-empty/unknown;
-- an unexpected publisher, engine, agent, scheduled task, listener, or writer is
-  running;
-- artifact or source digest differs from the recorded value;
-- extraction would overwrite an existing directory;
-- persistent state/queue compatibility is unknown for a proposed switch;
-- no proven prior target and rollback procedure exist;
-- command authority is anything other than `advisory`.
-
-## 7. What we deliberately are not building tomorrow
-
-The CI work is not unnecessary complexity. It gives one exact commit a repeatable
-test record and catches cross-version regressions before either lab endpoint is
-touched. The unnecessary complexity would be pretending the connector plus a
-collection of privileged shell commands is already production CD.
-
-Keep tomorrow's architecture deliberately small:
-
-1. GitHub-hosted CI validates source without endpoint credentials.
-2. A digest-bound, explicitly non-promotable candidate supports rehearsal.
-3. A human uses the connector to invoke narrowly reviewed endpoint steps.
-4. Each step produces a receipt and leaves the old installation intact.
-
-Defer signing/provenance, unattended pull agents, protected production
-environments, live state migration, automatic activation, and Convene/hardware
-cutover until the manual rehearsal exposes the real endpoint constraints.
-
-## 8. Definition of done
-
-The session is complete when:
-
-- the connector matrix is filled and risky reverse-control paths are resolved;
-- GitHub/commit/check identity is recorded, or inability to verify it is a
-  documented blocker;
-- both endpoint inventories exist with no secrets captured;
-- the gateway's existing code has a hash baseline and remains untouched;
-- release-root, config/state, receipt, and rollback conventions are agreed;
-- each endpoint has an explicit NO-GO, install-only GO, or isolated-run GO;
-- any candidate used matches the intended commit and is labeled unsigned,
-  non-promotable, and advisory;
-- no live service, task, hardware, tunnel, firewall, token, Convene namespace, or
-  command authority was changed.
-
-The next implementation slice should then be chosen from evidence: either close
-connector/security gaps, implement the fixed VM installer and receipt, implement
-the fixed Windows installer and receipt, or formalize state/queue compatibility.
-Do not start all three at once.
+1. Obtain Adam's GitHub username and send the Write invitation.
+2. Merge or identify the exact integrity commit Adam should use.
+3. Adam clones and validates the gateway while Luke brings up the VM.
+4. Exchange endpoint/token privately and perform the Day 2 integration.
+5. Bind Convene and rehearse the final presentation.

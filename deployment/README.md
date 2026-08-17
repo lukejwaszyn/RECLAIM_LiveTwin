@@ -27,9 +27,9 @@ Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 
 The executable plan for the next endpoint session is
 [`NEXT_SESSION_CD_REHEARSAL_PLAN.md`](NEXT_SESSION_CD_REHEARSAL_PLAN.md). It
-starts with connector and endpoint inventory, preserves the gateway's existing
-staged code, and permits only side-by-side install/rehearsal work behind explicit
-gates.
+splits work between the MacBook/VM lane and Adam's direct lab/gateway lane,
+preserves the gateway's existing staged code, and targets a fast advisory-only
+integration rather than production-grade CD.
 
 ## Documents
 
