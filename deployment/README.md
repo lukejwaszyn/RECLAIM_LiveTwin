@@ -25,6 +25,12 @@ full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 
 Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 
+The executable plan for the next endpoint session is
+[`NEXT_SESSION_CD_REHEARSAL_PLAN.md`](NEXT_SESSION_CD_REHEARSAL_PLAN.md). It
+starts with connector and endpoint inventory, preserves the gateway's existing
+staged code, and permits only side-by-side install/rehearsal work behind explicit
+gates.
+
 ## Documents
 
 ### Cross-cutting (read first — LIVING)
