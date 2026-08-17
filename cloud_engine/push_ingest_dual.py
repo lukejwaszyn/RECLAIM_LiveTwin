@@ -343,7 +343,7 @@ class DualPushEngine:
         names = [n for n in names if n] + ["sensor_valid"]
         provenance = ["schema_version", "mode", "run_id", "source_id", "seq", "ts_source",
                       "ts_engine", "cycle_id", "active_chamber", "source_op_state", "op_state",
-                      "ingest_status", "ingest_age_ms", "last_event", "event_count",
+                      "ingest_status", "ingest_age_ms", "state_age_ms", "last_event", "event_count",
                       "gap_count"]
         command = ["cmd_chamber", "cmd_mode", "cmd_power_setpoint_W", "cmd_safe_state_armed"]
         variables = ([{"name": "PL_" + n} for n in names]
