@@ -131,6 +131,7 @@ $Xml | Set-Content -Encoding UTF8 $ServiceXml
 
 $AclBackup = Join-Path $InstallRoot "state\sim_vars.acl.xml"
 if (-not (Test-Path $AclBackup)) { Get-Acl $OutputPath | Export-Clixml $AclBackup }
+$OutputDirectory = Split-Path $OutputPath -Parent
 
 & icacls.exe $InstallRoot /inheritance:r /grant:r `
     "SYSTEM:(OI)(CI)(F)" "BUILTIN\Administrators:(OI)(CI)(F)" "${ServiceAccount}:(OI)(CI)(RX)" | Out-Null
@@ -140,6 +141,9 @@ if (-not (Test-Path $AclBackup)) { Get-Acl $OutputPath | Export-Clixml $AclBacku
     "SYSTEM:(F)" "BUILTIN\Administrators:(F)" "${ServiceAccount}:(R)" | Out-Null
 & icacls.exe $ConfigPath /inheritance:r /grant:r `
     "SYSTEM:(F)" "BUILTIN\Administrators:(F)" "${ServiceAccount}:(R)" | Out-Null
+& icacls.exe $OutputDirectory /inheritance:r /grant:r `
+    "SYSTEM:(OI)(CI)(F)" "BUILTIN\Administrators:(OI)(CI)(F)" `
+    "${ServiceAccount}:(OI)(CI)(M)" "${ConveneAgentIdentity}:(OI)(CI)(R)" | Out-Null
 & icacls.exe $OutputPath /inheritance:r /grant:r `
     "SYSTEM:(F)" "BUILTIN\Administrators:(F)" "${ServiceAccount}:(M)" "${ConveneAgentIdentity}:(R)" | Out-Null
 

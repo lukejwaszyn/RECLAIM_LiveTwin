@@ -122,7 +122,7 @@ Luke's parallel lane:
 6. Establish the demonstration tunnel/hostname and create the separate ingest
    and read tokens.
 7. Install and validate the Windows state bridge; bind its output through the
-   existing VM Convene agent with the fail-closed publication lease.
+   VM Convene agent installed during bootstrap with the fail-closed publication lease.
 8. Hand Adam only the gateway endpoint and ingest token through the agreed
    private channel—not through Git, issues, logs, or screenshots.
 

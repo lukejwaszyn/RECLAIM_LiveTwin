@@ -1,5 +1,11 @@
 # Convene one-click setup - Windows (PowerShell)
-# Usage:  right-click > Run with PowerShell   (or)   powershell -ExecutionPolicy Bypass -File convene-setup.ps1
+# Headless is the safe/default VM posture. Desktop streaming is opt-in only.
+param(
+  [Parameter(Mandatory = $true)]
+  [ValidateNotNullOrEmpty()]
+  [string]$PairingCode,
+  [switch]$EnableDesktop
+)
 $ErrorActionPreference = "Stop"
 
 Write-Host "=================================================="
@@ -7,17 +13,29 @@ Write-Host "  Convene Connected Machine - one-click setup"
 Write-Host "=================================================="
 
 # 1. Python 3
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command python -ErrorAction SilentlyContinue) -and
+    -not (Get-Command py -ErrorAction SilentlyContinue)) {
   Write-Host "==> Installing Python 3 ..."
-  try { winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements }
+  try {
+    winget install -e --id Python.Python.3.13 --scope machine --silent `
+      --accept-package-agreements --accept-source-agreements
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + $env:Path
+  }
   catch { Write-Host "    Please install Python from https://python.org then re-run."; exit 1 }
 }
+if (Get-Command py -ErrorAction SilentlyContinue) {
+  $PythonExe = (& py -3.13 -c "import sys; print(sys.executable)").Trim()
+} else {
+  $PythonExe = (Get-Command python -ErrorAction Stop).Source
+}
+if (-not (Test-Path $PythonExe)) { throw "Python executable was not found after installation" }
 Write-Host "==> Installing Python packages (requests, psutil) ..."
-python -m pip install --quiet requests psutil
+& $PythonExe -m pip install --quiet requests psutil
 
-Write-Host "==> Installing screen-sharing tools (TightVNC, websockify, cloudflared) ..."
+if ($EnableDesktop) {
+Write-Host "==> Installing explicitly requested desktop-streaming tools ..."
 try { winget install -e --id GlavSoft.TightVNC --silent --accept-package-agreements --accept-source-agreements } catch { Write-Host "    Install TightVNC manually from https://tightvnc.com if needed." }
-python -m pip install --quiet websockify
+& $PythonExe -m pip install --quiet websockify
 if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
   try { winget install -e --id Cloudflare.cloudflared --silent --accept-package-agreements --accept-source-agreements }
   catch {
@@ -43,9 +61,10 @@ foreach ($key in @("HKLM:\SOFTWARE\TightVNC\Server", "HKLM:\SOFTWARE\WOW6432Node
 }
 try { Restart-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue } catch {}
 try { & "$env:ProgramFiles\TightVNC\tvnserver.exe" -reload } catch {}
+}
 
 # 2. Write the agent
-$dir = "$env:USERPROFILE\.convene"
+$dir = "C:\ConveneAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $agent = @'
 #!/usr/bin/env python3
@@ -66,7 +85,9 @@ BACKEND        = "https://reservation-backend-25386666460.us-central1.run.app/ap
 HEARTBEAT_SEC  = 30
 WS_PORT        = 6080          # websockify port (noVNC bridge)
 VNC_PORT       = 5900          # local VNC server port
-CREDS_FILE     = os.path.expanduser("~/.convene_agent.json")
+BASE_DIR       = os.path.dirname(os.path.abspath(__file__))
+CREDS_FILE     = os.path.join(BASE_DIR, "agent-credentials.json")
+SIM_VARS_FILE  = os.path.join(BASE_DIR, "sim_vars.json")
 DESKTOP        = "--desktop" in sys.argv
 VNC_URL        = None          # auto-filled when the public tunnel is up
 IS_WIN         = platform.system() == "Windows"
@@ -247,6 +268,15 @@ def get_stats():
         }
     except Exception:
         return {"cpuPercent":0,"memoryPercent":0,"diskPercent":0,"uptime":0}
+
+def get_sim_vars():
+    """Read the bridge handoff without retaining a partial/invalid payload."""
+    try:
+        with open(SIM_VARS_FILE, "r", encoding="utf-8") as f:
+            value = json.load(f)
+        return value if isinstance(value, dict) else {}
+    except (FileNotFoundError, OSError, ValueError):
+        return {}
 
 def push_variable(token, var_id, value):
     """Call from your simulation script to push a value."""
@@ -473,6 +503,7 @@ def heartbeat_loop(token):
     while True:
         try:
             payload = get_stats()
+            payload["simVars"] = get_sim_vars()
             if VNC_URL:
                 payload["vncUrl"] = VNC_URL
             r = requests.post(
@@ -525,6 +556,9 @@ if __name__ == "__main__":
     else:
         print("Run with --code YOUR_CODE to pair first.")
         sys.exit(1)
+    if "--pair-only" in sys.argv:
+        print("OK Pairing complete; exiting before heartbeat startup.")
+        sys.exit(0)
     if DESKTOP:
         threading.Thread(target=start_desktop, daemon=True).start()
     # Fast poll for interactive Terminal commands (independent of the 30s telemetry heartbeat).
@@ -534,7 +568,29 @@ if __name__ == "__main__":
 '@
 Set-Content -Path "$dir\convene_agent.py" -Value $agent -Encoding UTF8
 
-# 3. Pair + start
+# 3. Pair, lock down credentials, and register the headless startup task.
 Write-Host "==> Connecting this machine to Convene ..."
 Set-Location $dir
-python convene_agent.py --code 1079675C --desktop
+& $PythonExe convene_agent.py --code $PairingCode --pair-only
+if ($LASTEXITCODE -ne 0) { throw "Convene pairing failed" }
+
+$CredentialsPath = Join-Path $dir "agent-credentials.json"
+if (-not (Test-Path $CredentialsPath)) { throw "Convene credentials were not created" }
+& icacls.exe $dir /inheritance:r /grant:r `
+  "SYSTEM:(OI)(CI)(F)" "BUILTIN\Administrators:(OI)(CI)(F)" | Out-Null
+
+$TaskName = "Convene-Agent"
+$Action = New-ScheduledTaskAction -Execute $PythonExe `
+  -Argument ('"' + (Join-Path $dir "convene_agent.py") + '"') `
+  -WorkingDirectory $dir
+$Trigger = New-ScheduledTaskTrigger -AtStartup
+$Settings = New-ScheduledTaskSettingsSet -RestartCount 999 `
+  -RestartInterval (New-TimeSpan -Minutes 1) `
+  -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
+$Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
+  -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
+  -Settings $Settings -Principal $Principal -Force | Out-Null
+Start-ScheduledTask -TaskName $TaskName
+Write-Host "Convene agent paired and started headless as task '$TaskName'."
+Write-Host "State handoff: $dir\sim_vars.json -> heartbeat simVars"

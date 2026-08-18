@@ -21,7 +21,7 @@ authenticated telemetry transmitted by the Windows 10 gateway
   -> normalized reclaim.state.v1 GET /state
   -> independent Windows state bridge
   -> atomic C:\ConveneAgent\sim_vars.json
-  -> existing VM Convene agent heartbeat
+  -> headless VM Convene agent installed from this repository
   -> bound Convene sim_ variables and fail-closed operator view
 BOUNDARY END
 ```
@@ -63,12 +63,15 @@ Then inspect the exact source and tests used by the runbooks:
 ## Non-negotiable scope
 
 - Work only on the Windows VM, its repository checkout/release directory, engine
-  service, Cloudflare route, state bridge, and this VM's existing Convene agent
-  and bindings.
+  service, Cloudflare route, state bridge, VM Convene agent installation, and
+  bindings.
 - Do not modify the Windows 10 gateway, cRIO, LabVIEW, PLC, firewall, hardware
   interlock, Kubernetes infrastructure, or any actuator path.
 - Keep `/command` advisory and non-actionable. Do not connect it to hardware.
 - Never print or commit live credentials. Keep ingest and read tokens distinct.
+- This is an intentionally clean VM. Missing Python, `uv`, RECLAIM directories,
+  WinSW, cloudflared, engine/bridge services, `C:\ConveneAgent`, the Convene task,
+  and bindings are expected bootstrap work—not stop conditions.
 - Preserve unexpected services, tunnels, files, ACLs, and `sim_vars.json` writers.
   Stop and report conflicts instead of overwriting them.
 - Use one exact reviewed `TARGET_SHA`. Do not deploy a moving branch or an
@@ -85,15 +88,49 @@ Before mutation, report:
 - release, secret, state, log, bridge, and `C:\ConveneAgent` paths and ACLs,
   without secret contents;
 - current Cloudflare route/hostname;
-- existing VM Convene agent identity and every writer of `sim_vars.json`; and
+- Convene agent/task presence and every writer of `sim_vars.json`; and
 - whether `C:\ProgramData\RECLAIM` persists across required VM/Kubernetes
   recovery events.
 
-Stop if the platform is not Windows Server 2025, the selected SHA is ambiguous,
-port 8078 has an unknown owner, durable storage is not established, or another
-writer owns `sim_vars.json`.
+An empty result for the application/tooling checks is the planned baseline. Stop
+only if the platform is not Windows Server 2025, the selected SHA is ambiguous,
+port 8078 has an unexpected owner, an unexpected deployment exists, or another
+writer owns `sim_vars.json`. Record infrastructure-level reschedule persistence as
+verified or pending; absence of pre-created application directories is not a
+blocker.
 
 ## Execute in this order
+
+### Phase 0 — bootstrap the clean Windows VM
+
+You are authorized and expected to install the deployment prerequisites and
+create the repository-owned paths. Use elevated PowerShell:
+
+```powershell
+winget install -e --id Python.Python.3.13 --scope machine `
+  --accept-package-agreements --accept-source-agreements
+winget install -e --id Cloudflare.cloudflared `
+  --accept-package-agreements --accept-source-agreements
+py -3.13 -m pip install "uv==0.11.21"
+```
+
+Refresh the process PATH, then verify `py -0p`, `py -3.13 -m uv --version`, and
+`cloudflared --version`. Retrieve the reviewed WinSW 3.x binary from its official
+release channel, record its version and SHA-256, and use it only through the
+repository templates. Create `C:\ProgramData\RECLAIM` and its release/service/
+state/secret/log paths as directed by the runbooks.
+
+Install and pair the headless VM Convene agent from the repository; do not enable
+desktop streaming:
+
+```powershell
+$PairingCode = Read-Host 'Convene pairing code'
+.\deployment\convene-setup-2.ps1 -PairingCode $PairingCode
+```
+
+This creates `C:\ConveneAgent`, registers `Convene-Agent` at startup as SYSTEM,
+and includes `sim_vars.json` as the heartbeat's `simVars` object. Verify the task
+and machine registration before installing the bridge.
 
 ### Phase 1 — exact release and local proof
 
@@ -137,8 +174,8 @@ and advancing `seq` with authenticated loopback `/state` and engine logs.
 
 Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`. The bridge uses the read
 token only, polls only `http://127.0.0.1:8078/state`, and atomically replaces
-`C:\ConveneAgent\sim_vars.json`. The existing VM Convene agent remains the only
-heartbeat transport and the only `sim_` publisher.
+`C:\ConveneAgent\sim_vars.json`. The newly installed headless VM Convene agent
+remains the only heartbeat transport and the only `sim_` publisher.
 
 Determine whether the VM agent adds the `sim_` prefix or expects it in the JSON;
 prove exactly one prefix. Bind the process/provenance fields plus:
@@ -176,7 +213,7 @@ Declare `PASS` only when all of these are evidenced for the exact `TARGET_SHA`:
 2. The acceptance harness reports `20/20` and `/state` advances with the correlated
    run/source/sequence.
 3. The Windows bridge publishes that state atomically to `sim_vars.json`.
-4. The existing VM agent delivers the correlated state to the bound Convene
+4. The installed VM agent delivers the correlated state to the bound Convene
    `sim_` fields.
 5. Convene shows `DATA IS LIVE` only while status, freshness, and
    `bridge_valid_until` are valid, then shows `DATA NOT LIVE` after feed/lease

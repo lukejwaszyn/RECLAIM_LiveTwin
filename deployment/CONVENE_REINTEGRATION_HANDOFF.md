@@ -5,7 +5,8 @@
 
 The live predictive-engine guest is Windows Server 2025 in Kubernetes-managed
 cloud infrastructure. Its independent Windows state bridge writes
-`C:\ConveneAgent\sim_vars.json` for the existing VM Convene agent. The Windows 10
+`C:\ConveneAgent\sim_vars.json` for the VM Convene agent installed during
+bootstrap. The Windows 10
 gateway laptop remains the separate `gw_` audit source.
 
 ## Proven repository contract

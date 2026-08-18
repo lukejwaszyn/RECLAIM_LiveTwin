@@ -37,14 +37,14 @@ Read these files before changing anything, in this order:
   infrastructure, registered in Convene as `reclaim-engine-2`. Kubernetes is the
   outer hosting boundary; guest work uses PowerShell, Windows services, NTFS, and
   ACLs, not Linux container commands.
-- Its existing Convene agent independently includes
+- The Convene agent installed during clean-VM bootstrap independently includes
   `C:\ConveneAgent\sim_vars.json` in that VM's heartbeat.
 - Other Convene agents run on entirely separate devices. They may use mechanically
   similar heartbeat behavior, but they do not overlap with this VM implementation.
 - Do not inspect, reuse, modify, coordinate, or make assumptions about those other
   agents. This task changes only the Windows VM state-bridge infrastructure in the
   repository.
-- The existing VM Convene agent is the transport consumer of `sim_vars.json`; it is
+- The installed VM Convene agent is the transport consumer of `sim_vars.json`; it is
   not the `/state` bridge and must not be rewritten.
 - The VM predictive engine continues to receive authenticated `POST /ingest`
   telemetry through its Cloudflare Tunnel. Preserve that required engine route; the
@@ -130,7 +130,7 @@ The installer must:
 - configure a dedicated least-privilege service identity where practical;
 - apply explicit ACLs to configuration, secrets, logs, and
   `C:\ConveneAgent\sim_vars.json`;
-- never modify or unregister the existing VM Convene agent task; and
+- never modify or unregister the installed VM Convene agent task; and
 - support rollback of only the bridge artifacts it owns.
 
 ## Tests and proof

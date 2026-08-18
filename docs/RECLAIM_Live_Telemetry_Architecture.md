@@ -2,7 +2,7 @@
 
 **Status:** proposed production contract  
 **Scope:** cRIO/LabVIEW → Windows 10 laptop gateway → Cloudflare → cloud-hosted
-Windows Server 2025 predictive-engine VM → Windows state bridge → existing VM
+Windows Server 2025 predictive-engine VM → Windows state bridge → installed VM
 Convene agent
 
 ## Purpose and decision
@@ -222,7 +222,7 @@ infrastructure. Kubernetes is the outer infrastructure boundary; VM guest
 operations use PowerShell, Windows services, NTFS paths, and ACLs. The
 gateway uses authenticated outbound HTTPS to the Cloudflare-protected cloud `/ingest`
 URL; Convene receives cloud `/state` through the repository-owned Windows state
-bridge and the existing VM agent.
+bridge and the VM agent installed during bootstrap.
 
 ```
 Windows 10 gateway -- authenticated HTTPS --> Cloudflare --> Windows VM engine :8078
@@ -231,7 +231,7 @@ Windows 10 gateway -- authenticated HTTPS --> Cloudflare --> Windows VM engine :
                                                         Windows state bridge
                                                                │ sim_vars.json
                                                                v
-                                                        existing VM Convene agent
+                                                        installed VM Convene agent
                                                                │
                                                                v
                                                         Convene sim_ variables

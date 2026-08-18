@@ -9,7 +9,7 @@
 |---|---|---|
 | RECLAIM hardware | cRIO + LabVIEW | Authoritative telemetry and process sequencing |
 | Edge gateway | Windows 10 laptop | Receives cRIO TCP telemetry, frames and buffers it, and posts authenticated live telemetry |
-| Predictive-engine VM | Cloud-hosted Windows Server 2025 guest in Kubernetes-managed infrastructure | Runs the dual predictive engine, Cloudflare tunnel client, state bridge, and existing VM Convene agent |
+| Predictive-engine VM | Cloud-hosted Windows Server 2025 guest in Kubernetes-managed infrastructure | Clean deployment target; this integration installs the dual predictive engine, Cloudflare client, state bridge, and headless VM Convene agent |
 | Convene | External service | Receives the VM `sim_` predictive namespace and separate laptop `gw_` audit namespace |
 
 The Kubernetes layer hosts/orchestrates the Windows VM. Guest deployment and
@@ -35,7 +35,7 @@ Windows Server 2025 predictive engine
   -> authenticated loopback GET /state
 Windows state bridge
   -> atomic C:\ConveneAgent\sim_vars.json
-Existing VM Convene agent
+Headless VM Convene agent installed during bootstrap
   -> Convene sim_ namespace
 
 Windows 10 gateway GET 127.0.0.1:9080/latest

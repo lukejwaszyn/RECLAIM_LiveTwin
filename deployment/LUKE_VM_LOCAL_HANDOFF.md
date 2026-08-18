@@ -15,7 +15,7 @@ No Linux or Raspberry Pi runtime is part of the live pipeline.
   credentials and persistent run/sequence identity.
 - Prove the Cloudflare ingress with the 20-check acceptance harness.
 - Install and accept the independent Windows state bridge.
-- Bind the existing VM Convene agent to normalized state with single-writer,
+- Install the headless VM Convene agent and bind it to normalized state with single-writer,
   prefix, freshness, and publication-lease proof.
 - Privately hand Adam only the `/ingest` URL and ingest credential.
 - Capture one synthetic VM-to-Convene run and one real gateway-to-Convene run.
@@ -72,7 +72,7 @@ Follow `VM_ENGINE_RUNBOOK.md`:
 
 Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`:
 
-1. discover the existing VM agent identity and ACLs;
+1. install/pair the headless VM agent and verify its identity and ACLs;
 2. verify an approved WinSW binary/checksum;
 3. install the bridge side-by-side with read credential only;
 4. start in `passthrough` prefix mode;

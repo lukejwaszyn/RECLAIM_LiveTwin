@@ -75,7 +75,7 @@ integration rather than production-grade CD.
 
 | Doc | Role |
 |---|---|
-| `convene-setup-2.ps1` | Convene connected-machine agent installer, as provided. The always-on outbound plane (HANDOFF §4). |
+| `convene-setup-2.ps1` | Headless-by-default Windows VM Convene agent bootstrap: Python dependency setup, pairing, startup task, and `sim_vars.json` heartbeat transport. |
 
 ### Historical / superseded (kept for context — NOT current work plans)
 
