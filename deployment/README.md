@@ -25,6 +25,12 @@ full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 
 Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 
+The executable plan for the next endpoint session is
+[`NEXT_SESSION_CD_REHEARSAL_PLAN.md`](NEXT_SESSION_CD_REHEARSAL_PLAN.md). It
+splits work between the MacBook/VM lane and Adam's direct lab/gateway lane,
+preserves the gateway's existing staged code, and targets a fast advisory-only
+integration rather than production-grade CD.
+
 ## Documents
 
 ### Cross-cutting (read first — LIVING)
@@ -42,6 +48,7 @@ Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 
 | Doc | Role |
 |---|---|
+| `LUKE_VM_LOCAL_HANDOFF.md` | **Luke's active owner lane:** local source gate, VM deployment, endpoint acceptance, Adam rendezvous, and Convene cutover. |
 | `VM_ENGINE_HANDOFF.md` | **Read first.** Full story of the endpoint (prior reboot/discrepancy + fix), the DO-NOT-DEBUG-IT-BACK guardrails, and the acceptance gates. |
 | `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session (objective + step outline). |
 | `VM_ENGINE_RUNBOOK.md` | Executable step-by-step: deploy, secrets, systemd unit, quick tunnel, verify, hand back. |
@@ -55,6 +62,10 @@ Overall system status remains **NO-GO for live data** until Stages 1–3 close.
 | Doc | Role |
 |---|---|
 | `CONVENE_GW_MAPPING.md` | `gw_` audit variables → gateway `/latest` jsonPaths (36 vars). Feeds the three-column V&V. |
+| `CONVENE_REINTEGRATION_HANDOFF.md` | Repository-proven cloud/gateway binding contract, isolated rehearsal identities, field gaps, and the explicit external operator checkpoint. |
+| `WINDOWS_VM_CONVENE_STATE_BRIDGE_HANDOFF.md` | Approved architecture and implementation contract for the independent Windows VM `/state` → `sim_vars.json` bridge. |
+| `NewChat_Windows_VM_Convene_State_Bridge_Prompt.md` | Turnkey fresh-agent prompt to implement and test the Windows VM state bridge without mutating the VM. |
+| `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md` | Lease-aware Windows service configuration, guarded installation, verification, logging, acceptance, and rollback procedure. |
 
 ### Stage 0 — Base tooling / installers (reference)
 

@@ -19,3 +19,30 @@ def test_framer_stamps_live_provenance_and_preserves_labview_schema():
     assert frame["vars"]["PL_process"] is True
     assert frame["vars"]["MW_power"] == 0.0
     assert warnings  # raw LabVIEW fields are intentionally preserved, not dropped
+
+
+def test_latest_audit_frame_preserves_typed_envelope_and_raw_shared_power():
+    framer = Framer(Config(run_id="gateway-audit-run", mode="live"))
+    frame, _ = framer.build({
+        "source_id": "reclaim-crio-audit",
+        "cycle_id": "audit-cycle",
+        "ts": "2026-08-16T16:00:00Z",
+        "source_op_state": "S_MicrowaveHeating",
+        "active_chamber": "MT",
+        "MW_power": 2750.0,
+        "MW_reverse": 75.0,
+        "MW_RF": True,
+    })
+
+    assert set(frame) == {
+        "schema_version", "mode", "run_id", "source_id", "cycle_id", "seq",
+        "ts", "source_op_state", "active_chamber", "vars",
+    }
+    assert frame["run_id"] == "gateway-audit-run"
+    assert frame["source_id"] == "reclaim-crio-audit"
+    assert frame["seq"] == 1 and isinstance(frame["seq"], int)
+    assert frame["active_chamber"] == "MT"
+    assert frame["vars"]["MW_power"] == 2750.0
+    assert frame["vars"]["MW_reverse"] == 75.0
+    assert frame["vars"]["MW_RF"] is True
+    assert not any(key.startswith("sim_") for key in frame | frame["vars"])

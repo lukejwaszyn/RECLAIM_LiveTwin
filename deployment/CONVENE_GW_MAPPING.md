@@ -97,10 +97,10 @@ See §4.
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_PL_bottom1` | `$.vars.PL_bottom1` | `sim_PL_T_bed_tc1` | +273.15 |
-| `gw_PL_bottom2` | `$.vars.PL_bottom2` | `sim_PL_T_bed_tc2` | +273.15 |
-| `gw_PL_bottom3` | `$.vars.PL_bottom3` | `sim_PL_T_bed_tc3` | +273.15 |
-| `gw_PL_bottom4` | `$.vars.PL_bottom4` | `sim_PL_T_bed_tc4` | +273.15 |
+| `gw_PL_bottom1` | `$.vars.PL_bottom1` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `gw_PL_bottom2` | `$.vars.PL_bottom2` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `gw_PL_bottom3` | `$.vars.PL_bottom3` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `gw_PL_bottom4` | `$.vars.PL_bottom4` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
 | `gw_PL_surface_temp` | `$.vars.PL_surface_temp` | `sim_PL_T_wall_meas` | +273.15 |
 | `gw_PL_top_condenser_temp` | `$.vars.PL_top_condenser_temp` | `sim_PL_T_cond_top` | +273.15 |
 | `gw_PL_bottom_condenser_temp` | `$.vars.PL_bottom_condenser_temp` | `sim_PL_T_cond_bottom` | +273.15 |
@@ -132,7 +132,7 @@ Booleans ride through prefixed but otherwise untouched (`labview_map.py:181-183`
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_MT_bottom` | `$.vars.MT_bottom` | `sim_MT_T_bed_tc1` | +273.15 |
+| `gw_MT_bottom` | `$.vars.MT_bottom` | `sim_MT_T_bed_meas` | +273.15 |
 | `gw_MT_top` | `$.vars.MT_top` | `sim_MT_T_wall_meas` | +273.15 |
 
 Bottom = crucible/bed core, top = chamber wall/head (`labview_map.py:52-53`).
@@ -170,8 +170,11 @@ Four behaviors will otherwise look like faults when the chain is healthy.
 ### 4.1 `gw_` is raw, `sim_` is SI
 
 The audit view compares **unlike units**. A bed TC at 100.2 °C appears as
-`gw_PL_bottom1 = 100.2` and `sim_PL_T_bed_tc1 = 373.35`. Apply the conversion
-column above (or configure it in the Convene view) before declaring a mismatch.
+`gw_PL_bottom1 = 100.2`, while `/state` publishes one
+`sim_PL_T_bed_meas` equal to the mean of the valid four-channel bank after the
+°C→K conversion. The current cloud record does **not** publish individual
+`sim_PL_T_bed_tc1..4` fields. Compare the converted bank mean, not each raw TC,
+and apply the pressure conversion column above before declaring a mismatch.
 
 ### 4.2 Exact `0.0` means "unwired", and only `gw_` shows it
 

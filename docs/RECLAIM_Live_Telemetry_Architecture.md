@@ -197,7 +197,10 @@ Convene receives the state output using its `sim_` prefix. Bind:
 Every dashboard shows `sim_mode`, `sim_run_id`, `sim_seq`, and data age beside
 `sim_op_state`. If the mode is not `live`, status is not `accepted`, or age is
 over the configured limit, it shows **DATA NOT LIVE** instead of a process-state
-color.
+color. A file-backed VM bridge additionally publishes `data_live` and a short
+`bridge_valid_until` lease. The dashboard compares its own UTC clock to that
+deadline so a stopped bridge or persistent atomic-replacement failure cannot leave
+an old `data_live=true` file apparently live.
 
 Choose exactly one publisher per environment:
 
