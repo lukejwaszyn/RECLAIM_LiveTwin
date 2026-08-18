@@ -19,7 +19,8 @@ Kubernetes is the outer cloud hosting boundary. The guest is not a Linux host or
 Linux container: operate it with PowerShell, Windows services, NTFS paths, and
 ACLs as recorded in `DEPLOYMENT_TOPOLOGY.md`.
 
-The VM agent already knows how to include the JSON object stored at:
+The VM agent installed during the clean-host bootstrap knows how to include the
+JSON object stored at:
 
 ```text
 C:\ConveneAgent\sim_vars.json
@@ -33,7 +34,7 @@ The VM agent and bridge have separate responsibilities:
 
 - the predictive engine owns normalized/predictive state;
 - the state bridge validates that state and performs the atomic file handoff; and
-- the existing VM Convene agent owns only its heartbeat transport to Convene.
+- the VM Convene agent installed during bootstrap owns only its heartbeat transport to Convene.
 
 ## 2. Approved architecture
 
@@ -52,7 +53,7 @@ RECLAIM state bridge (independent Windows service)
                  v
 C:\ConveneAgent\sim_vars.json
                  |
-                 | read by existing VM agent
+                 | read by installed VM agent
                  v
 Convene heartbeat for machine reclaim-engine-2
 ```
@@ -184,7 +185,7 @@ so these are static, reviewed bridge configuration values.
 
 ## 6. Prefix policy
 
-The existing VM agent sends the object from `sim_vars.json` as `simVars`. Whether
+The installed VM agent sends the object from `sim_vars.json` as `simVars`. Whether
 Convene prefixes those keys automatically must be proven against the registered
 `reclaim-engine-2` machine before final binding.
 
@@ -261,7 +262,7 @@ C:\ProgramData\RECLAIM\convene-bridge\
 The WinSW executable is an external prerequisite; do not commit an unreviewed binary.
 The installer must discover existing services/files first, preserve unexpected
 deployments, and install side-by-side or stop for operator direction. It must not
-modify, replace, or unregister the existing VM Convene agent task.
+modify, replace, or unregister the installed VM Convene agent task.
 
 The uninstall/rollback script removes or disables only the bridge service created by
 this package. It must preserve `sim_vars.json` unless the operator explicitly chooses
@@ -324,7 +325,7 @@ Do not install on the VM until repository review and tests pass.
 8. Stop telemetry and prove `data_live=false` within 15 seconds and `DATA NOT LIVE`
    in the view.
 9. Exercise invalid auth, malformed state, engine restart, and bridge restart.
-10. Confirm the existing VM Convene agent still owns its heartbeat and no other
+10. Confirm the installed VM Convene agent still owns its heartbeat and no other
     device or heartbeat was altered.
 
 ## 13. Stop conditions
@@ -365,6 +366,6 @@ live payloads use the configured short lease.
 
 This resolves the Windows sharing-violation edge case: if `os.replace` ultimately
 cannot replace a previously live file, the last complete destination remains intact
-but becomes non-live when its independently evaluated lease expires. The existing VM
+but becomes non-live when its independently evaluated lease expires. The installed VM
 Convene agent remains unchanged. Acceptance must prove the lease expires in the
 Convene view; without that proof, fail-closed acceptance is not complete.

@@ -40,7 +40,7 @@ Approved release artifact is created
 |---|---|---|
 | MacBook workspace | Source development, local sanity checks, Monte Carlo fault injection, release approval | Git client and GitHub web interface / CLI |
 | CI service | Tests, release packaging, traceability | GitHub Actions hosted runner |
-| Predictive-engine VM | Windows Server 2025 guest in Kubernetes-managed cloud infrastructure; production engine, loopback-only state bridge, existing Convene agent, Cloudflare Tunnel | Reviewed PowerShell/WinSW deployment; never a general CI runner |
+| Predictive-engine VM | Windows Server 2025 guest in Kubernetes-managed cloud infrastructure; production engine, loopback-only state bridge, headless Convene agent installed during bootstrap, Cloudflare Tunnel | Reviewed PowerShell/WinSW deployment; never a general CI runner |
 | Windows gateway | cRIO receiver, durable queue, authenticated cloud publisher | Approved, operator-run PowerShell release script through TeamViewer |
 | cRIO / LabVIEW | Live telemetry producer | Never deployed by this pipeline |
 | Convene | Read-only state consumer and visualization | Not changed until live V&V passes |

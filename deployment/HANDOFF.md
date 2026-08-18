@@ -52,7 +52,7 @@ cRIO / LabVIEW ──(Ethernet 192.168.50.x, INGRESS)──► Laptop edge gatew
                                                                           │ dual engine on loopback
                                                                           │ Windows state bridge
                                                                           ▼
-                                                                   existing VM Convene agent
+                                                                   installed VM Convene agent
                                                                           │ sim_ + native .stp view
 
    Parallel audit tap:  Laptop  ──(Convene agent, gw_ set from /latest)──►  Convene
@@ -203,7 +203,7 @@ deploy `push_ingest_dual.py --production` on the Windows Server 2025 VM
 cloudflared, verify `/health`, then **hand the ingress hostname + ingest token
 back** so the gateway's `config.windows.yaml` can be finalized and ACL-locked.
 Next, install the independent Windows state bridge and bind its output through
-the existing VM Convene agent. Only then do the §5 contract gates and §6 V&V
+the VM Convene agent installed during bootstrap. Only then do the §5 contract gates and §6 V&V
 become runnable.
 
 ---
@@ -227,7 +227,7 @@ become runnable.
 | `docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Engine fault/fix analysis + autonomous-lifecycle design of record |
 | `deployment/CONVENE_GW_MAPPING.md` | `gw_` audit variables → `/latest` jsonPaths (36 vars) |
 | `deployment/SSH_Tailscale_ClaudeCode_Setup.md` | Access setup as run (SSH parts now superseded — see §9.1) |
-| `deployment/convene-setup-2.ps1` | The Convene agent installer (as provided) |
+| `deployment/convene-setup-2.ps1` | Headless-by-default Windows VM Convene agent bootstrap; pairs, registers the startup task, and carries `sim_vars.json` as heartbeat `simVars` |
 | `deployment/START_HERE.md`, `ClaudeCode_*_Prompts.md` | Historical Stage-0 session records (see `deployment/README.md`) |
 | `docs/RECLAIM_Remote_Gateway_Preflight.md` | The canonical deployment preflight |
 | `docs/RECLAIM_Live_Telemetry_Architecture.md` | Schemas, validation, single-writer contract |

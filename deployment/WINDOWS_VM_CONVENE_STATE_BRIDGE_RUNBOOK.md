@@ -11,7 +11,8 @@ See `DEPLOYMENT_TOPOLOGY.md` for the authoritative end-to-end platform boundary.
 
 This service reads authenticated `GET http://127.0.0.1:8078/state`, validates the
 `reclaim.state.v1` live-data contract, and atomically replaces
-`C:\ConveneAgent\sim_vars.json`. The existing Convene agent remains the heartbeat
+`C:\ConveneAgent\sim_vars.json`. The headless Convene agent installed during VM
+bootstrap remains the heartbeat
 transport. The bridge does not call `/ingest`, consume `/command`, or connect to a
 telemetry producer or control system.
 
@@ -58,8 +59,9 @@ C:\ProgramData\RECLAIM\convene-bridge\
 
 The installer defaults to `NT AUTHORITY\LocalService`. Final service identity and
 local policy remain a VM-acceptance decision. The installer requires the actual
-existing Convene agent identity so it can grant that identity read-only access to
-`sim_vars.json`; it never guesses the identity.
+installed Convene agent identity so it can grant that identity read-only access to
+`sim_vars.json`; verify the `Convene-Agent` scheduled-task principal. The standard
+bootstrap installs it as `NT AUTHORITY\SYSTEM`.
 
 ## Prerequisites and preflight
 
@@ -74,7 +76,8 @@ installation.
    release channel, verify the publisher/release provenance, calculate
    `Get-FileHash -Algorithm SHA256`, and record the version and checksum in the
    deployment evidence. No WinSW executable is committed here.
-4. Discover and record existing files, services, tasks, identities, and ACLs:
+4. Confirm the headless VM Convene agent bootstrap completed, then discover and
+   record files, services, tasks, identities, and ACLs:
 
    ```powershell
    Get-ChildItem C:\ConveneAgent -Force
@@ -142,7 +145,7 @@ Required review points:
 - `freshness_limit_ms` is `15000` unless a reviewed decision changes it;
 - `lease_duration_ms` remains longer than poll interval plus request timeout;
 - prefix starts as `passthrough`; and
-- output remains the existing VM agent's `C:\ConveneAgent\sim_vars.json`.
+- output remains the installed VM agent's `C:\ConveneAgent\sim_vars.json`.
 
 Place only the read token into `secrets\read-token.txt` using a secure local method,
 then re-check that only Administrators, SYSTEM, and the service identity can read it.
@@ -174,7 +177,7 @@ Logs contain identity/sequence/status information but no token or full state dum
 6. Add a harmless canary scalar and observe whether Convene adds `sim_`. Retain
    `passthrough` if it does; otherwise change to `sim`, restart, and prove exactly one
    prefix. Record the result.
-7. Confirm the existing Convene agent still owns its heartbeat and that no other
+7. Confirm the installed Convene agent still owns its heartbeat and that no other
    device, task, machine registration, `/ingest` route, or command path changed.
 
 ## Upgrade
@@ -192,6 +195,6 @@ convene_bridge\windows\uninstall-state-bridge.ps1 -ArchiveSimVars
 
 The rollback removes only the owned bridge service, application copy, WinSW files,
 and virtual environment. By default it preserves diagnostic bridge data and always
-preserves the existing Convene task and original `sim_vars.json`. Use
+preserves the installed Convene task and original `sim_vars.json`. Use
 `-PurgeBridgeData` only after explicitly deciding that bridge configuration,
 credential file, state, and logs may be irrecoverably removed.

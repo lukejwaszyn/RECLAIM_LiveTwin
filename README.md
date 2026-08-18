@@ -15,14 +15,14 @@ source workspace but are not part of this release.
 cRIO / LabVIEW -> Windows 10 gateway -> Cloudflare -> Windows Server 2025 VM
                                                        -> dual engine on loopback
                                                        -> Windows state bridge
-                                                       -> existing VM Convene agent
+                                                       -> headless VM Convene agent installed during bootstrap
                                                        -> Convene-native .stp visualization
 ```
 
 The VM is cloud-hosted in Kubernetes-managed infrastructure, but the guest and
 all repository-owned runtime procedures are Windows. There is no Linux host or
 Raspberry Pi in the live path. The cloud engine owns state processing. The
-existing VM Convene agent consumes the bridge's validated copy of the cloud
+headless VM Convene agent installed during bootstrap consumes the bridge's validated copy of the cloud
 `/state` record; its native visualization tool binds the incoming
 variables to specific elements of a `.stp` (STEP) model, animating the system's
 geometry as data changes in operation. The visualization is a read-only view of

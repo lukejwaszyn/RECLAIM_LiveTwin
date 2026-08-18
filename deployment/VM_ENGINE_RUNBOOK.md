@@ -44,13 +44,52 @@ Also record, without printing secret values:
 - the process holding port 8078;
 - existing Cloudflare tunnel type and hostname;
 - whether engine secret and durable identity files exist and their ACLs;
-- the existing VM Convene agent service/task and identity;
+- any VM Convene agent service/task and identity;
 - every writer of `C:\ConveneAgent\sim_vars.json`; and
 - whether the Windows VM disk paths survive Kubernetes workload rescheduling.
 
-Stop if an unexpected deployment or writer exists.
+This VM is intentionally clean. Missing Python, `uv`, RECLAIM directories,
+WinSW, cloudflared, engine/bridge services, `C:\ConveneAgent`, Convene task, and
+bindings are the expected starting condition. Stop only if an unexpected
+deployment, port owner, or writer exists.
 
-## 3. Stage and verify the exact release
+## 3. Bootstrap the clean Windows VM
+
+Run from elevated PowerShell. Install the supported toolchain when discovery
+shows it is absent:
+
+```powershell
+winget install -e --id Python.Python.3.13 --scope machine `
+  --accept-package-agreements --accept-source-agreements
+winget install -e --id Cloudflare.cloudflared `
+  --accept-package-agreements --accept-source-agreements
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $env:Path
+py -3.13 -m pip install "uv==0.11.21"
+py -0p
+py -3.13 -m uv --version
+cloudflared --version
+New-Item -ItemType Directory -Force C:\ProgramData\RECLAIM\releases | Out-Null
+```
+
+Obtain the reviewed WinSW 3.x executable from its official release channel and
+record its version and `Get-FileHash -Algorithm SHA256` result. The executable is
+an expected external prerequisite; do not commit it.
+
+Install and pair the repository-provided VM Convene agent in headless mode:
+
+```powershell
+$PairingCode = Read-Host 'Convene pairing code'
+.\deployment\convene-setup-2.ps1 -PairingCode $PairingCode
+Get-ScheduledTask -TaskName Convene-Agent
+Get-ChildItem C:\ConveneAgent -Force
+```
+
+The default invocation must not install or start desktop streaming. It creates
+`C:\ConveneAgent`, registers the `Convene-Agent` startup task as SYSTEM, and sends
+the JSON object in `sim_vars.json` as heartbeat `simVars`. Record the resulting
+machine registration without printing its credential.
+
+## 4. Stage and verify the exact release
 
 Copy or check out the exact source under the release path, then verify:
 
@@ -59,7 +98,7 @@ Set-Location "C:\ProgramData\RECLAIM\releases\$env:TARGET_SHA"
 git rev-parse HEAD
 git status --short
 $env:UV_CACHE_DIR = 'C:\ProgramData\RECLAIM\uv-cache'
-uv sync --frozen --all-extras --dev --python 3.13
+py -3.13 -m uv sync --frozen --all-extras --dev --python 3.13
 Push-Location cloud_engine
 ..\.venv\Scripts\python.exe -c "import numpy, scipy, sklearn; from scipy.stats import chi2; import push_ingest_dual; print('imports OK')"
 Pop-Location
@@ -71,14 +110,14 @@ The printed SHA must equal `TARGET_SHA`. Python 3.11 through 3.13 is supported b
 Run the locked local gates before installing a service:
 
 ```powershell
-$env:PYTHONPATH = 'pi_gateway'
-uv run --frozen pytest -q convene_bridge/tests
-uv run --frozen pytest -q cloud_engine/tests pi_gateway/tests
-uv run --frozen python scripts/check_repository_hygiene.py
+$env:PYTHONPATH = 'cloud_engine;pi_gateway'
+py -3.13 -m uv run --frozen pytest -q convene_bridge/tests
+py -3.13 -m uv run --frozen pytest -q cloud_engine/tests pi_gateway/tests
+py -3.13 -m uv run --frozen python scripts/check_repository_hygiene.py
 Remove-Item Env:PYTHONPATH
 ```
 
-## 4. Create Windows state, secret, and log directories
+## 5. Create Windows state, secret, and log directories
 
 ```powershell
 $EngineRoot = 'C:\ProgramData\RECLAIM\engine'
@@ -124,7 +163,7 @@ C:\ProgramData\RECLAIM\engine\state\ingest_state.json
 The Kubernetes/VM storage owner must confirm this path survives the required VM
 recovery and rescheduling scenarios.
 
-## 5. Install the engine as a Windows service
+## 6. Install the engine as a Windows service
 
 Use an operator-approved WinSW 3.x binary. Verify its official release provenance
 and SHA-256; do not commit the executable.
@@ -161,7 +200,7 @@ Get-Service RECLAIMIngestEngine
 Start-Service RECLAIMIngestEngine
 ```
 
-## 6. Verify the loopback engine
+## 7. Verify the loopback engine
 
 ```powershell
 Get-Service RECLAIMIngestEngine
@@ -177,11 +216,11 @@ screenshots or logs.
 Confirm the WinSW logs contain no credentials and that a service restart preserves
 `ingest_state.json` identity/deduplication state.
 
-## 7. Establish the Cloudflare route
+## 8. Establish the Cloudflare route
 
-First discover the existing Windows cloudflared installation and service. Preserve
-an unexpected named tunnel. For the demonstration, a foreground quick tunnel is an
-acceptable temporary route:
+Use the Windows cloudflared installed during bootstrap. Preserve an unexpected
+named tunnel if discovery found one. For the demonstration, a foreground quick
+tunnel is an acceptable temporary route:
 
 ```powershell
 cloudflared tunnel --url http://127.0.0.1:8078 --no-autoupdate
@@ -191,7 +230,7 @@ Its hostname is ephemeral and bearer credentials are the only application-layer
 protection. A named tunnel with an approved DNS name and Access policy is preferred
 for durable interoperability. Never route synthetic ports 8177–8179.
 
-## 8. Run endpoint acceptance
+## 9. Run endpoint acceptance
 
 From a trusted workstation, load credentials into environment variables rather
 than process arguments:
@@ -207,11 +246,13 @@ Required result: all 20 checks pass. Restart `RECLAIMIngestEngine` and verify th
 last accepted frame remains a duplicate and fresh telemetry continues with durable
 identity intact.
 
-## 9. Install and accept the Convene state bridge
+## 10. Install and accept the Convene state bridge
 
 Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`. The bridge is a separate
 Windows service, uses only the read token, reads only loopback `/state`, and writes
-the existing VM agent's `sim_vars.json` atomically.
+the installed VM agent's `sim_vars.json` atomically. The expected Convene agent
+identity is `NT AUTHORITY\SYSTEM`; verify the scheduled-task principal rather than
+assuming it.
 
 Convene acceptance must prove:
 
@@ -219,16 +260,16 @@ Convene acceptance must prove:
 - exactly one `sim_` writer;
 - mode/status/freshness/data-live gating;
 - independent expiration of `bridge_valid_until`; and
-- no change to the existing VM Convene agent or `/command` authority.
+- no unintended change to the installed VM Convene agent or `/command` authority.
 
 Tuesday integration is `PASS` only after the acceptance telemetry that entered
 through the public Cloudflare route is correlated by run/source/sequence through
-`/state`, the bridge file, the existing VM agent, and visible Convene `sim_`
+`/state`, the bridge file, the installed VM agent, and visible Convene `sim_`
 fields. Stop the source and prove the Convene view becomes `DATA NOT LIVE` after
 freshness/lease expiry. Ingress plus local `/state` without Convene evidence is
 `PARTIAL`, not `PASS`.
 
-## 10. Gateway handoff
+## 11. Gateway handoff
 
 Send the Windows 10 gateway operator, through an approved private channel:
 
@@ -241,7 +282,7 @@ Send the Windows 10 gateway operator, through an approved private channel:
 Do not send the read token unless a separately reviewed gateway function requires
 it. ACL-lock the gateway configuration after inserting its credential.
 
-## 11. Isolated rehearsal profiles
+## 12. Isolated rehearsal profiles
 
 The synthetic nominal, power-outage, and lunar demonstrations are separate
 GET-only services. They do not use port 8078, production credentials, the
@@ -264,7 +305,7 @@ identities in `CONVENE_REINTEGRATION_HANDOFF.md`.
 Stop and uninstall only `RECLAIMIngestEngine`, return the tunnel to its prior
 configuration, and preserve the previous release, secret, durable identity, logs,
 and unexpected services. Do not delete Kubernetes storage or VM disks as part of a
-guest-service rollback. The bridge and existing Convene agent have separate rollback
+guest-service rollback. The bridge and installed Convene agent have separate rollback
 procedures.
 
 ## Stop conditions

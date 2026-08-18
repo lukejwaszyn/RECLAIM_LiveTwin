@@ -1,7 +1,8 @@
 # RECLAIM Convene Live Binding
 
 This binding starts clean. Configure exactly one live `sim_` publisher: the
-existing Windows Server 2025 VM Convene agent reading the repository state
+headless Windows Server 2025 VM Convene agent installed during bootstrap and
+reading the repository state
 bridge's atomic `C:\ConveneAgent\sim_vars.json` output. The bridge alone reads
 the cloud dual engine's loopback `/state` endpoint. Do not run the legacy state publisher,
 simulation bridge, CSV importer, or harness publisher against this same
@@ -47,7 +48,7 @@ corresponding bodies, `sim_active_chamber` highlights the live chamber,
 Rules:
 
 1. **Read-only consumer of the VM agent's `sim_` publication.** The visualization
-   binds the same fields delivered from the bridge through the existing VM
+   binds the same fields delivered from the bridge through the installed VM
    Convene agent. It does not call `/state`, possess `RECLAIM_READ_TOKEN`, become
    a second writer, or talk to the cRIO.
 2. **Bind to the published `sim_` set only**, not raw channels — the `sim_`
