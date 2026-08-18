@@ -54,6 +54,7 @@ integration rather than production-grade CD.
 | `LUKE_VM_LOCAL_HANDOFF.md` | **Luke's active owner lane:** local source gate, VM deployment, endpoint acceptance, Adam rendezvous, and Convene cutover. |
 | `VM_ENGINE_HANDOFF.md` | **Read first.** Full story of the endpoint (prior reboot/discrepancy + fix), the DO-NOT-DEBUG-IT-BACK guardrails, and the acceptance gates. |
 | `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session (objective + step outline). |
+| `NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` | Turnkey prompt for a Codex session running on the Windows VM: exact ingress-to-Convene boundary, Tuesday PASS evidence, and isolated rehearsal profiles. |
 | `VM_ENGINE_RUNBOOK.md` | Executable Windows Server 2025 steps: deploy, ACL-protected secrets/state, WinSW service, cloudflared, verify, hand back. |
 | `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Authoritative fault/fix analysis (why the reboot was needed; §4.1 design of record). |
 | `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), the command-authority mode (advisory default), and the deploy-blocking disposition. |

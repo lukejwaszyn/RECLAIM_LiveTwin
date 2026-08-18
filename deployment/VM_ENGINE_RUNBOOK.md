@@ -221,6 +221,13 @@ Convene acceptance must prove:
 - independent expiration of `bridge_valid_until`; and
 - no change to the existing VM Convene agent or `/command` authority.
 
+Tuesday integration is `PASS` only after the acceptance telemetry that entered
+through the public Cloudflare route is correlated by run/source/sequence through
+`/state`, the bridge file, the existing VM agent, and visible Convene `sim_`
+fields. Stop the source and prove the Convene view becomes `DATA NOT LIVE` after
+freshness/lease expiry. Ingress plus local `/state` without Convene evidence is
+`PARTIAL`, not `PASS`.
+
 ## 10. Gateway handoff
 
 Send the Windows 10 gateway operator, through an approved private channel:
@@ -233,6 +240,24 @@ Send the Windows 10 gateway operator, through an approved private channel:
 
 Do not send the read token unless a separately reviewed gateway function requires
 it. ACL-lock the gateway configuration after inserting its credential.
+
+## 11. Isolated rehearsal profiles
+
+The synthetic nominal, power-outage, and lunar demonstrations are separate
+GET-only services. They do not use port 8078, production credentials, the
+production state bridge, or live `sim_`/`gw_` bindings. Start one per foreground
+PowerShell terminal from the release root:
+
+```powershell
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
+```
+
+The profiles use ports 8177, 8178, and 8179 respectively. Verify their explicit
+`mode`, `scenario`, `environment`, and `speed` through `/health`; use `/history`
+to capture brief outage/restart transitions. Bind only to the isolated rehearsal
+identities in `CONVENE_REINTEGRATION_HANDOFF.md`.
 
 ## Rollback
 

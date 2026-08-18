@@ -52,9 +52,17 @@ POST /ingest -> Windows engine -> loopback /state -> state bridge
 -> C:\ConveneAgent\sim_vars.json -> existing VM agent -> Convene
 ```
 
-Convene must show `DATA NOT LIVE` for stale state, invalid authentication, stopped
-engine, stopped bridge, and expired `bridge_valid_until`. A value merely appearing
-in Convene is not acceptance.
+Tuesday integration is `PASS` only when synthetic live-shaped telemetry traverses
+the same public Cloudflare `/ingest` route the gateway will use, the engine's
+correlated `/state` advances, the bridge writes it, and the existing VM agent
+delivers the correlated run/sequence into bound Convene `sim_` fields. Convene
+must then show `DATA NOT LIVE` for stale state, invalid authentication, stopped
+engine, stopped bridge, and expired `bridge_valid_until`. Ingress or local
+`/state` without Convene evidence is `PARTIAL`; a value merely appearing and then
+freezing in Convene is not acceptance.
+
+Use `NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` as the turnkey
+prompt for the Codex session running on the VM.
 
 ## Wednesday dependency
 

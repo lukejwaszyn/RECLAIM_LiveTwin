@@ -222,6 +222,7 @@ become runnable.
 | `deployment/GATEWAY_GO_LIVE.md` | Living go/no-go punch list (authoritative status) |
 | `deployment/VM_ENGINE_HANDOFF.md` | **Stage 1 — read-first** full story + guardrails + acceptance gates for the VM session |
 | `deployment/VM_ENGINE_SESSION_BRIEF.md` | Stage 1 — turnkey brief for the cloud VM engine session |
+| `deployment/NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` | Fresh VM Codex prompt for Tuesday ingress-to-Convene integration and rehearsal profiles |
 | `deployment/VM_ENGINE_RUNBOOK.md` | Stage 1 — executable step-by-step VM deployment (quick tunnel) |
 | `docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Engine fault/fix analysis + autonomous-lifecycle design of record |
 | `deployment/CONVENE_GW_MAPPING.md` | `gw_` audit variables → `/latest` jsonPaths (36 vars) |

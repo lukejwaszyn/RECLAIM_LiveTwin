@@ -143,31 +143,41 @@ scenario, and one successful fallback run.
 
 ## Synthetic service launch sheet
 
-Run each command from `cloud_engine/` in a separate terminal. All hosts are
-loopback and intentionally use non-production ports.
+Run each command from the release root in a separate PowerShell terminal. The
+wrapper selects the reviewed scenario, environment, loopback port, and speed.
+All profiles are foreground processes, stop with Ctrl+C, and intentionally avoid
+production port 8078.
 
-```sh
-../.venv/bin/python -m reclaim_predictive_engine.service \
-  --scenario nominal --env earth_lab --host 127.0.0.1 --port 8177 --speed 6
-
-../.venv/bin/python -m reclaim_predictive_engine.service \
-  --scenario power_outage --env earth_lab --host 127.0.0.1 --port 8178 --speed 12
-
-../.venv/bin/python -m reclaim_predictive_engine.service \
-  --scenario nominal --env lunar_surface --host 127.0.0.1 --port 8179 --speed 6
+```powershell
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
 ```
 
-Read-only smoke checks:
+Read-only smoke checks, using the selected profile's port:
 
-```sh
-curl --fail --silent http://127.0.0.1:8177/health
-curl --fail --silent http://127.0.0.1:8177/manifest
-curl --fail --silent http://127.0.0.1:8177/state
-curl --fail --silent http://127.0.0.1:8177/history
+```powershell
+Invoke-RestMethod http://127.0.0.1:8177/health
+Invoke-RestMethod http://127.0.0.1:8177/manifest
+Invoke-RestMethod http://127.0.0.1:8177/state
+Invoke-RestMethod http://127.0.0.1:8177/history
 ```
 
-Repeat for ports `8178` and `8179`. Never substitute the public tunnel hostname
-or production port into these rehearsal commands.
+Expected repeatable results:
+
+| Profile | Port | `/health` identity | Key `/state` or `/history` result |
+|---|---:|---|---|
+| `nominal` | 8177 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=6` | stable `P_fwd=2200`; one 400-s simulated cycle in about 67 wall-clock seconds |
+| `power-outage` | 8178 | `mode=harness`, `scenario=power_outage`, `environment=earth_lab`, `speed=12` | history shows `S_PowerInterrupted` and `P_fwd=0` near 38 wall-clock seconds, then `S_Restart` near 63 seconds; cycle about 75 seconds |
+| `lunar` | 8179 | `mode=harness`, `scenario=nominal`, `environment=lunar_surface`, `speed=6` | stable `P_fwd=2200` under lunar-surface physics; one cycle in about 67 seconds |
+
+Repeat the smoke checks for ports `8178` and `8179`. The service retains up to
+600 history frames; use `/history` during or immediately after the outage cycle
+for the brief interruption and restart transitions so a polling interval cannot
+miss them.
+Never substitute the public tunnel hostname or production port into these
+rehearsal commands. Bind only the isolated `rehearsal_nominal_`,
+`rehearsal_outage_`, and `rehearsal_lunar_` Convene identities.
 
 ## Track B live nominal gates
 

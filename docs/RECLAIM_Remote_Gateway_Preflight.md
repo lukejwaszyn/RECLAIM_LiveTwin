@@ -274,12 +274,14 @@ running after cutover — it is a permanent V&V fixture, not scaffolding.
 
 ## 8. Rehearsal isolation (lunar operations, power outage)
 
-The two rehearsal scenarios run on a **separate engine instance**, never by
-switching the live one: different port, fed by the scenario generator
-(`--scenario power_outage`, `--env lunar_habitat` / `lunar_surface`), output
-labeled non-live, bound only to a separate rehearsal Convene namespace. Start
-and stop it at any time without touching the live stack; the live engine
-rejects rehearsal-labeled frames by design (§5 proved it). Note ADR-002
+The rehearsal scenarios run as **separate GET-only engine instances**, never by
+switching the live one. On the Windows VM, start them with
+`cloud_engine\windows\start-rehearsal-scenario.ps1` using `nominal`,
+`power-outage`, or `lunar`. They use loopback ports 8177–8179, publish explicit
+`mode=harness` plus scenario/environment metadata, and bind only to separate
+rehearsal Convene namespaces. Start and stop them without touching the live
+stack; the live engine rejects rehearsal-labeled frames by design (§5 proved
+it). Note ADR-002
 separately provides the lunar-vs-terrestrial *cooldown contrast from live
 data* via counterfactual projection — that is part of the live engine and is
 not a rehearsal.
