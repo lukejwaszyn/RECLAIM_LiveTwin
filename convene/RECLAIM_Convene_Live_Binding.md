@@ -15,13 +15,19 @@ Convene adds `sim_` to received fields. Bind these variables:
 | `sim_PL_op_state`, `sim_MT_op_state` | chamber-local state |
 | `sim_run_id`, `sim_cycle_id`, `sim_seq`, `sim_ts_source` | traceability and ordering |
 | `sim_mode`, `sim_ingest_status`, `sim_ingest_age_ms` | live-data validity gate |
+| `sim_data_live`, `sim_bridge_status`, `sim_bridge_valid_until` | bridge validation and downstream publication lease |
 | `sim_PL_T_bed_est`, `sim_MT_T_bed_est` | principal predicted temperatures |
 | `sim_PL_advisory_severity`, `sim_MT_advisory_severity` | chamber risk/advisory display |
 
 The primary system dashboard binds `sim_op_state`, not either chamber state.
 It visibly displays `sim_mode`, `sim_run_id`, `sim_seq`, and
 `sim_ingest_age_ms`. If mode is not `live`, status is not `accepted`, or the
-age exceeds the agreed limit, show **DATA NOT LIVE**.
+age exceeds the agreed limit, show **DATA NOT LIVE**. The VM state bridge also
+publishes a short `bridge_valid_until` lease. Convene must compare its own UTC
+clock to that deadline; an expired lease shows **DATA NOT LIVE** even if the last
+complete heartbeat payload still says `data_live: true`. This closes the case in
+which a bridge crash or persistent Windows sharing violation prevents a newer
+`sim_vars.json` replacement.
 
 First bind these fields in a separate test view. After a successful shadow run,
 remove legacy writers and promote this binding set to the operator view.
@@ -43,10 +49,11 @@ Rules:
    is never a second writer and never talks to the cRIO.
 2. **Bind to the published `sim_` set only**, not raw channels — the `sim_`
    variables above are the contract surface.
-3. **Same freshness gate as the dashboard.** When `sim_mode` is not `live`,
+3. **Same freshness and lease gate as the dashboard.** When `sim_mode` is not `live`,
    `sim_ingest_status` is not `accepted`, or `sim_ingest_age_ms` exceeds the
-   agreed limit, the view must show **DATA NOT LIVE** rather than freezing on a
-   stale pose.
+   agreed limit, or the viewer's current UTC time exceeds
+   `sim_bridge_valid_until`, the view must show **DATA NOT LIVE** rather than
+   freezing on a stale pose.
 4. **Element mapping is a maintained artifact.** Keep the variable→`.stp`-element
    binding table with the model so a geometry revision can't silently detach a
    signal from its body.
