@@ -2,7 +2,8 @@
 
 > **Stage:** Convene VM publication infrastructure
 > **Status:** APPROVED ARCHITECTURE / IMPLEMENTATION NOT STARTED
-> **Platform:** Windows VM registered in Convene as `reclaim-engine-2`
+> **Platform:** cloud-hosted Windows Server 2025 VM, in Kubernetes-managed
+> infrastructure, registered in Convene as `reclaim-engine-2`
 > **Purpose:** publish the predictive engine's normalized `/state` record through
 > this VM's independent Convene heartbeat.
 
@@ -13,6 +14,10 @@ engine VM. Other Convene agents run on separate devices and send their own
 independent heartbeats. Their implementation, state, scheduling, credentials, and
 variable-writing behavior are not inputs to this design and must not be reused,
 modified, or treated as a shared runtime.
+
+Kubernetes is the outer cloud hosting boundary. The guest is not a Linux host or
+Linux container: operate it with PowerShell, Windows services, NTFS paths, and
+ACLs as recorded in `DEPLOYMENT_TOPOLOGY.md`.
 
 The VM agent already knows how to include the JSON object stored at:
 

@@ -32,7 +32,7 @@ class Framer:
         self.cfg = cfg
         self._allowed = set(cfg.fields)
         self._warned_fields: set = set()   # warn once per unknown field (fix M5)
-        # A run identity belongs to the Pi session, not to an individual cRIO line.
+        # A run identity belongs to the gateway session, not to an individual cRIO line.
         self.run_id = cfg.run_id or str(uuid.uuid4())
         self._seq_store = seq_store
         start = 1

@@ -1,5 +1,14 @@
 # Integrated Handoff Evaluation
 
+> **Historical review record — not an operational runbook.** The platform
+> assumptions in this 2026-08-16 snapshot were corrected on 2026-08-17. The live
+> cloud guest is Windows Server 2025 in Kubernetes-managed infrastructure, and
+> the live gateway is a Windows 10 laptop. Findings that cite Linux VM paths,
+> systemd units, Raspberry Pi deployment, missing Git initialization, or absent
+> locks describe the repository at review time and are superseded by
+> `deployment/DEPLOYMENT_TOPOLOGY.md` plus the current runbooks. Safety findings
+> remain historical evidence until individually closed.
+
 **Review date:** 2026-08-16  
 **Repository reviewed:** `/Users/lukewaszyn/RECLAIM_LiveTwin`  
 **Review mode:** Read-only architecture, safety, and execution-readiness review. No runtime, service, deployment, CI, secret, host, or Git changes were made.
@@ -366,4 +375,3 @@ Only decisions that cannot safely be inferred are listed.
 Do **not** execute the current VM or gateway runbooks and do not connect or expose the command path.
 
 The next exact action is a controls/development review that records Decisions 1, 2, 3, 6, 7, and 8 above, marks the current deployment runbooks NO-GO under the integrated remediation program, and authorizes only the test-first session described here. That session should establish the locked test runner and commit failing RT-03/RT-05 regression evidence. Runtime implementation should begin only after those tests and the complete transaction-state inventory are reviewed.
-

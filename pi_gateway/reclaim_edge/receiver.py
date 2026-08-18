@@ -59,7 +59,7 @@ class Receiver(threading.Thread):
         conn.settimeout(1.0)
         try:
             conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            # Linux: probe after 10s idle, every 5s, drop after 3 failures.
+            # Platform TCP keepalive defaults are a secondary half-open defense.
             if hasattr(socket, "TCP_KEEPIDLE"):
                 conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
                 conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 5)

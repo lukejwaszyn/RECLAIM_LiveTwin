@@ -1,7 +1,8 @@
 # RECLAIM Laptop Gateway / Cloud Preflight
 
-**Deployment:** onsite Windows 10 laptop gateway (relay + HMI hub) · cloud VM
-predictive engine behind Cloudflare Tunnel · Convene as consumer/visualizer.
+**Deployment:** onsite Windows 10 laptop gateway (relay + HMI hub) · cloud-hosted
+Windows Server 2025 predictive-engine VM in Kubernetes-managed infrastructure,
+behind Cloudflare Tunnel · Convene as consumer/visualizer.
 The laptop receives cRIO frames over a direct Ethernet link and forwards them
 over Wi-Fi/Internet to the cloud. Deployment is intentionally side-by-side: do
 not replace an operating stack or change Convene bindings until the new live
@@ -16,102 +17,53 @@ outage) is a separate isolated instance — see §8.
 
 ---
 
-## 1. Remote access first (step zero — replaces TeamViewer)
+## 1. Remote access first
 
-Persistent, scriptable shell access is the foundation; every later
-configuration action happens through this shell. All inbound access rides
-Cloudflare Tunnel — outbound-only from the laptop, no port forwarding,
-protected by a Cloudflare Access policy.
+The gateway's enforced WDAC policy blocks inbound SSH and RDP listeners. Do not
+install or expose an SSH server and do not tunnel the unauthenticated gateway
+status port. Use the existing outbound-only administration plane:
 
-### 1.1 SSH server on the laptop (elevated PowerShell)
+- TeamViewer for hands-on Windows administration;
+- Tailscale for the approved private network; and
+- the existing boot-started Convene agent for its narrowly approved heartbeat
+  and audit role, not as a general deployment runner.
 
-```powershell
-# OpenSSH server
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-Set-Service sshd -StartupType Automatic
-Start-Service sshd
+The predictive-engine VM is also Windows. Use the cloud provider's approved
+Windows console or remote-management path. Kubernetes is the infrastructure
+hosting boundary, not an instruction to use Linux guest commands.
 
-# key auth for an admin account (Windows quirk: admin keys live here)
-Add-Content C:\ProgramData\ssh\administrators_authorized_keys "<your ssh-ed25519 public key>"
-icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r `
-       /grant "Administrators:F" /grant "SYSTEM:F"
-# after key login is verified: set 'PasswordAuthentication no' in
-# C:\ProgramData\ssh\sshd_config and Restart-Service sshd
-```
+### 1.1 Observation
 
-### 1.2 Named tunnel as a boot-started service
+On the gateway, inspect `http://127.0.0.1:9080/health`, `/latest`, and `/command`
+locally through the operator session. On the VM, inspect the engine at
+`http://127.0.0.1:8078` and use the external Cloudflare hostname only for the
+intended authenticated pipeline checks.
 
-```powershell
-winget install Cloudflare.cloudflared
-cloudflared tunnel login
-cloudflared tunnel create reclaim-laptop
-cloudflared tunnel route dns reclaim-laptop ssh-gw.<your-domain>
-cloudflared tunnel route dns reclaim-laptop status-gw.<your-domain>
-cloudflared service install
-Set-Service cloudflared -StartupType Automatic
-```
+### 1.2 Exit gate for §1
 
-`config.yml`:
-
-```yaml
-tunnel: reclaim-laptop
-credentials-file: C:\Users\<user>\.cloudflared\<tunnel-id>.json
-ingress:
-  - hostname: ssh-gw.<your-domain>
-    service: ssh://localhost:22
-  - hostname: status-gw.<your-domain>
-    service: http://localhost:9080
-  - service: http_status:404
-```
-
-In the Cloudflare dashboard, create a self-hosted Access application covering
-both hostnames with a policy allowing team emails only.
-
-### 1.3 PuTTY client (any workstation)
-
-Install `cloudflared` on the client. In PuTTY: Session → Host Name
-`ssh-gw.<your-domain>`, port 22; Connection → Proxy → Proxy type **Local**,
-local proxy command:
-
-```
-cloudflared access ssh --hostname %host
-```
-
-First connection opens a browser for the Access login, then the session lands.
-For scripted use (scp/rsync of configs), the equivalent `ssh_config` entry is
-`ProxyCommand cloudflared access ssh --hostname %h`.
-
-### 1.4 Observation by URL (interim)
-
-`https://status-gw.<domain>/health` is the interim observation point: rx/tx
-counters, queue depth, dead-letter count, last-ack age. `/latest` shows the
-most recent submitted frame; `/command` shows the returning CommandSignal.
-Once the new cloud engine deployment is the observation plane, the same
-numbers are read from cloud `/health` + `/state` and the status hostname
-becomes a maintenance-only path.
-
-### 1.5 Exit gate for §1
-
-Remote SSH works from an offsite network via PuTTY; both tunnel hostnames
-answer after a laptop reboot with no login; Convene loads from the laptop;
-cloud ingress `/health` reachable from the laptop (`curl
-https://<ingress>/health`, record round-trip times). Only then proceed.
+TeamViewer access survives a gateway reboot; the approved VM management path is
+recorded; the gateway Convene agent resumes its heartbeat; and the gateway can
+reach the cloud ingress `/health` endpoint. Only then proceed.
 
 ---
 
 ## 2. Reconnaissance (record before changing anything)
 
-On the cloud host:
+On the Windows Server 2025 cloud VM (PowerShell):
 
-```bash
-hostnamectl
-python3 --version
-ps aux | grep -E '[p]ush_ingest|[r]eclaim_edge|[c]onvene'
-ss -tlnp | grep -E '8077|8078|8079|9070|9080'
-systemctl list-units --all | grep -i reclaim
+```powershell
+Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber
+py --version
+Get-CimInstance Win32_Process |
+  Where-Object { $_.Name -match 'python|cloudflared|convene|reclaim' } |
+  Select-Object ProcessId, Name, ExecutablePath, CommandLine
+Get-NetTCPConnection -State Listen |
+  Where-Object { $_.LocalPort -in 8077,8078,8079,9070,9080 }
+Get-Service | Where-Object { $_.Name -match 'reclaim|cloudflared|convene' }
+Get-ScheduledTask | Where-Object { $_.TaskName -match 'reclaim|cloudflared|convene' }
 ```
 
-On the laptop (over the new SSH path): `ipconfig`, `route print -4`,
+On the Windows 10 laptop (through TeamViewer): `ipconfig`, `route print -4`,
 `Get-NetTCPConnection -LocalPort 9070`, and
 `Get-ScheduledTask | Where-Object {$_.TaskName -match 'reclaim'}`.
 
@@ -123,14 +75,10 @@ name: save `/health`, `/manifest`, and `/state` from each observed cloud port.
 
 ## 3. Cloud preparation
 
-Deploy the dual-engine package to a new directory and use a free port. Before
-starting its production service, create the secret file:
-
-```bash
-sudo install -d -m 700 /etc/reclaim
-sudo sh -c 'umask 077; cp reclaim-ingest.env.example /etc/reclaim/reclaim-ingest.env'
-sudoedit /etc/reclaim/reclaim-ingest.env
-```
+Deploy the dual-engine package to a new versioned directory on the Windows VM
+and use a free loopback port. Follow `deployment/VM_ENGINE_RUNBOOK.md`; the
+authoritative paths are under `C:\ProgramData\RECLAIM`, with application code
+in `releases\<SHA>` and secrets, state, and logs outside the release tree.
 
 Set a long random `RECLAIM_INGEST_TOKEN`, and a distinct `RECLAIM_READ_TOKEN`
 for the GET endpoints (`/state`, `/manifest`, `/history`, `/command`) used by
@@ -140,11 +88,14 @@ both `POST /ingest` and the GET routes to the engine, which binds
 **loopback only** so it is reachable exclusively through the tunnel. Never
 expose the engine port directly to the Internet.
 
-Install the supplied `reclaim-ingest.service` only after setting its absolute
-Python and working-directory paths for the actual host. Tokens come from the
-`EnvironmentFile` only — never on the command line (visible in `ps`). The unit
-sets `RECLAIM_INGEST_STATE` so run/sequence identity survives restarts; both
-are required in `--production`.
+Install the repository's WinSW service template only after setting its absolute
+Windows paths and verifying the WinSW binary. Tokens come from the ACL-protected
+secret file read by `cloud_engine\windows\run-ingest-engine.ps1`; they never
+appear in service XML or command-line arguments. The runner sets
+`RECLAIM_INGEST_STATE` so run/sequence identity survives restarts. Protect the
+state and secret paths with NTFS ACLs and confirm the VM platform preserves the
+underlying Windows disk across Kubernetes rescheduling before declaring restart
+recovery proven.
 
 ---
 
@@ -234,10 +185,11 @@ passive confirmation, not a blocker.)
 From a trusted shell, post one fresh v1 frame through the authenticated
 ingress. The response must report one accepted frame and zero errors. Then:
 
-```bash
-curl -sS https://<ingress>/health                                  # open (probe)
-curl -sS -H 'Authorization: Bearer <READ token>' https://<ingress>/state
-curl -sS -H 'Authorization: Bearer <READ token>' https://<ingress>/manifest
+```powershell
+Invoke-RestMethod https://<ingress>/health
+$headers = @{ Authorization = "Bearer $env:RECLAIM_READ_TOKEN" }
+Invoke-RestMethod https://<ingress>/state -Headers $headers
+Invoke-RestMethod https://<ingress>/manifest -Headers $headers
 ```
 
 Expected `/state` fields include `schema_version: reclaim.state.v1`,
@@ -336,10 +288,10 @@ not a rehearsal.
 
 ## Handoff checklist
 
-- [ ] §1 SSH via PuTTY from offsite; tunnel survives reboot; Access policy on
+- [ ] §1 outbound-only gateway access and approved VM management path verified
 - [ ] §2 recon recorded (cloud ports/processes, laptop network state)
-- [ ] §3 cloud engine deployed: loopback bind, env-file tokens (600), state
-      file configured, `--production`
+- [ ] §3 Windows cloud engine deployed: loopback bind, ACL-protected tokens,
+      persistent state file configured, WinSW service running `--production`
 - [ ] §4 cRIO link static IPs; gateway config in place; `RECLAIM-EdgeGateway`
       task installed and running from boot; `/health` `/latest` `/command`
       answering

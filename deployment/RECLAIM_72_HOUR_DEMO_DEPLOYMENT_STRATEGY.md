@@ -8,6 +8,11 @@
 **Commitment:** one guaranteed nominal synthetic demo plus two synthetic practice scenarios
 **Live posture:** optional stretch path only; currently NO-GO
 
+**Platform correction (2026-08-17):** the live cloud guest is Windows Server
+2025 in Kubernetes-managed infrastructure and the edge gateway is a Windows 10
+laptop. All VM guest work uses PowerShell, Windows services, NTFS paths, and
+ACLs. There is no Linux or Raspberry Pi runtime in Track B.
+
 ## Decision
 
 Run two tracks in parallel without coupling the guaranteed demo to unavailable
@@ -54,7 +59,7 @@ Success also requires:
 | Gateway ingress `:9070` | Receive cRIO telemetry | Not used | Bound only to approved interface; firewall and single-source behavior verified |
 | Gateway status `127.0.0.1:9080` | Local health/latest visibility | Optional display only | `/health` and `/latest` green; raw `/command` is not consumed or surfaced as actionable |
 | Synthetic services `127.0.0.1:8177-8179` | Isolated scenario engines | Required | Never tunnel or route to production |
-| VM ingest `127.0.0.1:8078` | Production dual push engine | Not used | RT-03/RT-05 green, locked artifact, state path writable, advisory mode, maintenance gate |
+| Windows Server 2025 VM ingest `127.0.0.1:8078` | Production dual push engine | Not used | RT-03/RT-05 green, locked artifact, persistent Windows state path writable, advisory mode, maintenance gate |
 | Cloudflare public route | Authenticated VM egress edge | Not used | Stable hostname, TLS, tokens, route-to-loopback, health and auth checks |
 | Convene rehearsal namespace | Demo visualization | Preferred; local HTTP viewer is fallback | Distinct fields such as `rehearsal_nominal_*`, `rehearsal_outage_*`, and `rehearsal_lunar_*` |
 | Convene live `sim_` namespace | One live publisher | Prohibited | Six contract gates, three-column V&V, single-writer cutover, owner GO |

@@ -1,7 +1,9 @@
 # RECLAIM Convene Live Binding
 
-This binding starts clean. Configure exactly one live publisher from the cloud
-dual engine's `/state` endpoint. Do not run the legacy state publisher,
+This binding starts clean. Configure exactly one live `sim_` publisher: the
+existing Windows Server 2025 VM Convene agent reading the repository state
+bridge's atomic `C:\ConveneAgent\sim_vars.json` output. The bridge alone reads
+the cloud dual engine's loopback `/state` endpoint. Do not run the legacy state publisher,
 simulation bridge, CSV importer, or harness publisher against this same
 Convene variable set.
 
@@ -44,9 +46,10 @@ corresponding bodies, `sim_active_chamber` highlights the live chamber,
 
 Rules:
 
-1. **Read-only consumer of `/state`.** The visualization reads the same cloud
-   `/state` record (through the tunnel hostname, with `RECLAIM_READ_TOKEN`); it
-   is never a second writer and never talks to the cRIO.
+1. **Read-only consumer of the VM agent's `sim_` publication.** The visualization
+   binds the same fields delivered from the bridge through the existing VM
+   Convene agent. It does not call `/state`, possess `RECLAIM_READ_TOKEN`, become
+   a second writer, or talk to the cRIO.
 2. **Bind to the published `sim_` set only**, not raw channels — the `sim_`
    variables above are the contract surface.
 3. **Same freshness and lease gate as the dashboard.** When `sim_mode` is not `live`,
@@ -74,8 +77,9 @@ Rules:
    (`gw_MW_power`, `gw_PL_bottom1`, …). It never writes any `sim_` variable —
    the cloud engine's publisher remains the single writer of that set.
 2. **Read-only tap, out of the delivery path.** The Convene connection reads
-   the gateway's local `/latest` endpoint (directly or via the status tunnel
-   hostname). It can never block, slow, or reorder the durable queue feeding
+   the gateway's local loopback `/latest` endpoint through the existing laptop
+   Convene agent. Do not expose port 9080 through a status tunnel. The audit tap
+   can never block, slow, or reorder the durable queue feeding
    the cloud.
 3. **The audit view** shows three columns per signal: LabVIEW indicator,
    `gw_*`, `sim_*`. Matching `gw_seq`/`sim_seq` and equal

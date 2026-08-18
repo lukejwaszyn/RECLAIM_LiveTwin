@@ -1,317 +1,132 @@
-# Luke Handoff — Local Source, VM Engine, and Convene Lane
+# Luke Handoff — Windows Cloud VM, Convene, and Local Coordination
 
-> **Owner:** Luke  
-> **Status:** Ready for the next integration session (2026-08-17)  
-> **Objective:** make the reviewed engine reachable and demonstrably correct while
-> Adam deploys and validates the Windows gateway against the physical RECLAIM system.
-> This is an advisory-only demonstration deployment. Production-grade CD is out of
-> scope.
+> **Owner:** Luke
+> **Status:** Ready for Windows VM integration
+> **Platform:** Windows Server 2025 VM in Kubernetes-managed cloud infrastructure
 
-## Finish line for this lane
+Read `DEPLOYMENT_TOPOLOGY.md` first. The edge gateway is a Windows 10 laptop.
+No Linux or Raspberry Pi runtime is part of the live pipeline.
 
-Luke's lane is complete when:
+## Finish line for Luke's lane
 
-- the exact reviewed source revision is recorded and passes the local source gate;
-- the synthetic services remain available as a labeled fallback;
-- the production-mode ingest service runs on the VM at `127.0.0.1:8078` with
-  persistent state and separate ingest/read tokens;
-- a Cloudflare hostname or quick-tunnel URL reaches that service;
-- the live acceptance harness passes through the public URL;
-- Adam privately receives only the `/ingest` URL and ingest token;
-- Convene reads normalized engine state using the read token and the existing STEP
-  model/bindings are reconciled to the final field contract; and
-- one synthetic run and one real-gateway run are captured with source revision,
-  run identity, timestamps, and evidence.
+- Select and record the exact reviewed source revision.
+- Discover and preserve the current Windows VM deployment before change.
+- Run the production dual engine on `127.0.0.1:8078` with distinct ingest/read
+  credentials and persistent run/sequence identity.
+- Prove the Cloudflare ingress with the 20-check acceptance harness.
+- Install and accept the independent Windows state bridge.
+- Bind the existing VM Convene agent to normalized state with single-writer,
+  prefix, freshness, and publication-lease proof.
+- Privately hand Adam only the `/ingest` URL and ingest credential.
+- Capture one synthetic VM-to-Convene run and one real gateway-to-Convene run.
 
-This lane does **not** include automatic promotion, fleet management, signed
-artifacts, blue/green deployment, or production-grade secret management.
+## Ownership
 
-## Ownership boundary
-
-| Luke owns | Adam owns | Rendezvous |
+| Luke | Adam | Joint checkpoint |
 |---|---|---|
-| Branch/PR/CI, exact source revision, local tests, VM engine, tunnel, engine acceptance, Convene coordination | Physical RECLAIM system, cRIO link, Windows gateway, real raw-frame validation, local gateway configuration | Endpoint handoff, first accepted frame, field reconciliation, end-to-end V&V, demonstration rehearsal |
+| PR/CI, exact SHA, Windows VM engine, Cloudflare route, state bridge, VM `sim_` publisher, Convene coordination | Windows 10 gateway, cRIO link, real raw-frame validation, `gw_` audit publisher | endpoint handoff, first accepted frame, field reconciliation, full sequence, fail-closed evidence |
 
-Remote control of the lab endpoints is a support channel. It is useful for a
-joint troubleshooting session, but it does not change ownership or become a
-runtime dependency.
+Kubernetes/hosting operators own the outer VM workload and storage policy. Controls
+operators retain hardware authority and the independent interlock.
 
-## Starting point
+## Phase 1 — Source gate
 
-- Repository: `lukejwaszyn/RECLAIM_LiveTwin`
-- Integration branch: `agent/rt03-rt05-convene-integrity`
-- Draft PR: `#1`
-- Last recorded branch revision: `d87bbae4b097dff3ac7eacfbc909e59b0259b0da`
-- Integrity implementation begins at `3379402`; subsequent commits add tests and
-  integration documentation.
-- Adam's GitHub account `adamzim30` has a pending Write invitation.
-- `Convene-Systems` is a GitHub organization, not an individual collaborator;
-  repository access still requires a named user or a separately approved transfer.
-
-Treat these as a pickup point, not a permanent deployment identity. Refresh the PR
-and record the exact revision used before copying anything to the VM.
-
-## Phase 1 — Close the local source gate
-
-From the repository root on the MacBook:
-
-```bash
+```powershell
 git status --short
 git branch --show-current
 git rev-parse HEAD
 gh pr checks 1
-uv sync --locked --all-extras --dev --python 3.13
-python3 scripts/check_repository_hygiene.py
-cd cloud_engine
-../.venv/bin/python -m pytest tests/test_rt03_rt05_integrity.py -q
-../.venv/bin/python -m pytest tests -q
-cd ../pi_gateway
-PYTHONPATH=. ../.venv/bin/python -m pytest tests -q
+$env:UV_CACHE_DIR = Join-Path $env:TEMP 'reclaim-uv-cache'
+$env:PYTHONPATH = 'pi_gateway'
+uv run --frozen pytest -q convene_bridge\tests
+uv run --frozen pytest -q cloud_engine\tests pi_gateway\tests
+uv run --frozen python scripts\check_repository_hygiene.py
+Remove-Item Env:PYTHONPATH
 ```
 
-Gate:
+Record the full PR head or merged-main SHA as `TARGET_SHA`. Do not embed a moving
+SHA in a durable runbook.
 
-- worktree changes are intentional;
-- repository hygiene passes;
-- RT-03/RT-05 and full cloud tests pass;
-- gateway tests pass; and
-- all required PR checks pass before merge or release selection.
+## Phase 2 — Windows VM discovery
 
-After review, choose either the reviewed PR head or the merged `main` revision.
-Record the full SHA as `TARGET_SHA` in the session notes. Never deploy the old
-candidate manifest under `artifacts/`; its recorded revision predates the current
-integrity work.
+Use the read-only commands in `VM_ENGINE_RUNBOOK.md`. Confirm Windows build,
+services, tasks, port 8078, release directories, secret/state ACLs, cloudflared,
+Convene agent identity, and `sim_vars.json` writers. Also confirm whether
+`C:\ProgramData\RECLAIM` survives Kubernetes VM rescheduling.
 
-## Phase 2 — Keep the local demonstration fallback ready
+Do not overwrite or stop an unexpected deployment.
 
-These services are synthetic and must be labeled as such. They are not the public
-ingest endpoint and should not be exposed through the tunnel.
+## Phase 3 — Engine and tunnel
 
-From `cloud_engine/`, run each in its own terminal when needed:
+Follow `VM_ENGINE_RUNBOOK.md`:
 
-```bash
-../.venv/bin/python -m reclaim_predictive_engine.service --scenario nominal --env earth_lab --host 127.0.0.1 --port 8177 --speed 6
-../.venv/bin/python -m reclaim_predictive_engine.service --scenario outage --env earth_lab --host 127.0.0.1 --port 8178 --speed 12
-../.venv/bin/python -m reclaim_predictive_engine.service --scenario nominal --env lunar_surface --host 127.0.0.1 --port 8179 --speed 6
-```
+1. stage `TARGET_SHA` under a fresh Windows release directory;
+2. build the locked venv and run tests/import gates;
+3. create ACL-protected, distinct ingest/read credentials;
+4. install/reconcile `RECLAIMIngestEngine` through reviewed WinSW;
+5. prove loopback-only port 8078 and durable identity;
+6. preserve or establish the Windows cloudflared route; and
+7. pass the 20-check endpoint harness and restart test.
 
-Smoke-test `/health`, `/manifest`, `/state`, and `/history` on each port. The
-nominal service is the fallback for visualization work while Adam is offline; the
-outage and lunar services are rehearsal scenarios.
+## Phase 4 — Bridge and Convene
 
-## Phase 3 — Discover before changing the VM
+Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`:
 
-On the VM, collect the following without printing tokens or environment-file
-contents into captured logs:
+1. discover the existing VM agent identity and ACLs;
+2. verify an approved WinSW binary/checksum;
+3. install the bridge side-by-side with read credential only;
+4. start in `passthrough` prefix mode;
+5. use bridge metadata as the harmless prefix canary;
+6. bind health/lease fields before process fields;
+7. prove stale, unauthorized, engine-stop, bridge-stop, and file-lock behavior;
+8. verify Convene computes current UTC against `bridge_valid_until`; and
+9. confirm exactly one `sim_` writer and no change to `/command` authority.
 
-```bash
-hostnamectl
-python3 --version
-df -h
-systemctl status reclaim-ingest.service --no-pager
-systemctl status cloudflared.service --no-pager
-sudo ss -ltnp
-sudo find /opt/reclaim -maxdepth 3 -type d 2>/dev/null
-```
+Tuesday is complete only when authenticated synthetic ingest reaches Convene and
+every failure case displays `DATA NOT LIVE`.
 
-Also record:
+## Phase 5 — Gateway rendezvous
 
-- login user and intended service user;
-- current engine directory and revision, if any;
-- whether `/etc/reclaim/reclaim-ingest.env` exists and its permissions;
-- whether `/var/lib/reclaim-ingest/ingest_state.json` exists; and
-- the current tunnel type and hostname, if any.
-
-Do not overwrite an unexpected running deployment. If the VM is not in the state
-described by `VM_ENGINE_RUNBOOK.md`, preserve it, identify what owns port 8078, and
-reconcile the discrepancy first.
-
-## Phase 4 — Deploy the exact revision to the VM
-
-Use a fresh directory for the selected revision. If this is genuinely the first VM
-install, the supplied unit expects `/opt/reclaim/engine`. If that path already
-contains a deployment, stage the new revision under
-`/opt/reclaim/releases/<TARGET_SHA>` and deliberately update a copy of the unit's
-`WorkingDirectory` and `ExecStart`; do not overwrite the existing tree in place.
-
-Minimum deployment record:
-
-| Item | Record |
-|---|---|
-| Full source SHA | `TARGET_SHA` |
-| VM directory | Exact absolute path |
-| Python | Version and virtual-environment path |
-| Unit | Unit name and installed unit-file checksum |
-| Configuration | Path only; never values |
-| State | Persistent state-file path |
-| Tunnel | Type and public base URL |
-
-Follow `VM_ENGINE_RUNBOOK.md` for transfer and environment setup. Before starting
-the service, run this import gate from the VM virtual environment:
-
-```bash
-python -c "import numpy, scipy, sklearn; print('engine dependencies import')"
-```
-
-The supplied unit is designed for:
-
-- `127.0.0.1:8078` only;
-- `--production` and `--max-frame-age-s 15`;
-- configuration at `/etc/reclaim/reclaim-ingest.env`; and
-- persistent identity at `/var/lib/reclaim-ingest/ingest_state.json`.
-
-Generate independent, high-entropy ingest and read tokens. Store them only in the
-root-owned environment file with mode `0600`. Do not paste tokens into GitHub,
-session notes, screenshots, recorded terminals, or this document.
-
-Start and inspect the engine:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now reclaim-ingest.service
-systemctl status reclaim-ingest.service --no-pager
-sudo ss -ltnp | grep 8078
-curl --fail --silent http://127.0.0.1:8078/health
-```
-
-Pass the read token only in the authorization mechanism expected by the endpoint
-when checking `/manifest`, `/state`, `/history`, and `/command`. Avoid commands that
-echo secrets into shell history.
-
-## Phase 5 — Establish and prove the external endpoint
-
-A Cloudflare quick tunnel is acceptable for this event if a stable named tunnel is
-not already configured. Record that a quick-tunnel URL is ephemeral and reissue the
-endpoint handoff if it changes. Expose only `127.0.0.1:8078`; never expose the local
-synthetic ports.
-
-Run the repository's acceptance harness through the public URL from the MacBook:
-
-```bash
-cd cloud_engine
-../.venv/bin/python tools/redteam_ingest.py \
-  --url https://<engine-host> \
-  --ingest-token '<private-ingest-token>' \
-  --read-token '<private-read-token>'
-```
-
-Required result: all 20 checks pass. Then restart the ingest service and verify:
-
-- `active_run_id` persists;
-- the accepted sequence boundary persists;
-- replaying the last accepted frame does not step the engine again; and
-- fresh telemetry is accepted after restart.
-
-## Endpoint packet for Adam
-
-Send this privately after VM acceptance:
+Privately provide Adam:
 
 | Field | Value |
 |---|---|
-| Base URL | `https://<engine-host>` |
 | Gateway destination | `https://<engine-host>/ingest` |
-| Credential | Ingest token only |
+| Credential | ingest token only |
 | Schema | `reclaim.telemetry.v1` |
-| Maximum frame age | 15 seconds |
-| Engine source | Full `TARGET_SHA` |
-| Availability window | Planned integration start/end |
-| Support | Luke plus agreed remote-control channel |
+| Maximum age | 15 seconds |
+| Engine revision | full `TARGET_SHA` |
+| Availability | agreed integration window |
 
-Do not send Adam the read token unless his gateway implementation demonstrably
-requires it; the normal gateway path only writes to `/ingest`. Ask Adam to return:
+Adam returns the gateway SHA, redacted first `/latest` record, actual raw field
+names, identity/timestamp semantics, and confirmation that no advisory output is
+wired to control.
 
-- gateway branch and SHA;
-- redacted `/latest` sample;
-- actual raw cRIO field-name list;
-- timestamp, sequence, active chamber, and operation-state semantics; and
-- confirmation that the advisory output is not wired to control authority.
+## Wednesday full-pipeline sequence
 
-## First-frame rendezvous
+1. Verify safe hardware state and the independent interlock.
+2. Establish the Windows 10 laptop/cRIO direct network and narrow firewall rule.
+3. Run the gateway manually before installing or starting its boot task.
+4. Capture the first real `/latest` frame and reconcile names/units.
+5. Pass fresh, duplicate, harness, stale, gateway-restart, engine-restart, and
+   freshness-decay gates.
+6. Publish the separate `gw_` audit namespace; never write `sim_` from the laptop.
+7. Run one complete controlled process sequence with LabVIEW/`gw_`/`sim_`
+   agreement and bounded lag.
+8. Exercise network interruption, queue drain, telemetry stop, and component
+   restart behavior.
+9. Install the gateway boot task only after the manual path passes.
 
-Luke watches the VM while Adam starts the gateway:
+## Evidence
 
-```bash
-sudo journalctl -fu reclaim-ingest.service
-```
-
-Verify in this order:
-
-1. `/health` stays healthy before traffic.
-2. One fresh frame is accepted.
-3. Engine `/state` matches Adam's `/latest` for source, sequence, timestamp,
-   active chamber, operation state, and mapped process values.
-4. A duplicate is acknowledged without a second model step.
-5. A malformed or stale frame is rejected without state mutation.
-6. A short network interruption queues data on the gateway and drains cleanly.
-7. Loss of telemetry increases freshness age and the UI fails closed.
-
-If fields disagree, fix the contract and tests in Adam's branch. Do not patch
-machine-specific configuration into the repository or normalize unexplained values
-silently on the VM.
-
-## Convene cutover
-
-Use exactly two live data paths:
-
-- `sim_`: normalized/predictive state from VM `/state`, authenticated with the
-  read token;
-- `gw_`: raw audit state from the Windows gateway `/latest`.
-
-Reuse the submission-era `.stp` model and existing part-to-variable bindings.
-Reconcile them against the actual final field names; do not rebuild the visualization
-unless a binding is genuinely missing. Confirm the display clearly distinguishes
-source, environment, run, sequence, freshness, model trust, active process state,
-and advisory output. `DATA LIVE` must fail closed when either required source is
-stale or mismatched.
-
-The `/command` surface remains advisory. Physical interlocks and the LabVIEW
-sequencer retain sole control authority.
-
-## Checkpoints with Adam
-
-| Checkpoint | Luke brings | Adam brings | Exit condition |
-|---|---|---|---|
-| A — Source | Reviewed `TARGET_SHA`, passing checks | Clean checkout and passing gateway tests | Both lanes use known revisions |
-| B — Endpoint | Accepted public URL and private ingest token | Console-ready gateway configuration | No secret or URL committed |
-| C — First frame | VM logs and authenticated state view | Real `/latest` frame and raw field list | Identity and process fields agree |
-| D — V&V | `sim_` feed, engine evidence, Convene view | `gw_` feed, physical observations | Nominal, outage, lunar, and stale-data behaviors captured |
-
-## Evidence to retain
-
-For each accepted run, capture:
-
-- date/time and operator;
-- MacBook, VM, and gateway source SHAs;
-- engine run ID and source identity;
-- environment and scenario;
-- first/last sequence and timestamps;
-- harness/test results;
-- redacted state and gateway samples;
-- Convene screenshots or video showing model-part response and freshness; and
-- deviations, decisions, and follow-up owner.
-
-Never include tokens, operational credentials, or unredacted machine configuration.
+Record operators, Windows VM identity, Kubernetes workload identity, VM/gateway
+source SHAs, service identities, run/source IDs, sequence/time range, redacted
+state/latest samples, test results, Convene screenshots, prefix mode, lease-expiry
+evidence, deviations, and rollback result. Never record credentials.
 
 ## Stop conditions
 
-Stop and reconcile rather than improvising if:
-
-- the selected revision does not pass its gate;
-- port 8078 or the service directory is owned by an unknown deployment;
-- the engine binds anything other than loopback;
-- identity changes unexpectedly after restart;
-- source/sequence/timestamp semantics differ between the gateway and VM;
-- Convene shows data as live when either source is stale; or
-- any advisory output is connected to hardware control authority.
-
-## Immediate sequence tomorrow
-
-1. Refresh PR #1, close the source gate, and record `TARGET_SHA`.
-2. Confirm the synthetic nominal fallback locally.
-3. Discover the VM's real state and deploy the exact revision side-by-side.
-4. Start the loopback production-mode engine and external tunnel.
-5. Pass the 20-check acceptance harness and restart-persistence test.
-6. Send Adam the private endpoint packet.
-7. Meet at the first-frame checkpoint, reconcile real fields, then connect Convene.
-8. Rehearse and record nominal, outage, lunar, and stale-data behavior.
-
+Stop if source revisions are uncertain, port/service/file ownership is unexpected,
+the engine is not loopback-only, durable identity is not persistent, gateway and
+engine identity semantics differ, Convene remains live after lease expiry, multiple
+writers exist, or advisory output gains hardware authority.

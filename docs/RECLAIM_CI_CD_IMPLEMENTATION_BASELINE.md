@@ -94,9 +94,10 @@ origin  https://github.com/lukejwaszyn/RECLAIM_LiveTwin.git
 ```
 
 The repository is private, its default branch is `main`, and local `main` tracks
-`origin/main`. The first hosted runs proved that repository hygiene and both
-baseline matrix jobs pass while the RT-03/RT-05 gate fails for the known product
-defects. Branch and tag protection remain an explicit owner decision.
+`origin/main`. The first hosted runs established the baseline. The RT-03/RT-05
+remediation is now implemented on the integration branch and the locked local
+suite passes; hosted checks must confirm each exact review/deployment SHA. Branch
+and tag protection remain an explicit owner decision.
 
 Before accepting pull requests, configure the remote repository as follows:
 

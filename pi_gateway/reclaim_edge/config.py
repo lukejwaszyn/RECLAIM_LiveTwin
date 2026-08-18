@@ -1,8 +1,9 @@
 """RECLAIM Edge Gateway — configuration.
 
 Typed config loaded from YAML (or defaults). One config object is threaded through
-the whole service. Secrets (tokens/certs) live in the YAML under /etc/reclaim-edge/,
-never in code.
+the whole service. On the Windows 10 deployment, secrets (tokens/certs) live in
+the YAML selected by RECLAIM_EDGE_CONFIG under a restricted NTFS ACL, never in
+code.
 
 Author: LJW.
 """
@@ -42,11 +43,11 @@ class Config:
     mode: str = "live"                # live | replay | harness
     schema_version: str = "reclaim.telemetry.v1"
 
-    # Seam A — cRIO -> Pi (trusted LAN, plaintext TCP)
+    # Seam A — cRIO -> Windows 10 gateway laptop (trusted LAN, plaintext TCP)
     listen_host: str = "0.0.0.0"       # bind to LAN interface
     listen_port: int = 9070
 
-    # Seam B — Pi -> cloud (TLS)
+    # Seam B — Windows 10 gateway laptop -> cloud (TLS)
     transport: str = "console"          # console | https | mqtts
     cloud_url: str = "https://vm.example/ingest"   # https mode
     mqtt_host: str = "vm.example"       # mqtts mode
@@ -74,7 +75,7 @@ class Config:
     # Set to at least several telemetry periods; 0 disables the idle drop.
     conn_idle_timeout_s: float = 30.0
 
-    # read-only status endpoint (for remote readability via a tunnel); 0 = off
+    # read-only loopback status endpoint; do not expose it through a tunnel; 0 = off
     status_port: int = 9080
 
     fields: List[str] = field(default_factory=lambda: list(MANIFEST_MEASURED_FIELDS))

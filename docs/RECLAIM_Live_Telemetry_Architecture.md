@@ -1,7 +1,9 @@
 # RECLAIM Live Telemetry Architecture
 
 **Status:** proposed production contract  
-**Scope:** cRIO/LabVIEW → laptop gateway → cloud predictive engine → Convene
+**Scope:** cRIO/LabVIEW → Windows 10 laptop gateway → Cloudflare → cloud-hosted
+Windows Server 2025 predictive-engine VM → Windows state bridge → existing VM
+Convene agent
 
 ## Purpose and decision
 
@@ -18,16 +20,16 @@ consumer, visualizer, and digital-thread system.
 cRIO / LabVIEW
   │ raw telemetry, source state, active chamber
   ▼
-Laptop gateway
+Windows 10 laptop gateway
   │ validates, stamps provenance, buffers, authenticated HTTPS POST
   ▼
-Cloud ingress / dual predictive engine
+Cloudflare ingress / Windows Server 2025 dual predictive engine on loopback
   │ validates order and run identity; estimates PL and MT independently
   ▼
 Canonical flat /state record
-  │ exactly one selected publisher
+  │ independent Windows state bridge; atomic sim_vars.json handoff
   ▼
-Convene agent / machine publish
+Existing VM Convene agent / machine publish
   └── sim_op_state, sim_PL_op_state, sim_MT_op_state, ...
 ```
 
@@ -214,14 +216,25 @@ Use a separate Convene project, agent registration, or explicit
 
 ## Deployment topology
 
-The cloud dual engine is the only production process on the live port. The
+The cloud dual engine is the only production process on the live port. It runs
+inside a Windows Server 2025 guest hosted by Kubernetes-managed cloud
+infrastructure. Kubernetes is the outer infrastructure boundary; VM guest
+operations use PowerShell, Windows services, NTFS paths, and ACLs. The
 gateway uses authenticated outbound HTTPS to the Cloudflare-protected cloud `/ingest`
-URL; Convene receives cloud `/state` through the one selected publisher.
+URL; Convene receives cloud `/state` through the repository-owned Windows state
+bridge and the existing VM agent.
 
 ```
-Laptop gateway -- authenticated HTTPS --> Cloudflare ingress --> dual engine :8078
-                                                          │
-                                                          └--> one Convene publisher --> Convene sim_ variables
+Windows 10 gateway -- authenticated HTTPS --> Cloudflare --> Windows VM engine :8078
+                                                               │ GET /state
+                                                               v
+                                                        Windows state bridge
+                                                               │ sim_vars.json
+                                                               v
+                                                        existing VM Convene agent
+                                                               │
+                                                               v
+                                                        Convene sim_ variables
 
 Harness / replay --> isolated port and isolated Convene namespace only
 Legacy single engine --> disabled in production
@@ -255,7 +268,8 @@ or process name.
 | LabVIEW / cRIO | Emit `source_op_state`, explicit `active_chamber`, `cycle_id`, and timing; preserve raw sensor values. |
 | Laptop gateway | Create `run_id`; stamp `source_id`, `seq`, `ts`, and `mode`; buffer/retry idempotently; authenticate to ingress. |
 | Cloud dual engine | Validate before stepping; track identity/order; publish canonical system/chamber state plus provenance and feed health. |
-| Convene publisher | Pass scalar provenance and health fields; run one publisher per binding set. |
+| Windows VM state bridge | Validate `/state`, enforce freshness and publication lease, and atomically replace `sim_vars.json`. |
+| Existing VM Convene agent | Publish the bridge output as the single `sim_` writer. |
 | Convene model/dashboard | Bind `sim_op_state` as system state, `sim_PL_op_state`/`sim_MT_op_state` as local state, and gate display/verification on status and freshness. |
 
 The contract separates what the source controller says the system is doing,

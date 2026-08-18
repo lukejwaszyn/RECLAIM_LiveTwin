@@ -1,8 +1,13 @@
 # Windows VM Convene State Bridge — Operator Runbook
 
-**Scope:** repository-owned bridge on the Windows predictive-engine VM only
+**Scope:** repository-owned bridge on the cloud-hosted Windows Server 2025
+predictive-engine VM only. The VM is hosted by Kubernetes-managed infrastructure;
+all guest procedures in this runbook use Windows services, PowerShell, NTFS paths,
+and ACLs.
 **Target machine registration:** `reclaim-engine-2`
 **Installation status:** not performed by repository implementation
+
+See `DEPLOYMENT_TOPOLOGY.md` for the authoritative end-to-end platform boundary.
 
 This service reads authenticated `GET http://127.0.0.1:8078/state`, validates the
 `reclaim.state.v1` live-data contract, and atomically replaces

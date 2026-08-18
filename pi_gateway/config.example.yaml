@@ -1,5 +1,6 @@
-# RECLAIM Edge Gateway config — copy to /etc/reclaim-edge/config.yaml and edit.
-# Secrets live here (mode 600), never in code.
+# RECLAIM Windows 10 Edge Gateway config — copy to
+# C:/RECLAIM/pi_gateway/config.windows.yaml and edit.
+# Secrets live here under a restricted NTFS ACL, never in code.
 
 src: reclaim-crio-01
 # Leave run_id blank to generate a new UUID when the gateway starts. Set it only
@@ -8,11 +9,11 @@ run_id: ""
 mode: live
 schema_version: reclaim.telemetry.v1
 
-# Seam A — cRIO -> Pi (trusted LAN, plaintext TCP)
+# Seam A — cRIO -> Windows 10 gateway laptop (trusted LAN, plaintext TCP)
 listen_host: 0.0.0.0
 listen_port: 9070
 
-# Seam B — Pi -> cloud
+# Seam B — Windows 10 gateway laptop -> cloud
 # transport: console | https | mqtts
 transport: console            # start here for E0 (no cloud needed)
 cloud_url: https://vm.example/ingest

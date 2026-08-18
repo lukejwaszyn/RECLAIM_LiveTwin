@@ -1,15 +1,15 @@
 """RECLAIM Edge Gateway — read-only status HTTP endpoint.
 
-Makes the Pi *readable* from anywhere (via a tunnel) without opening inbound ports
+Makes the gateway *readable* locally without opening additional inbound ports
 in the production sense: this is a small localhost HTTP server that a tunnel
 (cloudflared / ngrok / tailscale) exposes over an OUTBOUND-initiated connection.
 
 Endpoints (GET, JSON):
     /health   gateway metrics — rx, tx, queue depth, drops, last-ack age, uptime
-    /latest   the most recent canonical telemetry frame the Pi received
+    /latest   the most recent canonical telemetry frame the gateway received
     /         index of the above
 
-Stdlib only (http.server) so there is nothing extra to install on the Pi.
+Stdlib only (http.server) so there is nothing extra to install on the gateway.
 
 Author: LJW.
 """

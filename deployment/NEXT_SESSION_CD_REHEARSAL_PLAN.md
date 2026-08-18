@@ -3,11 +3,17 @@
 > **Objective:** get the advisory-only Live Twin integrated and demonstration-ready
 > in the next few days. Production-grade CD is out of scope.
 
+> **Authoritative schedule/platform:** Tuesday 2026-08-18 is the cloud-hosted
+> Windows Server 2025 VM deployment and Convene binding day. Wednesday
+> 2026-08-19 is the full cRIO → Windows 10 gateway → Cloudflare → Windows VM →
+> Convene pipeline with hardware-bound telemetry. Kubernetes hosts the Windows
+> VM; it is not a Linux guest deployment.
+
 ## Ownership
 
 | Owner | Workstream |
 |---|---|
-| Luke / MacBook | Repository, pull request, CI, release identity, VM engine, Convene coordination |
+| Luke / MacBook | Repository, pull request, CI, release identity, Windows VM engine/state bridge, Convene coordination |
 | Adam / lab | Physical RECLAIM system, cRIO, Windows edge gateway, real telemetry validation |
 | Both | End-to-end test, nominal/outage/lunar demonstrations, final evidence |
 
@@ -28,7 +34,7 @@ they are not the deployment architecture.
 - Run the gateway from a console first. Install or change its boot task only after
   the end-to-end path is proven.
 
-## Day 1 — Give Adam a clean starting point
+## Tuesday 2026-08-18 — VM integration and gateway preparation
 
 ### 1. Repository access
 
@@ -102,26 +108,29 @@ Day 1 handback from Adam:
 - any mapping or configuration deviations;
 - confirmation that no active command path was connected.
 
-## Day 1 in parallel — MacBook and VM
+## Tuesday in parallel — MacBook and Windows Server 2025 VM
 
 Luke's parallel lane:
 
 1. Restore GitHub CLI authentication.
 2. Review and merge the integrity PR when checks and review are complete.
-3. Deploy the exact reviewed engine commit to the VM.
+3. Deploy the exact reviewed engine commit to the Windows Server 2025 VM using
+   `VM_ENGINE_RUNBOOK.md`.
 4. Run it on loopback in advisory mode with persistent identity state.
 5. Verify `/health`, `/manifest`, `/state`, `/history`, and authenticated
    `/ingest` locally.
 6. Establish the demonstration tunnel/hostname and create the separate ingest
    and read tokens.
-7. Hand Adam only the gateway endpoint and ingest token through the agreed
+7. Install and validate the Windows state bridge; bind its output through the
+   existing VM Convene agent with the fail-closed publication lease.
+8. Hand Adam only the gateway endpoint and ingest token through the agreed
    private channel—not through Git, issues, logs, or screenshots.
 
 The VM does not need an automated production installer for this event. Record
 the commit, directory, Python version, configuration path, and restart command so
 the manual deployment is reproducible.
 
-## Day 2 — Connect the two lanes
+## Wednesday 2026-08-19 — hardware-bound full pipeline
 
 Adam updates the external Windows configuration with the VM ingest endpoint and
 token, then runs the gateway in a console.
@@ -140,7 +149,7 @@ Verify in order:
 Fix real schema/mapping differences in Adam's branch, add or update tests, and
 open a pull request. Keep machine-specific configuration outside the commit.
 
-## Day 2–3 — Convene and demonstration
+## Wednesday after pipeline proof — Convene V&V and demonstration
 
 Connect exactly two live consumers:
 

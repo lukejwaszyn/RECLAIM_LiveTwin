@@ -12,6 +12,8 @@ cloud-pipeline, and Convene sequence. `ClaudeCode_Backend_Remediation_Prompt.md`
 remains the narrower backend-only prompt. For the **current VM engine session**,
 read `VM_ENGINE_HANDOFF.md` first. For project-wide context, `HANDOFF.md` is the
 full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
+`DEPLOYMENT_TOPOLOGY.md` is the authoritative platform record: Windows Server
+2025 cloud VM plus Windows 10 gateway laptop.
 
 ## Integration stages
 
@@ -37,6 +39,7 @@ integration rather than production-grade CD.
 
 | Doc | Role |
 |---|---|
+| `DEPLOYMENT_TOPOLOGY.md` | Authoritative deployment topology, OS boundaries, live data path, and ownership rules. |
 | `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |
 | `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for RT-03/RT-05 backend fixes. |
 | `NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md` | **Primary fresh-chat prompt:** implement backend fixes, prove the cloud pipeline, and prepare isolated Convene reintegration. |
@@ -51,7 +54,7 @@ integration rather than production-grade CD.
 | `LUKE_VM_LOCAL_HANDOFF.md` | **Luke's active owner lane:** local source gate, VM deployment, endpoint acceptance, Adam rendezvous, and Convene cutover. |
 | `VM_ENGINE_HANDOFF.md` | **Read first.** Full story of the endpoint (prior reboot/discrepancy + fix), the DO-NOT-DEBUG-IT-BACK guardrails, and the acceptance gates. |
 | `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session (objective + step outline). |
-| `VM_ENGINE_RUNBOOK.md` | Executable step-by-step: deploy, secrets, systemd unit, quick tunnel, verify, hand back. |
+| `VM_ENGINE_RUNBOOK.md` | Executable Windows Server 2025 steps: deploy, ACL-protected secrets/state, WinSW service, cloudflared, verify, hand back. |
 | `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Authoritative fault/fix analysis (why the reboot was needed; §4.1 design of record). |
 | `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), the command-authority mode (advisory default), and the deploy-blocking disposition. |
 | `../cloud_engine/tools/redteam_ingest.py` | Live acceptance harness (LabVIEW-terminology emitter + pipeline/lifecycle assertions). Gate 2 in the handoff. |
@@ -79,7 +82,7 @@ integration rather than production-grade CD.
 |---|---|---|
 | `START_HERE.md` | 0 | Kickoff pointer for the staging session. Complete; superseded by `HANDOFF.md`. |
 | `ClaudeCode_Staging_Prompts.md` | 0 | The staging session's prompt pack. Record of how the gateway was staged. |
-| `ClaudeCode_Gateway_Reconciliation_Prompts.md` | 0.5 | The Pi→laptop doc-reconciliation session (GO_LIVE §9.6). Executed. |
+| `ClaudeCode_Gateway_Reconciliation_Prompts.md` | 0.5 | Historical Pi→Windows-laptop naming reconciliation (GO_LIVE §9.6). Executed; not a live deployment plan. |
 | `SSH_Tailscale_ClaudeCode_Setup.md` | 0 | Access setup. **SSH parts superseded** by the outbound-only model (§9.1); Tailscale/Claude Code steps still valid. |
 
 ## Conventions

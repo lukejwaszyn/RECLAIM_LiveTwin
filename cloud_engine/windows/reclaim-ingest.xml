@@ -1,0 +1,26 @@
+<!-- WinSW 3.x template. The operator substitutes the {{...}} values. -->
+<service>
+  <id>RECLAIMIngestEngine</id>
+  <name>RECLAIM Predictive Ingest Engine</name>
+  <description>Windows Server 2025 dual predictive engine on loopback port 8078.</description>
+  <executable>powershell.exe</executable>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File &quot;{{RUNNER_PATH}}&quot; -PythonExe &quot;{{PYTHON_EXE}}&quot; -EngineDir &quot;{{ENGINE_DIR}}&quot; -SecretFile &quot;{{SECRET_FILE}}&quot; -StateFile &quot;{{STATE_FILE}}&quot;</arguments>
+  <workingdirectory>{{ENGINE_DIR}}</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>30sec</stoptimeout>
+  <onfailure action="restart" delay="5 sec" />
+  <onfailure action="restart" delay="15 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <serviceaccount>
+    <username>{{SERVICE_ACCOUNT}}</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  <log mode="roll-by-size-time">
+    <sizeThreshold>10240</sizeThreshold>
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <zipOlderThanNumDays>7</zipOlderThanNumDays>
+    <keepFiles>14</keepFiles>
+  </log>
+</service>

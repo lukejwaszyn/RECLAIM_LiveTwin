@@ -1,7 +1,8 @@
 # RECLAIM Live Twin — CI/CD Architecture
 
-> **Status:** Local CI/release-candidate baseline implemented; remote repository
-> controls and every production-promotion mechanism remain pending. The red-team
+> **Status:** Local CI/release-candidate baseline and private GitHub remote exist;
+> branch/tag controls and every production-promotion mechanism remain pending.
+> The red-team
 > requirements in [CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md](CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md)
 > take precedence over any conflicting language in this document.
 >
@@ -26,7 +27,8 @@ CI validates the exact commit
         v
 Approved release artifact is created
         |
-        +--> VM deployment --> systemd predictive engine + named Cloudflare Tunnel
+        +--> VM deployment --> Windows services: predictive engine + state bridge
+        |                      + named Cloudflare Tunnel
         |
         +--> Gateway deployment --> TeamViewer-operated PowerShell script
                                       -> Windows Scheduled Task
@@ -38,7 +40,7 @@ Approved release artifact is created
 |---|---|---|
 | MacBook workspace | Source development, local sanity checks, Monte Carlo fault injection, release approval | Git client and GitHub web interface / CLI |
 | CI service | Tests, release packaging, traceability | GitHub Actions hosted runner |
-| Predictive-engine VM | Production engine, loopback-only ingest service, Cloudflare Tunnel | Future fixed, least-privilege pull installer; never a general CI runner |
+| Predictive-engine VM | Windows Server 2025 guest in Kubernetes-managed cloud infrastructure; production engine, loopback-only state bridge, existing Convene agent, Cloudflare Tunnel | Reviewed PowerShell/WinSW deployment; never a general CI runner |
 | Windows gateway | cRIO receiver, durable queue, authenticated cloud publisher | Approved, operator-run PowerShell release script through TeamViewer |
 | cRIO / LabVIEW | Live telemetry producer | Never deployed by this pipeline |
 | Convene | Read-only state consumer and visualization | Not changed until live V&V passes |
@@ -66,19 +68,19 @@ copied from the Mac. A future promotable bundle must bind its source commit and
 artifact digest to an independently verifiable signed manifest. The current
 workflow produces an explicitly unsigned, non-promotable candidate only.
 
-### Initial prerequisite
+### Repository prerequisite status
 
-This workspace was not a Git repository when this plan was drafted. The local
-baseline now contains CI configuration, a dependency lock, and release-candidate
-tooling. Before enabling remote CI and any promotion:
+This workspace was not a Git repository when this plan was drafted. It is now a
+Git repository with private origin
+`https://github.com/lukejwaszyn/RECLAIM_LiveTwin.git`, CI configuration, a
+dependency lock, and release-candidate tooling. Before any promotion:
 
-1. Create a private remote repository under the approved organization/owner.
-2. Review and publish the local baseline commit.
-3. Configure a protected `main` branch and protected version tags.
-4. Require the named checks in
+1. Review and merge changes through pull requests.
+2. Configure a protected `main` branch and protected version tags.
+3. Require the named checks in
    [RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md](../docs/RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md)
    before merge.
-5. Replace the CODEOWNERS placeholders with approved user/team identities.
+4. Replace the CODEOWNERS placeholders with approved user/team identities.
 
 Do not treat `RECLAIM_LiveTwin 2.zip` as a deployment source. It is an archive or
 handoff artifact; Git tags and release bundles become the controlled lineage.
@@ -179,19 +181,22 @@ For release `v0.2.0`, the deployment procedure is:
 
 1. Download the specified release archive and verify its signed manifest and
    exact SHA-256 digest against the independently pinned trust policy.
-2. Extract it into `/opt/reclaim/releases/v0.2.0`.
+2. Extract it into `C:\ProgramData\RECLAIM\releases\v0.2.0`.
 3. Create a release-local virtual environment and install the pinned
    dependencies.
 4. Run imports, unit checks, and loopback health checks.
 5. Stop `reclaim-ingest`.
-6. Point `/opt/reclaim/current` at the selected release.
+6. Point `C:\ProgramData\RECLAIM\current` at the selected release using an
+   approved junction or equivalent atomic release switch.
 7. Start `reclaim-ingest` and verify it is active, binds only
    `127.0.0.1:8078`, and answers `/health` locally.
-8. If any verification fails, restore `/opt/reclaim/current` to the previous
+8. If any verification fails, restore `C:\ProgramData\RECLAIM\current` to the previous
    release and restart that known-good service.
 
-Keep `/etc/reclaim/reclaim-ingest.env` and `/var/lib/reclaim-ingest/` outside
-release directories. CI must not read, copy, or log their contents.
+Keep `C:\ProgramData\RECLAIM\engine\secrets`, `state`, and `logs` outside release
+directories and protect them with NTFS ACLs. CI must not read, copy, or log their
+contents. Verify the cloud platform preserves the VM's Windows state disk across
+Kubernetes rescheduling before relying on restart-safe identity.
 
 Before unattended operation, replace the ephemeral Cloudflare quick tunnel with
 a named tunnel and stable hostname. A quick-tunnel hostname changes after a
@@ -273,8 +278,10 @@ active in order to be recoverable.
 
 ## Deliberately excluded complexity
 
-At this stage, do not add Docker, Kubernetes, or a separate secrets platform.
-GitHub Actions, protected approvals, immutable release archives, signed
-digest-bound manifests, systemd, Windows Task Scheduler, the existing TeamViewer
-workflow, and a named Cloudflare Tunnel meet the present operational need with
-less failure surface.
+At this stage, do not add an application-level container layer or a separate
+secrets platform. Kubernetes already exists as the cloud infrastructure hosting
+boundary; it does not change the Windows guest deployment contract. GitHub
+Actions, protected approvals, immutable release archives, signed digest-bound
+manifests, WinSW/Windows services, Windows Task Scheduler, the existing
+TeamViewer workflow, and a named Cloudflare Tunnel meet the present operational
+need.
