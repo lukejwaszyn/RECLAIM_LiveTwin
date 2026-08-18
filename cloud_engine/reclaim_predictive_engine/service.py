@@ -61,13 +61,27 @@ SCENARIOS = {"runaway": runaway_scenario, "nominal": nominal_scenario,
 class TwinStateService:
     """Thread-safe holder of the latest manifest + frame, fed by a driver."""
 
-    def __init__(self, history: int = 600):
+    def __init__(self, history: int = 600, *, scenario: str | None = None,
+                 environment: str | None = None, speed: float | None = None,
+                 feed: str | None = None, host: str = "127.0.0.1",
+                 port: int = 0):
         self._lock = threading.Lock()
         self._manifest = json.loads(default_manifest().to_json())
         self._latest = {"t_sim": None, "op_state": "S_Idle", "events": [],
                         "status": "starting"}
         self._history = deque(maxlen=history)
         self.cycle = 0
+        self.metadata = {}
+        if scenario is not None:
+            self.metadata = {
+                "mode": "harness" if feed == "harness" else "replay",
+                "scenario": scenario,
+                "environment": environment,
+                "speed": speed,
+                "feed": feed,
+                "host": host,
+                "port": port,
+            }
 
     def set_manifest(self, manifest_json: str):
         with self._lock:
@@ -75,11 +89,15 @@ class TwinStateService:
 
     def update(self, frame_values: dict, t_sim: float, events, cycle: int):
         rec = _jsonable(dict(frame_values))
+        for key in ("mode", "scenario", "environment", "speed"):
+            if key in self.metadata:
+                rec[key] = self.metadata[key]
         rec["t_sim"] = t_sim
         rec["events"] = list(events)
         rec["cycle"] = cycle
         rec["status"] = "running"
         with self._lock:
+            self.cycle = cycle
             self._latest = rec
             self._history.append(rec)
 
@@ -94,6 +112,17 @@ class TwinStateService:
     def history(self, n: int) -> list:
         with self._lock:
             return list(self._history)[-n:]
+
+    def health(self) -> dict:
+        with self._lock:
+            return {
+                "ok": True,
+                "service": "reclaim-predictive-engine",
+                **self.metadata,
+                "cycle": self.cycle,
+                "status": self._latest.get("status", "starting"),
+                "t_sim": self._latest.get("t_sim"),
+            }
 
 
 def _make_handler(svc: TwinStateService):
@@ -111,13 +140,15 @@ def _make_handler(svc: TwinStateService):
         def do_GET(self):
             path = self.path.split("?")[0].rstrip("/")
             if path in ("", "/health"):
-                self._send({"ok": True, "service": "reclaim-predictive-engine"})
+                self._send(svc.health())
             elif path == "/manifest":
                 self._send(svc.manifest())
             elif path == "/state":
                 self._send(svc.state())
             elif path == "/history":
-                self._send({"frames": svc.history(200)})
+                # Keep enough samples to retain both the interruption and restart
+                # transitions in the 900-second power-outage rehearsal.
+                self._send({"frames": svc.history(600)})
             else:
                 self._send({"error": "not found",
                             "endpoints": ["/manifest", "/state", "/history", "/health"]}, 404)
@@ -214,7 +245,14 @@ def main():
     ap.add_argument("--file", default=None, help="TDMS/CSV path when --feed replay")
     args = ap.parse_args()
 
-    svc = TwinStateService()
+    svc = TwinStateService(
+        scenario=args.scenario,
+        environment=args.env,
+        speed=args.speed,
+        feed=args.feed,
+        host=args.host,
+        port=args.port,
+    )
     stop = threading.Event()
     if args.feed == "replay":
         if not args.file:

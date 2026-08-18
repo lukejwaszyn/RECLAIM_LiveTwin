@@ -534,6 +534,7 @@ class DualPushEngine:
             candidate._latest = copy.deepcopy(service._latest)
             candidate._history.extend(copy.deepcopy(list(service._history)))
             candidate.cycle = service.cycle
+            candidate.metadata = copy.deepcopy(service.metadata)
         return candidate
 
     def _candidate(self):
