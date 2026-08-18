@@ -182,6 +182,7 @@ Copy the approved binary as `reclaim-ingest.exe`. Replace the XML placeholders:
 | `{{ENGINE_DIR}}` | `<release>\cloud_engine` |
 | `{{SECRET_FILE}}` | `$EngineRoot\secrets\reclaim-ingest.env` |
 | `{{STATE_FILE}}` | `$EngineRoot\state\ingest_state.json` |
+| `{{LOG_DIR}}` | `$EngineRoot\logs` |
 | `{{SERVICE_ACCOUNT}}` | reviewed Windows service identity |
 
 The wrapper reads secrets from the ACL-protected file into the child environment;

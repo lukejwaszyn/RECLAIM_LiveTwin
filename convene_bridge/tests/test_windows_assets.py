@@ -12,6 +12,7 @@ def test_winsw_template_has_no_secret_argument_or_embedded_binary():
     arguments = root.findtext("arguments") or ""
     assert "--config" in arguments
     assert "token" not in arguments.lower()
+    assert root.findtext("logpath") == "{{LOG_DIR}}"
     assert not list(WINDOWS.glob("*.exe"))
 
 
@@ -25,6 +26,7 @@ def test_installer_discovers_and_protects_existing_deployments():
         ".reclaim-state-bridge-owned.json",
         "ConveneAgentIdentity",
         "icacls.exe",
+        'Replace("{{LOG_DIR}}", $LogDir)',
     ):
         assert required in source
     for prohibited in (
