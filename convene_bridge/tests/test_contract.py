@@ -103,6 +103,8 @@ def test_enrichment_adds_live_metadata_and_expiring_lease(
     assert result["engine_source_sha"] == "a" * 40
     assert result["bridge_source_sha"] == "b" * 40
     assert result["freshness_limit_ms"] == 15_000
+    assert "nullable" not in result
+    assert all(value is not None for value in result.values())
 
 
 def test_fail_closed_payload_has_immediately_expired_lease(

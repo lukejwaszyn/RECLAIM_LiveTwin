@@ -92,7 +92,10 @@ def enrich(
     status: str,
     error_code: str,
 ) -> dict:
-    result = dict(state)
+    # Convene's shared-file contract accepts only string, number, and boolean
+    # values. Optional engine fields may legitimately be null, so omit those
+    # fields instead of failing the entire otherwise-live state publication.
+    result = {key: value for key, value in state.items() if value is not None}
     result.update(
         {
             "data_live": live,
