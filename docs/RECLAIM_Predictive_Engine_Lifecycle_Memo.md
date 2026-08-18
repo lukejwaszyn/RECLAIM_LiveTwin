@@ -102,7 +102,7 @@ to the rest of the stack.
 
 ### 3.2 The run-supersession gap
 
-Run supersession is the "recovers automatically after a Pi reboot" feature. When a
+Run supersession is the "recovers automatically after a gateway restart" feature. When a
 fresh, valid frame arrives with a new `run_id`, `ingest_line` retires the old run's
 sequence keys and swaps `active_run_id` (`push_ingest_dual.py:500-506`) — the
 **identity** layer recovers correctly. But the **estimator** is not told anything:

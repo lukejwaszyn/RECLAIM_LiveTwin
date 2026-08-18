@@ -1,7 +1,12 @@
 # Convene Reintegration — Repository Proof and Operator Checkpoint
 
-**Date:** 2026-08-16
+**Date:** 2026-08-17
 **Status:** repository side proven; no external Convene mutation performed
+
+The live predictive-engine guest is Windows Server 2025 in Kubernetes-managed
+cloud infrastructure. Its independent Windows state bridge writes
+`C:\ConveneAgent\sim_vars.json` for the existing VM Convene agent. The Windows 10
+gateway laptop remains the separate `gw_` audit source.
 
 ## Proven repository contract
 
@@ -54,14 +59,18 @@ The binding/view must compute one fail-closed display predicate:
 
 ```text
 DATA IS LIVE only when
-  sim_mode == "live"
+  sim_data_live == true
+  AND current_utc <= sim_bridge_valid_until
+  AND sim_mode == "live"
   AND sim_ingest_status == "accepted"
   AND sim_state_age_ms <= APPROVED_FRESHNESS_LIMIT_MS
 otherwise show "DATA NOT LIVE"
 ```
 
 `APPROVED_FRESHNESS_LIMIT_MS` remains an operator/controls decision and is not
-invented here. `cmd_*` and `/command` remain advisory representations only. No
+invented here. The lease comparison is mandatory: `sim_data_live` alone is not
+sufficient because the last complete JSON file may remain readable if a bridge
+write fails. `cmd_*` and `/command` remain advisory representations only. No
 gateway, PLC, cRIO, Convene action, or actuator may consume them as authority.
 
 ## Known field and geometry gaps

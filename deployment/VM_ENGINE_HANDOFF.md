@@ -21,10 +21,11 @@ purpose of this document is to make sure the VM session **does not re-introduce 
 2b. `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` — the red-team
    findings (RT-01..08), the **command-authority mode**, and what blocks the
    advisory deploy vs. active control. Read before wiring `/command`.
-3. `VM_ENGINE_RUNBOOK.md` — the exact deploy commands (venv, secrets, systemd,
-   cloudflared, verify, hand back).
-4. `VM_ENGINE_SESSION_BRIEF.md` — the one-page objective + step outline.
-5. `GATEWAY_GO_LIVE.md` / `HANDOFF.md` — project-wide status and the go/no-go list.
+3. `DEPLOYMENT_TOPOLOGY.md` — authoritative Windows-only live platform map.
+4. `VM_ENGINE_RUNBOOK.md` — the exact Windows Server 2025 deployment commands
+   (release, venv, ACL-protected secrets, WinSW, cloudflared, verify, hand back).
+5. `VM_ENGINE_SESSION_BRIEF.md` — the one-page objective + step outline.
+6. `GATEWAY_GO_LIVE.md` / `HANDOFF.md` — project-wide status and the go/no-go list.
 
 If you only remember one thing: **§4 (Do not debug it back).**
 
@@ -33,7 +34,10 @@ If you only remember one thing: **§4 (Do not debug it back).**
 ## 2. What this endpoint is
 
 The cloud **dual predictive engine** (`cloud_engine/push_ingest_dual.py`) runs on
-the Convene VM, bound to loopback, fronted by a Cloudflare Tunnel. It:
+the cloud-hosted Windows Server 2025 Convene VM inside Kubernetes-managed
+infrastructure, bound to loopback and fronted by a Cloudflare Tunnel. Kubernetes
+hosts the VM; guest operation uses Windows services, PowerShell, NTFS paths, and
+ACLs. It:
 
 - accepts authenticated live telemetry frames at `POST /ingest` (the gateway posts
   them), one estimator per chamber (plastics `PL`, metals `MT`);
@@ -137,14 +141,14 @@ forecast/advisory fields, which stay clearly labeled non-authoritative until the
 
 ## 5. Deploy sequence (pointer, not a duplicate)
 
-Follow `VM_ENGINE_RUNBOOK.md` exactly. In brief: fresh dir + venv from
-`deploy/requirements-cloud.txt` → run the import/deps smoke (numpy/scipy/sklearn) →
-mode-600 `/etc/reclaim/reclaim-ingest.env` with distinct `RECLAIM_INGEST_TOKEN` and
-`RECLAIM_READ_TOKEN` → install the systemd unit (loopback `127.0.0.1:8078`,
-`--production`, `RECLAIM_INGEST_STATE`) → cloudflared quick tunnel → verify `/health`
-and `/state` → hand the ingress hostname + ingest token back to the gateway and
-ACL-lock its config. `--production` accepts `mode: "live"` only; deploy side-by-side,
-never overwrite a running stack.
+Follow `VM_ENGINE_RUNBOOK.md` exactly. In brief: fresh immutable release under
+`C:\ProgramData\RECLAIM\releases\<SHA>` → locked Windows venv → import/dependency
+smoke → ACL-protected secret file with distinct `RECLAIM_INGEST_TOKEN` and
+`RECLAIM_READ_TOKEN` → WinSW `RECLAIMIngestEngine` service on
+`127.0.0.1:8078` with durable `RECLAIM_INGEST_STATE` → Windows cloudflared route →
+endpoint acceptance → independent Windows state bridge → Convene lease/prefix
+acceptance → private gateway handoff. `--production` accepts `mode: "live"` only;
+deploy side-by-side and never overwrite a running release.
 
 **The old "scipy missing from requirements-cloud.txt" warning is stale** — the file
 already pins numpy/scipy/scikit-learn. Still run the import smoke to catch a
@@ -158,10 +162,10 @@ Run both. They are the guardrail against silently re-introducing the reboot bug.
 
 **Gate 1 — continuous-run regression test (offline, on the VM after venv install):**
 
-```bash
-cd /opt/reclaim/engine && . .venv/bin/activate
-pip install pytest
-PYTHONPATH=. python3 -m pytest tests -q       # expect: all pass (incl. test_lifecycle_continuous.py)
+```powershell
+Set-Location C:\ProgramData\RECLAIM\releases\<TARGET_SHA>
+$env:UV_CACHE_DIR = 'C:\ProgramData\RECLAIM\uv-cache'
+uv run --frozen pytest -q cloud_engine\tests
 ```
 
 `tests/test_lifecycle_continuous.py` drives multiple batches + a power cut through
@@ -171,13 +175,12 @@ catch (it rebuilt the engine each cycle).
 
 **Gate 2 — live acceptance harness through the tunnel (the endpoint proof):**
 
-```bash
-# from any box that can reach the tunnel hostname; needs `requests`
-python3 cloud_engine/tools/redteam_ingest.py \
-    --url https://<your-tunnel-host> \
-    --ingest-token "$RECLAIM_INGEST_TOKEN" \
-    --read-token  "$RECLAIM_READ_TOKEN"
-# restricted DNS (can't resolve the tunnel host)? add: --pin-ip <cloudflare-visitor-edge-ip>
+```powershell
+# From a trusted workstation; environment variables keep credentials out of the process list.
+$env:RECLAIM_INGEST_TOKEN = '<private value>'
+$env:RECLAIM_READ_TOKEN = '<different private value>'
+python cloud_engine\tools\redteam_ingest.py --url https://<your-tunnel-host>
+Remove-Item Env:RECLAIM_INGEST_TOKEN, Env:RECLAIM_READ_TOKEN
 # expect: ==== ACCEPTANCE RESULT: 20/20 checks passed ====
 ```
 

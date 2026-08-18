@@ -12,13 +12,18 @@ source workspace but are not part of this release.
 ## Runtime topology
 
 ```text
-cRIO / LabVIEW -> laptop gateway -> authenticated HTTPS -> cloud dual engine
-                                                    -> one Convene publisher
-                                                    -> Convene-native .stp visualization
+cRIO / LabVIEW -> Windows 10 gateway -> Cloudflare -> Windows Server 2025 VM
+                                                       -> dual engine on loopback
+                                                       -> Windows state bridge
+                                                       -> existing VM Convene agent
+                                                       -> Convene-native .stp visualization
 ```
 
-The cloud engine owns state processing. Convene is the sole consumer of the
-cloud `/state` record; its native visualization tool binds the incoming
+The VM is cloud-hosted in Kubernetes-managed infrastructure, but the guest and
+all repository-owned runtime procedures are Windows. There is no Linux host or
+Raspberry Pi in the live path. The cloud engine owns state processing. The
+existing VM Convene agent consumes the bridge's validated copy of the cloud
+`/state` record; its native visualization tool binds the incoming
 variables to specific elements of a `.stp` (STEP) model, animating the system's
 geometry as data changes in operation. The visualization is a read-only view of
 the same `/state` record — it does not talk to the cRIO and is not a second
@@ -26,9 +31,9 @@ predictive engine.
 
 ## Contents
 
-- `pi_gateway/` — cRIO receiver, provenance framer, durable queue, HTTPS publisher,
-  configuration template, systemd + Windows scheduled-task templates, and framing test.
-- `cloud_engine/` — dual plastics/metals predictive engine with the autonomous
+- `pi_gateway/` — Windows 10 cRIO receiver, provenance framer, durable queue, HTTPS publisher,
+  configuration template, Windows service + scheduled-task templates, and framing test.
+- `cloud_engine/` — Windows Server 2025 dual plastics/metals predictive engine with the autonomous
   per-chamber lifecycle (idle/running/suspended, self-resetting at batch boundaries),
   LabVIEW adapter, production ingest service, deployment template, contract + lifecycle
   tests, and `tools/redteam_ingest.py` (live acceptance harness).
@@ -77,10 +82,10 @@ cd ../pi_gateway
 PYTHONPATH=. ../.venv/bin/python -m pytest tests -q
 ```
 
-The named RT-03/RT-05 regression gate currently fails by design because it
-reproduces unresolved product defects. See
-`docs/RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md` before configuring branch
-protection or attempting to build a release candidate.
+The RT-03/RT-05 integrity remediation is implemented on the current integration
+branch. The locked local suite is green; deployment still requires review and CI
+evidence for the exact committed SHA. See
+`docs/RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md` before promotion.
 
 ```bash
 cd cloud_engine

@@ -36,7 +36,7 @@ LIVE INGEST CONTRACT (v1.1, fixes C1-C4/H1/H3 of the 2026-08 review):
     requirement: deprecated data never advances an estimator or reaches /state.
   * RUN SUPERSESSION. A valid, FRESH frame with a new run_id supersedes the
     active run (event RUN_SUPERSEDED); frames from retired runs are rejected
-    final (run_superseded). A Pi reboot therefore recovers automatically, while
+    final (run_superseded). A gateway restart therefore recovers automatically, while
     stale leftovers from the old run cannot re-pin it (they fail freshness).
   * MONOTONE SEQUENCE PER (run_id, source_id). seq <= last_seq is a duplicate
     (final, never re-steps the engine); gaps are counted and evented (SEQ_GAP),

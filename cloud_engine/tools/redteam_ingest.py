@@ -19,15 +19,16 @@ This is the go-live gate for the endpoint that previously required a reboot: run
 after deploy, before wiring Convene. A clean 20/20 means the reboot dependency is
 gone and the pipeline is unchanged.
 
-Usage:
-    python3 redteam_ingest.py --url https://<host> --ingest-token <T> --read-token <T>
+Usage (tokens are read from the environment so they do not enter the process list):
+    RECLAIM_INGEST_TOKEN=<T> RECLAIM_READ_TOKEN=<T> \
+      python3 redteam_ingest.py --url https://<host>
     # restricted-DNS networks (can't resolve the tunnel host): pin the visitor edge
     python3 redteam_ingest.py --url https://<host> ... --pin-ip 104.16.230.132
 
 Exit code 0 iff every check passes.
 """
 from __future__ import annotations
-import argparse, json, sys, time, uuid
+import argparse, json, os, sys, time, uuid
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -36,11 +37,16 @@ import requests
 def main() -> int:
     ap = argparse.ArgumentParser(description="RECLAIM cloud-engine live acceptance harness")
     ap.add_argument("--url", required=True, help="engine base URL (tunnel hostname), e.g. https://x.trycloudflare.com")
-    ap.add_argument("--ingest-token", required=True, help="RECLAIM_INGEST_TOKEN (POST /ingest bearer)")
-    ap.add_argument("--read-token", required=True, help="RECLAIM_READ_TOKEN (GET routes bearer)")
+    ap.add_argument("--ingest-token", default=os.environ.get("RECLAIM_INGEST_TOKEN", ""),
+                    help="POST /ingest bearer (prefer RECLAIM_INGEST_TOKEN environment variable)")
+    ap.add_argument("--read-token", default=os.environ.get("RECLAIM_READ_TOKEN", ""),
+                    help="GET bearer (prefer RECLAIM_READ_TOKEN environment variable)")
     ap.add_argument("--pin-ip", default=None, help="optional: force-resolve the URL host to this IP (restricted DNS)")
     ap.add_argument("--chamber", default="PL", choices=["PL", "MT"], help="chamber to exercise")
     args = ap.parse_args()
+
+    if not args.ingest_token or not args.read_token:
+        ap.error("RECLAIM_INGEST_TOKEN and RECLAIM_READ_TOKEN are required")
 
     base, ingest, read = args.url.rstrip("/"), args.ingest_token, args.read_token
     if args.pin_ip:

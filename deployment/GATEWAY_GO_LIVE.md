@@ -11,6 +11,11 @@ do not archive it at cutover — §6 and §8 remain permanent fixtures.
 flowing to the cloud and verified in Convene." Cross-references are to
 `docs/RECLAIM_Remote_Gateway_Preflight.md` unless stated otherwise.
 
+**Authoritative topology (2026-08-17):** the gateway is a Windows 10 laptop.
+The cloud predictive-engine guest is Windows Server 2025 in Kubernetes-managed
+infrastructure. There is no Linux host or Raspberry Pi in the live path. See
+`DEPLOYMENT_TOPOLOGY.md`.
+
 ## How to read this
 
 | Marker | Meaning |
@@ -73,8 +78,8 @@ console config — and why the boot task must not be installed yet (§6).
 - [ ] Cloud dual engine deployed, bound **loopback only**, behind the
       Cloudflare Tunnel (preflight §3)
 - [ ] Ingress hostname confirmed → set `cloud_url: https://<host>/ingest`
-- [ ] `RECLAIM_INGEST_TOKEN` generated (long, random) in the cloud's
-      mode-600 `EnvironmentFile` → same value into gateway `auth_token`
+- [ ] `RECLAIM_INGEST_TOKEN` generated (long, random) in the VM's
+      ACL-protected secret file → same value into gateway `auth_token`
 - [ ] `RECLAIM_READ_TOKEN` generated, distinct, for the GET routes
       (`/state`, `/manifest`, `/history`, `/command`) used by the Convene
       publisher and its native `.stp` visualization. `/health` stays open for probes
@@ -98,7 +103,7 @@ gate, not an enforced one** — treat it as a hard checklist item.
 
 - [ ] After entering real secrets, **restrict the ACL on
       `C:\RECLAIM\pi_gateway\config.windows.yaml`** — it holds the ingest token
-      in cleartext (the Windows equivalent of the doc's mode-600 requirement).
+      in cleartext; use an explicit restricted NTFS ACL.
       Suggested: break inheritance, grant SYSTEM and Administrators only.
 
 ---
@@ -232,24 +237,20 @@ strictly ordered. Nothing after §5 can start early.
 These are real findings from this laptop, not doc nitpicks. Each needs a
 decision from someone.
 
-### 9.1 Preflight §1 (remote access) is not achievable as written — needs a rewrite
+### 9.1 Preflight §1 remote access — RESOLVED 2026-08-17
 
-§1 specifies an OpenSSH **server** on the laptop plus a Cloudflare Tunnel
-fronting `ssh://localhost:22`. This machine enforces a **WDAC code-integrity
-policy and blocks inbound listener services** — OpenSSH server crash-loops, the
-RDP listener returns Access Denied. Outbound works fine, and Tailscale is up
-(`100.103.166.57`).
+The original §1 specified an OpenSSH server and tunneled status endpoint. The
+preflight now records the actual outbound-only model: TeamViewer for hands-on
+administration, Tailscale for the approved private network, and the existing
+Convene agent for its narrow heartbeat/audit role.
 
-This is not a workaround problem; §1 needs to be rewritten around an
-outbound-only access model, or the WDAC policy needs an authorized exception.
-**Do not attempt to stand up SSH/RDP listeners on this box.**
+The machine enforces a WDAC code-integrity policy and blocks inbound listener
+services. **Do not attempt to stand up SSH/RDP listeners on this box.**
 
-Note §1.4 designates `status-gw.<domain>/health` as the interim observation
-point. That tunnel would expose an endpoint with **no authentication of its
-own** (§9.4) — if it is ever built, the Cloudflare Access policy is the only
-thing protecting raw process telemetry.
+Gateway status remains loopback-only. Do not expose port 9080 through a status
+tunnel because the endpoint has no application authentication (§9.4).
 
-- [ ] Decide the remote-access model; rewrite preflight §1 accordingly
+- [x] Preflight §1 rewritten around the approved outbound-only access model
 
 ### 9.2 Python version drift
 
@@ -258,8 +259,8 @@ prompt pack assumed 3.12. **This box has only Python 3.13.0.** The venv was
 built with `py -3.13`. 3.13 satisfies the 3.10+ target and all 10 gateway tests
 pass on it, but no one has stated 3.13 as a supported version.
 
-- [ ] Confirm 3.13 is acceptable, or pin a supported interpreter and rebuild
-      the venv
+- [x] Python 3.13 is a supported target in the locked project/CI matrix; retain
+      the staged 3.13 venv and re-run the locked gateway suite before go-live
 
 ### 9.3 Graceful shutdown path untested
 
@@ -297,7 +298,7 @@ absent `sim_` fields.
       the mapping table, correct the table, and only then consider
       `strict_fields: true`
 
-### 9.6 Pi-vs-laptop naming drift (`CODE_REVIEW.md` H6) — RECONCILED 2026-08-15
+### 9.6 Historical Pi-vs-laptop naming drift (`CODE_REVIEW.md` H6) — CLOSED
 
 `README.md`, `FIXES.md`, and the architecture doc described a "Raspberry Pi 3B+
 gateway" while the deployment is a Windows laptop; the preflight filename still
@@ -311,15 +312,12 @@ said `Pi` though its title already said laptop.
       not silently rewritten. Pi-specific *rationale* is retained where it
       explains why a fix exists (M5 warn-once and the bounded dead-letter table
       were driven by SD-card wear)
-- [ ] **Still open:** `pi_gateway/systemd/reclaim-edge.service:2` reads
-      `Description=... Pi 3B+ flight computer`. Left untouched — descriptive
-      metadata, but it lives in a runtime file and the reconciliation was
-      scoped to docs/comments. Harmless either way; decide and close
-- [ ] **Still open:** the `pi_gateway/` directory name itself. Renaming it is a
-      runtime change (import paths, the task installer's `$GatewayDir`, the
-      systemd `WorkingDirectory`) and was deliberately out of scope
+- [x] The retired Linux service unit was removed; the live gateway uses the
+      Windows Scheduled Task template.
+- [x] The `pi_gateway/` directory name is retained as a repository compatibility
+      name only. It does not identify the deployment platform.
 
-### 9.7 Tailscale `reclaim-pi` node is offline
+### 9.7 Historical Tailscale `reclaim-pi` node is offline
 
 A `reclaim-pi` node exists in the tailnet but is offline. If it is a retired
 artifact of the earlier Pi plan, remove it so it cannot be confused for a live
@@ -395,6 +393,7 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |
 | 2026-08-15 | Handoff docs authored — `deployment/HANDOFF.md` (full project story) and `deployment/VM_ENGINE_SESSION_BRIEF.md` (turnkey brief for the cloud VM session). The Convene agent's always-on-at-boot status (§9.8) is framed there as the **architectural base** for the deferred ingress/egress build. Egress tunnel decision recorded: Cloudflare **quick tunnels** first, named tunnel + domain when interoperability warrants. Ingress/egress bring-up deliberately deferred. |
 | 2026-08-15 | Convene agent started and made boot-persistent as SYSTEM (task `Convene-Agent`); §9.8 closed, §9.9 added recording its remote-shell capability. |
 | 2026-08-15 | §9.6 closed — Pi-vs-laptop naming reconciled across `README.md`, `FIXES.md`, the architecture doc, and the preflight filename (now `RECLAIM_Remote_Gateway_Preflight.md`); two sub-items left open. §9.8 added: Convene agent confirmed **not running**, blocking §7. |

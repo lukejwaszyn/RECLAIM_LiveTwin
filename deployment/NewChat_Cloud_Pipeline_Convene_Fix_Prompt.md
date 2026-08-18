@@ -20,24 +20,30 @@ Primary outcome:
 4. Preserve a reliable nominal demo plus power-outage and lunar-surface practice
    scenarios within the existing 72-hour strategy.
 
+Authoritative platform constraint: the cloud predictive-engine target is a
+Windows Server 2025 guest in Kubernetes-managed infrastructure, and the edge
+gateway is a Windows 10 laptop. Kubernetes is the outer hosting layer. Do not
+create Linux guest, systemd, or Raspberry Pi deployment instructions.
+
 Read these documents completely before editing, in this order:
 
-1. deployment/HANDOFF.md
-2. deployment/README.md
-3. deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md
-4. deployment/ClaudeCode_Backend_Remediation_Prompt.md
-5. deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md
-6. docs/RECLAIM_RT03_RT05_Test_Baseline.md
-7. docs/RECLAIM_Integrated_Remediation_Architecture.md
-8. docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md
-9. deployment/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md
-10. deployment/CI_CD_ARCHITECTURE.md
-11. deployment/VM_ENGINE_HANDOFF.md
-12. deployment/VM_ENGINE_RUNBOOK.md
-13. deployment/GATEWAY_GO_LIVE.md
-14. docs/RECLAIM_Live_Telemetry_Architecture.md
-15. convene/RECLAIM_Convene_Live_Binding.md
-16. deployment/CONVENE_GW_MAPPING.md
+1. deployment/DEPLOYMENT_TOPOLOGY.md
+2. deployment/HANDOFF.md
+3. deployment/README.md
+4. deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md
+5. deployment/ClaudeCode_Backend_Remediation_Prompt.md
+6. deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md
+7. docs/RECLAIM_RT03_RT05_Test_Baseline.md
+8. docs/RECLAIM_Integrated_Remediation_Architecture.md
+9. docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md
+10. deployment/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md
+11. deployment/CI_CD_ARCHITECTURE.md
+12. deployment/VM_ENGINE_HANDOFF.md
+13. deployment/VM_ENGINE_RUNBOOK.md
+14. deployment/GATEWAY_GO_LIVE.md
+15. docs/RECLAIM_Live_Telemetry_Architecture.md
+16. convene/RECLAIM_Convene_Live_Binding.md
+17. deployment/CONVENE_GW_MAPPING.md
 
 Then inspect the implementation and tests directly, including:
 

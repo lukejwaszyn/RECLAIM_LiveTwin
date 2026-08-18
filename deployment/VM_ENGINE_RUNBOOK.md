@@ -1,282 +1,251 @@
-# RECLAIM Cloud Engine — VM Deployment Runbook (quick-tunnel)
+# Windows Server 2025 Predictive-Engine VM Runbook
 
-> **Stage:** 1 — Cloud engine on VM + egress tunnel · **Status:** CURRENT (active).
-> Executable companion to `VM_ENGINE_SESSION_BRIEF.md`.
+> **Stage:** VM engine, tunnel, and local state publication
+> **Status:** CURRENT
+> **Platform:** cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure
 
-**Written:** 2026-08-15 · **Scope:** stand up the dual predictive engine
-(`push_ingest_dual.py --production`) on the Convene VM, behind a **cloudflared
-quick tunnel**, with tokens, then hand the ingress hostname + ingest token back
-to finalize the laptop gateway. Companion to `deployment/VM_ENGINE_SESSION_BRIEF.md`
-and `deployment/GATEWAY_GO_LIVE.md`. Cross-refs (§n) are to
-`docs/RECLAIM_Remote_Gateway_Preflight.md`.
+Read `DEPLOYMENT_TOPOLOGY.md` first. The Kubernetes layer hosts the Windows VM;
+all guest operations below use PowerShell, Windows services, NTFS paths, and ACLs.
+Do not use the retired Linux/systemd instructions preserved in Git history.
 
-**Guardrails (verbatim):** engine binds **loopback only** — cloudflared is the
-only path in. `--production` accepts `mode: "live"` **only**. Tokens come from
-the `EnvironmentFile` **only** — never on a command line (visible in `ps`/`/proc`)
-and never committed. Deploy to a **fresh dir**; never overwrite a running stack
-in place.
+## 1. Freeze the reviewed source
 
-Assumptions: a Linux VM (systemd), sudo, outbound Internet. Adjust `User=`,
-paths, and Python as noted. This runbook is **prep-only** — commands are ready to
-run on the VM when you have a session there; nothing here touches the live laptop.
+Choose the reviewed PR head or merged `main` revision and record its full SHA as
+`TARGET_SHA`. Deploy an exact revision into a fresh release directory:
 
----
-
-## 0. Pre-flight on the VM (5 min)
-
-```bash
-# Confirm interpreter and that it's a supported one. Gateway staged on 3.13;
-# pick a 3.10–3.13 python on the VM and record which (open decision §9.2).
-python3 --version
-which python3
-
-# systemd + curl present?
-systemctl --version | head -1
-curl --version | head -1
+```text
+C:\ProgramData\RECLAIM\releases\<TARGET_SHA>\
 ```
 
-Record the exact `python3` version you use here — it closes GO-LIVE §9.2 for the
-cloud half.
+Never overwrite a running release in place. Record the outer Kubernetes workload
+or VM identity separately, without treating a pod/workload restart as an engine
+state reset.
 
----
+## 2. Discover before changing the VM
 
-## 1. Deploy the engine to a fresh dir
+Run in elevated PowerShell and retain redacted output:
 
-```bash
-sudo install -d -o "$USER" -g "$USER" /opt/reclaim/engine
-# Copy the cloud_engine tree to the VM. From your transfer method of choice, land:
-#   /opt/reclaim/engine/push_ingest_dual.py
-#   /opt/reclaim/engine/labview_map.py
-#   /opt/reclaim/engine/reclaim_predictive_engine/   (whole package)
-#   /opt/reclaim/engine/deploy/                       (requirements + unit + env example)
-# Do NOT copy __pycache__ or .pytest_cache.
-
-cd /opt/reclaim/engine
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r deploy/requirements-cloud.txt
+```powershell
+Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber
+py -0p
+Get-Service | Where-Object { $_.Name -match 'RECLAIM|Convene|cloudflared' }
+Get-ScheduledTask | Where-Object { $_.TaskName -match 'RECLAIM|Convene|cloudflared' }
+Get-NetTCPConnection -LocalPort 8078 -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -match 'push_ingest_dual|8078|cloudflared' } |
+  Select-Object ProcessId, Name, ExecutablePath, CommandLine
+Get-ChildItem C:\ProgramData\RECLAIM -Force -ErrorAction SilentlyContinue
+Get-ChildItem C:\ConveneAgent -Force -ErrorAction SilentlyContinue
 ```
 
-`requirements-cloud.txt` in this snapshot already pins `numpy>=1.24`,
-`scipy>=1.10`, `scikit-learn>=1.3`. **The old "scipy missing" gap noted in the
-session brief is already closed** — the brief text is stale; the file is correct.
+Also record, without printing secret values:
 
----
+- the current engine release and process/service owner;
+- the process holding port 8078;
+- existing Cloudflare tunnel type and hostname;
+- whether engine secret and durable identity files exist and their ACLs;
+- the existing VM Convene agent service/task and identity;
+- every writer of `C:\ConveneAgent\sim_vars.json`; and
+- whether the Windows VM disk paths survive Kubernetes workload rescheduling.
 
-## 2. Dependency + import verification (do this before installing the service)
+Stop if an unexpected deployment or writer exists.
 
-The single most likely failure is a numpy/scipy ABI mismatch on the VM's Python.
-Prove the imports *before* systemd hides the traceback.
+## 3. Stage and verify the exact release
 
-```bash
-cd /opt/reclaim/engine && . .venv/bin/activate
+Copy or check out the exact source under the release path, then verify:
 
-# 2a. Versions actually resolved
-pip show numpy scipy scikit-learn | grep -E '^(Name|Version)'
-
-# 2b. The exact import that used to be the gap: scipy.stats.chi2 via anomaly.py
-python - <<'PY'
-import numpy, scipy, sklearn
-from scipy.stats import chi2
-print("numpy", numpy.__version__, "| scipy", scipy.__version__, "| sklearn", sklearn.__version__)
-print("chi2.ppf(0.95, 3) =", float(chi2.ppf(0.95, 3)))  # exercises anomaly.py's call
-import reclaim_predictive_engine.anomaly  # full module import
-import push_ingest_dual                    # the service module itself imports clean
-print("imports OK")
-PY
+```powershell
+Set-Location "C:\ProgramData\RECLAIM\releases\$env:TARGET_SHA"
+git rev-parse HEAD
+git status --short
+$env:UV_CACHE_DIR = 'C:\ProgramData\RECLAIM\uv-cache'
+uv sync --frozen --all-extras --dev --python 3.13
+Push-Location cloud_engine
+..\.venv\Scripts\python.exe -c "import numpy, scipy, sklearn; from scipy.stats import chi2; import push_ingest_dual; print('imports OK')"
+Pop-Location
 ```
 
-Expected: version line prints, a finite chi2 value, then `imports OK`. If numpy
-throws an ABI/`_core` error, reinstall matched wheels
-(`pip install --force-reinstall --no-cache-dir numpy scipy`) and re-run.
+The printed SHA must equal `TARGET_SHA`. Python 3.11 through 3.13 is supported by
+`pyproject.toml`; record the exact interpreter used.
 
----
+Run the locked local gates before installing a service:
 
-## 3. Secrets first (mode-600 EnvironmentFile) — §3
-
-```bash
-sudo install -d -m 700 /etc/reclaim
-sudo sh -c 'umask 077; cp /opt/reclaim/engine/deploy/reclaim-ingest.env.example /etc/reclaim/reclaim-ingest.env'
-
-# Generate two DISTINCT long random secrets
-INGEST=$(openssl rand -hex 32); READ=$(openssl rand -hex 32)
-sudo tee /etc/reclaim/reclaim-ingest.env >/dev/null <<EOF
-RECLAIM_INGEST_TOKEN=$INGEST
-RECLAIM_READ_TOKEN=$READ
-EOF
-sudo chown root:root /etc/reclaim/reclaim-ingest.env
-sudo chmod 600 /etc/reclaim/reclaim-ingest.env
-unset INGEST READ   # keep them out of shell history/env
+```powershell
+$env:PYTHONPATH = 'pi_gateway'
+uv run --frozen pytest -q convene_bridge/tests
+uv run --frozen pytest -q cloud_engine/tests pi_gateway/tests
+uv run --frozen python scripts/check_repository_hygiene.py
+Remove-Item Env:PYTHONPATH
 ```
 
-- `RECLAIM_INGEST_TOKEN` → bearer for `POST /ingest`; **this same value** becomes
-  the gateway's `auth_token` in §6.
-- `RECLAIM_READ_TOKEN` → **distinct** bearer for `GET /state /manifest /history
-  /command` (Convene publisher + its native `.stp` visualization). `/health` stays open for probes.
+## 4. Create Windows state, secret, and log directories
 
-Retrieve the ingest token later, without echoing it into history:
-`sudo sed -n 's/^RECLAIM_INGEST_TOKEN=//p' /etc/reclaim/reclaim-ingest.env`
-
----
-
-## 4. Install the systemd unit
-
-The supplied `deploy/reclaim-ingest.service` is already correct for the
-`/opt/reclaim/engine` + `User=reclaim` layout: it binds `--host 127.0.0.1 --port
-8078 --production --max-frame-age-s 15`, sets `EnvironmentFile=` (required, no
-leading `-`), `StateDirectory=reclaim-ingest`, and
-`RECLAIM_INGEST_STATE=/var/lib/reclaim-ingest/ingest_state.json` (fix C4, so a
-restart can't double-step). Only edit if your VM differs:
-
-- If your service account isn't `reclaim`, change `User=reclaim`.
-- If the venv/workdir isn't `/opt/reclaim/engine/.venv`, fix `WorkingDirectory=`
-  and the `ExecStart=` python path.
-
-```bash
-sudo cp /opt/reclaim/engine/deploy/reclaim-ingest.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now reclaim-ingest
-sudo systemctl status reclaim-ingest --no-pager
-journalctl -u reclaim-ingest -n 30 --no-pager
+```powershell
+$EngineRoot = 'C:\ProgramData\RECLAIM\engine'
+$ServiceAccount = 'NT AUTHORITY\LocalService'
+New-Item -ItemType Directory -Force `
+  "$EngineRoot\config", "$EngineRoot\secrets", "$EngineRoot\state", `
+  "$EngineRoot\logs", "$EngineRoot\service" | Out-Null
 ```
 
-Sanity — the two `--production` guards must be *satisfied*, not tripped: the
-process refuses to start without `RECLAIM_INGEST_TOKEN` **and**
-`RECLAIM_INGEST_STATE`. A clean start proves both are wired.
+Use distinct high-entropy ingest and read credentials. Write them locally to:
 
-```bash
-# Loopback only — must show 127.0.0.1:8078, never 0.0.0.0
-ss -ltnp | grep 8078
-# Local liveness (no token)
-curl -s http://127.0.0.1:8078/health
+```text
+C:\ProgramData\RECLAIM\engine\secrets\reclaim-ingest.env
 ```
 
----
+The file format is:
 
-## 5. Cloudflared quick tunnel (egress) — §3
-
-Quick tunnel = no domain, no account config. **Caveats to plan around:** the
-`trycloudflare.com` hostname is **ephemeral (changes every restart)** and has
-**no Cloudflare Access policy**. Fine for first bring-up; move to a named tunnel
-+ domain once interop matters (see §8).
-
-```bash
-# Install cloudflared if absent (Debian/Ubuntu example)
-curl -L -o /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-sudo dpkg -i /tmp/cloudflared.deb
-
-# Foreground first, to read the assigned hostname:
-cloudflared tunnel --url http://127.0.0.1:8078
-# -> note the printed https://<random>.trycloudflare.com  (this is your ingress host)
+```text
+RECLAIM_INGEST_TOKEN=<private value>
+RECLAIM_READ_TOKEN=<different private value>
 ```
 
-To keep it up across logout, run it as a second unit (edit the URL only):
+Never pass either token in a command-line argument, paste it into a transcript, or
+store it in WinSW XML. Apply explicit ACLs:
 
-```bash
-sudo tee /etc/systemd/system/reclaim-tunnel.service >/dev/null <<'EOF'
-[Unit]
-Description=RECLAIM cloudflared quick tunnel -> 127.0.0.1:8078
-After=network-online.target reclaim-ingest.service
-Wants=network-online.target
-[Service]
-ExecStart=/usr/bin/cloudflared tunnel --url http://127.0.0.1:8078 --no-autoupdate
-Restart=on-failure
-RestartSec=3
-User=reclaim
-[Install]
-WantedBy=multi-user.target
-EOF
-sudo systemctl daemon-reload && sudo systemctl enable --now reclaim-tunnel
-# Read the hostname from the tunnel log after start:
-journalctl -u reclaim-tunnel -n 40 --no-pager | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'
+```powershell
+icacls "$EngineRoot\secrets\reclaim-ingest.env" /inheritance:r /grant:r `
+  'SYSTEM:(F)' 'BUILTIN\Administrators:(F)' "${ServiceAccount}:(R)"
+icacls "$EngineRoot\state" /inheritance:r /grant:r `
+  'SYSTEM:(OI)(CI)(F)' 'BUILTIN\Administrators:(OI)(CI)(F)' `
+  "${ServiceAccount}:(OI)(CI)(M)"
+icacls "$EngineRoot\logs" /inheritance:r /grant:r `
+  'SYSTEM:(OI)(CI)(F)' 'BUILTIN\Administrators:(OI)(CI)(F)' `
+  "${ServiceAccount}:(OI)(CI)(M)"
 ```
 
-Because the hostname changes on every tunnel restart, treat it as a value you
-re-fetch and re-hand to the gateway each time until you move to a named tunnel.
+The durable identity path is:
 
----
-
-## 6. Verify end-to-end, then hand back to the gateway
-
-Set `HOST` to the printed hostname and pull the read token locally on the VM:
-
-```bash
-HOST=https://<random>.trycloudflare.com
-READ=$(sudo sed -n 's/^RECLAIM_READ_TOKEN=//p' /etc/reclaim/reclaim-ingest.env)
-
-curl -s "$HOST/health"                                        # open, expect JSON liveness
-curl -s -H "Authorization: Bearer $READ" "$HOST/state"        # read-token gated
-# From the LAPTOP too (records round-trip; GATEWAY_GO_LIVE §3):
-#   curl -w '\n%{time_total}s\n' https://<host>/health
+```text
+C:\ProgramData\RECLAIM\engine\state\ingest_state.json
 ```
 
-Hand back to the gateway (closes the egress loop — GO-LIVE §3):
+The Kubernetes/VM storage owner must confirm this path survives the required VM
+recovery and rescheduling scenarios.
 
-1. **Ingress hostname** → set `cloud_url: https://<host>/ingest` in
-   `C:\RECLAIM\pi_gateway\config.windows.yaml`.
-2. **`RECLAIM_INGEST_TOKEN`** (the ingest value, not the read value) → `auth_token`
-   (same string).
-3. **ACL-lock** that config — it now holds the token in cleartext: break
-   inheritance, grant SYSTEM + Administrators only.
+## 5. Install the engine as a Windows service
 
-Reminder: those placeholders don't block startup (`config.py:131` only checks
-`auth_token` non-empty; `cloud_url` isn't validated). Replacing them is a **human
-gate** — verify by eye.
+Use an operator-approved WinSW 3.x binary. Verify its official release provenance
+and SHA-256; do not commit the executable.
 
----
+Copy these repository files into `$EngineRoot\service`:
 
-## 7. What becomes runnable next (still gated, still ordered)
+- `cloud_engine\windows\run-ingest-engine.ps1`
+- `cloud_engine\windows\reclaim-ingest.xml`
 
-Only after **ingress** (§2 cRIO IPs) *and* this **egress** are both real:
-install the gateway boot task, then run the **six §5 contract gates**
-(fresh / duplicate / harness-reject / stale / gateway-restart / cloud-restart +
-freshness decay), then the **§6 three-column V&V** with the `gw_` audit machine.
-The harness-reject gate is the live-only proof: `--production` rejects
-`mode: harness`. See `GATEWAY_GO_LIVE.md` §5–§7.
+Copy the approved binary as `reclaim-ingest.exe`. Replace the XML placeholders:
 
----
-
-## 8. Upgrade path — named tunnel + domain (when interop matters)
-
-Replaces the ephemeral hostname with a stable `cloud_url` and lets you put a
-Cloudflare Access policy in front of `/ingest` and the GET routes:
-
-```
-cloudflared tunnel login
-cloudflared tunnel create reclaim-engine
-cloudflared tunnel route dns reclaim-engine engine.<your-domain>
-# config.yml: ingress rule -> service http://127.0.0.1:8078 ; run as a service
-# then add a self-hosted Access app over engine.<your-domain>
-```
-
-Record the decision wherever GO-LIVE §9.1's access model is finalized.
-
----
-
-## 9. Open items this session should also close or record
-
-- **§9.2** Confirm the VM's Python (from §0) as supported, or pin one.
-- **§9.3** Graceful stop: the engine catches `KeyboardInterrupt` → `server.shutdown()`.
-  Confirm `systemctl stop reclaim-ingest` exits cleanly (no `on-failure` restart).
-- **§9.5** After first real frames flow, diff `/state` `vars` keys against
-  `CONVENE_GW_MAPPING.md` before considering `strict_fields: true`.
-- **§9.9** Record team acceptance of the SYSTEM-level Convene remote-shell posture
-  on the gateway; decide who may issue commands.
-- Quick-tunnel has **no Access policy** — until §8, the ingest bearer token is the
-  only thing protecting `POST /ingest`. Don't advertise the hostname.
-
----
-
-## Quick reference
-
-| Item | Value |
+| Placeholder | Value |
 |---|---|
-| Engine dir | `/opt/reclaim/engine` |
-| Bind | `127.0.0.1:8078` (loopback only) |
-| Service | `reclaim-ingest.service` (`--production --max-frame-age-s 15`) |
-| Secrets | `/etc/reclaim/reclaim-ingest.env` (mode 600 root:root) |
-| State | `/var/lib/reclaim-ingest/ingest_state.json` |
-| Tunnel | `cloudflared tunnel --url http://127.0.0.1:8078` (quick) |
-| Open routes | `/health` (open) · `/state /manifest /history /command` (read token) · `/ingest` (ingest token, POST) |
-| Hand back | `cloud_url=https://<host>/ingest`, `auth_token=<RECLAIM_INGEST_TOKEN>`, then ACL-lock |
+| `{{RUNNER_PATH}}` | `$EngineRoot\service\run-ingest-engine.ps1` |
+| `{{PYTHON_EXE}}` | `<release>\.venv\Scripts\python.exe` |
+| `{{ENGINE_DIR}}` | `<release>\cloud_engine` |
+| `{{SECRET_FILE}}` | `$EngineRoot\secrets\reclaim-ingest.env` |
+| `{{STATE_FILE}}` | `$EngineRoot\state\ingest_state.json` |
+| `{{SERVICE_ACCOUNT}}` | reviewed Windows service identity |
+
+The wrapper reads secrets from the ACL-protected file into the child environment;
+the WinSW command line and XML remain non-secret. It starts exactly:
+
+```text
+push_ingest_dual.py --host 127.0.0.1 --port 8078 --env earth_lab --production --max-frame-age-s 15
+```
+
+Install but do not start until paths, XML, account, and ACLs have been reviewed:
+
+```powershell
+Set-Location "$EngineRoot\service"
+.\reclaim-ingest.exe install
+Get-Service RECLAIMIngestEngine
+Start-Service RECLAIMIngestEngine
+```
+
+## 6. Verify the loopback engine
+
+```powershell
+Get-Service RECLAIMIngestEngine
+Get-NetTCPConnection -LocalPort 8078
+Invoke-RestMethod http://127.0.0.1:8078/health
+```
+
+Port 8078 must listen only on loopback. Load the read credential into a local
+PowerShell variable without printing it, then verify `/state` rejects an absent or
+wrong credential and accepts the correct bearer header. Never capture the header in
+screenshots or logs.
+
+Confirm the WinSW logs contain no credentials and that a service restart preserves
+`ingest_state.json` identity/deduplication state.
+
+## 7. Establish the Cloudflare route
+
+First discover the existing Windows cloudflared installation and service. Preserve
+an unexpected named tunnel. For the demonstration, a foreground quick tunnel is an
+acceptable temporary route:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8078 --no-autoupdate
+```
+
+Its hostname is ephemeral and bearer credentials are the only application-layer
+protection. A named tunnel with an approved DNS name and Access policy is preferred
+for durable interoperability. Never route synthetic ports 8177–8179.
+
+## 8. Run endpoint acceptance
+
+From a trusted workstation, load credentials into environment variables rather
+than process arguments:
+
+```powershell
+$env:RECLAIM_INGEST_TOKEN = '<private value>'
+$env:RECLAIM_READ_TOKEN = '<different private value>'
+python cloud_engine\tools\redteam_ingest.py --url https://<engine-host>
+Remove-Item Env:RECLAIM_INGEST_TOKEN, Env:RECLAIM_READ_TOKEN
+```
+
+Required result: all 20 checks pass. Restart `RECLAIMIngestEngine` and verify the
+last accepted frame remains a duplicate and fresh telemetry continues with durable
+identity intact.
+
+## 9. Install and accept the Convene state bridge
+
+Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`. The bridge is a separate
+Windows service, uses only the read token, reads only loopback `/state`, and writes
+the existing VM agent's `sim_vars.json` atomically.
+
+Convene acceptance must prove:
+
+- prefix behavior using a harmless bridge metadata field;
+- exactly one `sim_` writer;
+- mode/status/freshness/data-live gating;
+- independent expiration of `bridge_valid_until`; and
+- no change to the existing VM Convene agent or `/command` authority.
+
+## 10. Gateway handoff
+
+Send the Windows 10 gateway operator, through an approved private channel:
+
+- `https://<engine-host>/ingest`;
+- ingest token only;
+- full engine source SHA;
+- 15-second maximum frame age; and
+- planned availability window.
+
+Do not send the read token unless a separately reviewed gateway function requires
+it. ACL-lock the gateway configuration after inserting its credential.
+
+## Rollback
+
+Stop and uninstall only `RECLAIMIngestEngine`, return the tunnel to its prior
+configuration, and preserve the previous release, secret, durable identity, logs,
+and unexpected services. Do not delete Kubernetes storage or VM disks as part of a
+guest-service rollback. The bridge and existing Convene agent have separate rollback
+procedures.
+
+## Stop conditions
+
+Stop rather than improvise if the selected SHA is not exact, port 8078 has an
+unknown owner, the engine binds beyond loopback, tokens appear in command lines or
+logs, durable state is not persistent, the tunnel routes an unintended port,
+Convene remains live after lease expiry, another process writes `sim_vars.json`, or
+any advisory output is connected to hardware control authority.

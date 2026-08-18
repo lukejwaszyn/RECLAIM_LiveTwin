@@ -194,7 +194,8 @@ The installer:
 
 Standardize runtime paths before implementation:
 
-- VM: service `WorkingDirectory` and `ExecStart` resolve through `/opt/reclaim/current`.
+- Windows Server 2025 VM: WinSW service working directory and executable resolve
+  through `C:\ProgramData\RECLAIM\current`.
 - Gateway: Scheduled Task executable and working directory resolve through `C:\RECLAIM\current`.
 
 Release directories never contain secrets, live database files, logs, or mutable state.

@@ -47,14 +47,22 @@ The proposed archive contains a SHA-256 checksum, but the plan does not define w
 
 **Severity:** P1 — deployment plan is incomplete and rollback may be ineffective.
 
-The CI/CD document switches `/opt/reclaim/current` and `C:\RECLAIM\current`. Existing runtime templates do not use those paths:
+The CI/CD document proposes stable Windows release roots. Existing runtime
+entrypoints still require deliberate alignment before automated promotion:
 
-- [`cloud_engine/deploy/reclaim-ingest.service`](../cloud_engine/deploy/reclaim-ingest.service) runs `/opt/reclaim/engine/.venv/bin/python` with `WorkingDirectory=/opt/reclaim/engine`.
+- [`cloud_engine/windows/reclaim-ingest.xml`](../cloud_engine/windows/reclaim-ingest.xml)
+  is the Windows Server 2025 WinSW template and must resolve the reviewed engine
+  release beneath `C:\ProgramData\RECLAIM\releases`.
 - [`pi_gateway/windows/install-gateway-task.ps1`](../pi_gateway/windows/install-gateway-task.ps1) registers a task using `C:\RECLAIM\pi_gateway\.venv\Scripts\python.exe` and a working directory of `C:\RECLAIM\pi_gateway`.
 
 Changing `current` therefore does not change what either deployed service executes unless the unit/task is deliberately rewritten to use that stable path.
 
-**Required design:** Choose one release-root convention and make the runtime templates use it before the first CI/CD deployment. Example: `/opt/reclaim/current` and `C:\RECLAIM\current` are the only service/task roots; release directories are immutable; switching is atomic; the deployment verifies the resolved executable path after restart. Add a rollback test that proves the process version actually changes in both directions.
+**Required design:** Choose one Windows release-root convention and make the
+runtime templates use it before the first CI/CD deployment. The VM root is
+`C:\ProgramData\RECLAIM\current`; the gateway root is `C:\RECLAIM\current`.
+Release directories are immutable, switching is atomic, and deployment verifies
+the resolved executable path after restart. Add a rollback test that proves the
+process version actually changes in both directions.
 
 ### CD-04 — Dependencies are not reproducible between CI and production
 
@@ -82,7 +90,7 @@ The plan requires a protected branch but does not specify:
 - no repository/environment secrets in pull-request workflows;
 - artifact retention and release-approval audit requirements.
 
-**Required design:** Define these as mandatory repository settings before the first workflow. A change to `.github/workflows/`, deployment templates, systemd/task definitions, command authority code, or safety thresholds requires explicit controls/safety owner approval in addition to normal code review.
+**Required design:** Define these as mandatory repository settings before the first workflow. A change to `.github/workflows/`, deployment templates, Windows service/task definitions, command authority code, or safety thresholds requires explicit controls/safety owner approval in addition to normal code review.
 
 ### CD-06 — Restart/deploy during an active batch is not gated
 
@@ -202,7 +210,7 @@ Before implementation, create one test per row and make it a required check:
 
 - [ ] Decide whether the SYSTEM-level remote-command agent is removed or moved off the gateway before any control-connected deployment.
 - [ ] Amend `CI_CD_ARCHITECTURE.md` to reject production self-hosted Actions runners and to require signed digest-bound artifacts.
-- [ ] Define stable release roots and update the systemd unit / Windows task to execute through them.
+- [ ] Define stable release roots and update the Windows services/tasks to execute through them.
 - [ ] Create lock files, a wheel/artifact build, and a signed manifest format.
 - [ ] Implement the regression tests above before calling CI a safety gate.
 - [ ] Create fixed, least-privilege VM and gateway deployment tools with receipts and tested rollback.

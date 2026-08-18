@@ -3,7 +3,7 @@
 > **Stage:** cross-cutting (current pickup point) · **Status:** LIVING — authoritative
 > project story. Start here. See `deployment/README.md` for the stage-sorted index.
 
-**Written:** 2026-08-15 · **Updated:** 2026-08-16 · **Purpose:** clean pickup for
+**Written:** 2026-08-15 · **Updated:** 2026-08-17 · **Purpose:** clean pickup for
 the next working sessions. The immediate priority is the **RT-03/RT-05 backend
 remediation and 72-hour demo**, followed by the cloud VM predictive-engine
 session. This is the "full story" document; the detailed punch list lives in
@@ -24,15 +24,13 @@ ingress/egress work still to come.
 
 ### Immediate 72-hour pickup
 
-The Git repository and GitHub-hosted CI baseline now exist. The inherited
-gateway/cloud tests pass, while the named RT-03/RT-05 integrity gate remains red
-by design until the backend transaction and structural-validation defects are
-fixed. Work in this order:
+The Git repository, private GitHub remote, and hosted CI baseline now exist. The
+RT-03/RT-05 transaction and structural-validation remediation is implemented on
+the current integration branch, and the locked local suite is green. Review and
+hosted CI must still verify the exact deployment SHA. Work in this order:
 
-1. Implement `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` using
-   `deployment/NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md`. The narrower
-   `deployment/ClaudeCode_Backend_Remediation_Prompt.md` remains available when
-   the session must be limited strictly to RT-03/RT-05.
+1. Review the completed `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md`
+   implementation and require green CI on the exact deployment SHA.
 2. Preserve a guaranteed, loopback-only synthetic nominal demo and rehearse the
    power-outage and lunar-surface scenarios using
    `deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md`.
@@ -50,10 +48,12 @@ cRIO / LabVIEW ──(Ethernet 192.168.50.x, INGRESS)──► Laptop edge gatew
                                                            │
                                                            │ authenticated HTTPS (EGRESS)
                                                            ▼
-                                                  Cloudflare Tunnel ──► Cloud dual engine (VM)
-                                                                          │  /state, /manifest
+                                                  Cloudflare Tunnel ──► Windows Server 2025 VM
+                                                                          │ dual engine on loopback
+                                                                          │ Windows state bridge
                                                                           ▼
-                                                                   Convene (sim_ publisher + native .stp visualization, read-only)
+                                                                   existing VM Convene agent
+                                                                          │ sim_ + native .stp view
 
    Parallel audit tap:  Laptop  ──(Convene agent, gw_ set from /latest)──►  Convene
 ```
@@ -64,6 +64,10 @@ cRIO / LabVIEW ──(Ethernet 192.168.50.x, INGRESS)──► Laptop edge gatew
 - The **cloud engine** is the single writer of the Convene `sim_` set. The
   **laptop** is the `gw_` audit machine only (byte-for-byte V&V tap), never a
   second `sim_` writer.
+- The VM is a **Windows Server 2025 guest in Kubernetes-managed cloud
+  infrastructure**. Kubernetes is the outer hosting layer; VM operations use
+  PowerShell, Windows services, NTFS paths, and ACLs. There is no Linux host or
+  Raspberry Pi in the live pipeline. See `DEPLOYMENT_TOPOLOGY.md`.
 
 ---
 
@@ -82,7 +86,8 @@ cRIO / LabVIEW ──(Ethernet 192.168.50.x, INGRESS)──► Laptop edge gatew
   The **boot task is deliberately NOT installed** (`GATEWAY_GO_LIVE.md` §5) — with
   no cRIO IP and a placeholder URL it would crash-loop.
 - **Convene agent running as SYSTEM at boot** — see §4.
-- Docs reconciled (Pi→laptop; preflight renamed `RECLAIM_Remote_Gateway_Preflight.md`).
+- Docs reconciled to the Windows 10 laptop gateway and Windows Server 2025 VM;
+  the preflight is `RECLAIM_Remote_Gateway_Preflight.md`.
 
 ### Access model (settled this project)
 
@@ -91,9 +96,8 @@ Inbound listeners are blocked by an enforced **WDAC code-integrity policy**
 attempt SSH/RDP servers on this box.** Administration is **outbound-only**:
 **TeamViewer** for hands-on, **Tailscale** for the private network, and the
 **Convene agent** for a programmatic outbound control/telemetry plane. This is
-not a limitation to work around later — it is the architecture. `GATEWAY_GO_LIVE.md`
-§9.1 flags that preflight §1 (which assumed an SSH server + tunnel) must be
-rewritten around this reality.
+not a limitation to work around later — it is the architecture. Preflight §1 and
+`GATEWAY_GO_LIVE.md` §9.1 now record this model.
 
 ### Not yet built
 
@@ -182,9 +186,8 @@ record so the next session starts clean.
 
 ## 7. Open decisions carried forward (`GATEWAY_GO_LIVE.md` §9)
 
-- §9.1 Rewrite preflight §1 around outbound-only access (or authorize a WDAC
-  exception). §9.2 Confirm Python 3.13 as supported or pin one. §9.3 Exercise the
-  graceful-stop (Ctrl+C → exit 0) path. §9.4 Status server has no auth — never
+- §9.1 outbound-only access and §9.2 Python 3.13 support are resolved. §9.3
+  Exercise the graceful-stop (Ctrl+C → exit 0) path. §9.4 Status server has no auth — never
   tunnel 9080 without carrying auth. §9.5 Verify the 27 raw `vars` names against
   the first real frame. §9.7 Dispose of the offline `reclaim-pi` node. §9.9
   Accept/record the SYSTEM remote-shell posture (see §4).
@@ -194,12 +197,14 @@ record so the next session starts clean.
 ## 8. Next session — cloud VM predictive engine
 
 See `deployment/VM_ENGINE_SESSION_BRIEF.md` for the turnkey checklist. In short:
-deploy `push_ingest_dual.py --production` on the VM (loopback), create the
-mode-600 `EnvironmentFile` with `RECLAIM_INGEST_TOKEN` + `RECLAIM_READ_TOKEN` and
-the `RECLAIM_INGEST_STATE` file, stand up cloudflared (quick tunnel to start),
-verify `/health`, then **hand the ingress hostname + ingest token back** so the
-gateway's `config.windows.yaml` can be finalized and ACL-locked. Only then do the
-§5 contract gates and §6 V&V become runnable.
+deploy `push_ingest_dual.py --production` on the Windows Server 2025 VM
+(loopback), create the ACL-protected secret and persistent state files under
+`C:\ProgramData\RECLAIM`, install the reviewed WinSW service, stand up Windows
+cloudflared, verify `/health`, then **hand the ingress hostname + ingest token
+back** so the gateway's `config.windows.yaml` can be finalized and ACL-locked.
+Next, install the independent Windows state bridge and bind its output through
+the existing VM Convene agent. Only then do the §5 contract gates and §6 V&V
+become runnable.
 
 ---
 
@@ -209,6 +214,7 @@ gateway's `config.windows.yaml` can be finalized and ACL-locked. Only then do th
 |---|---|
 | `deployment/README.md` | **Stage-sorted index** of every deployment doc (start here for orientation) |
 | `deployment/HANDOFF.md` | **This doc** — full story + pickup pointers |
+| `deployment/DEPLOYMENT_TOPOLOGY.md` | Authoritative Windows VM/gateway topology and responsibility boundary |
 | `deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Immediate demo critical path, scenario run sheet, endpoint gates, and fallback |
 | `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | RT-03/RT-05 implementation contract and acceptance gates |
 | `deployment/NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md` | Primary fresh-chat prompt for backend fixes, cloud proof, and Convene reintegration |

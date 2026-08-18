@@ -33,7 +33,10 @@ Read these files before changing anything, in this order:
 
 ## Critical context
 
-- The target is a Windows VM registered in Convene as `reclaim-engine-2`.
+- The target is a cloud-hosted Windows Server 2025 VM in Kubernetes-managed
+  infrastructure, registered in Convene as `reclaim-engine-2`. Kubernetes is the
+  outer hosting boundary; guest work uses PowerShell, Windows services, NTFS, and
+  ACLs, not Linux container commands.
 - Its existing Convene agent independently includes
   `C:\ConveneAgent\sim_vars.json` in that VM's heartbeat.
 - Other Convene agents run on entirely separate devices. They may use mechanically
