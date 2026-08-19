@@ -8,7 +8,7 @@
 >
 > **Branch:** `desktop/edge-gateway`
 >
-> **Verified starting commit:** `933edfe`
+> **Commissioning baseline commit:** `322d333`
 >
 > **Overall live status:** **NO-GO** until a real cRIO frame traverses all three
 > endpoints and the evidence in §8 passes.
@@ -79,7 +79,7 @@ The two arrows into Convene are intentionally independent:
 | Item | State |
 |---|---|
 | Repository | `C:\Users\latitude4\Documents\Codex\2026-08-16\i\RECLAIM_LiveTwin` |
-| Branch | `desktop/edge-gateway`, pushed through `933edfe` |
+| Branch | `desktop/edge-gateway`, pushed through `322d333` before evidence capture |
 | Staged runtime | `C:\RECLAIM\pi_gateway` |
 | Laptop cRIO interface | Ethernet `192.168.1.1/24`, Private, no desktop-side default route |
 | cRIO peer | `192.168.1.2/24`, reachable by laptop ping |
@@ -89,10 +89,34 @@ The two arrows into Convene are intentionally independent:
 | Desktop Convene API | `https://reservation-backend-25386666460.us-central1.run.app/api` |
 | Direct publish probe | Empty `variables` reached authenticated semantic validation: HTTP 400 `no variables to publish`, not 401; no variable was created |
 | Gateway source | Dual-output source and non-secret Convene settings are staged |
-| Gateway task | **Not installed/running**; deliberately gated on a real VM `/ingest` URL/token |
-| Production config | Still contains placeholder VM URL/token and is intentionally rejected by the hardened loader |
+| Gateway task | `RECLAIM-EdgeGateway` installed and running as SYSTEM; listeners verified on `192.168.1.1:9070` and `127.0.0.1:9080` |
+| VM route | Current Quick Tunnel is `https://renewal-conclude-associates-relief.trycloudflare.com/ingest`; temporary and must be re-finalized if restarted |
+| Production config | Live HTTPS URL/token finalized; active file and one token-bearing backup verified as SYSTEM/Administrators only |
+| Synthetic fan-out | **PASS** at `2026-08-19T20:45:20Z`; desktop receive, VM ingest, and desktop Convene publish all advanced once |
 | Real cRIO frame | **Not yet observed** |
-| Tests | 25 gateway tests and 63 bridge/operator-workflow tests passed |
+| Tests | 26 gateway tests and 63 bridge/operator-workflow tests passed |
+
+### 3.1.1 Retained commissioning evidence
+
+The single supervised frame was deliberately labeled as synthetic and must not
+be treated as a physical measurement:
+
+| Evidence | Value |
+|---|---|
+| `source_id` | `reclaim-commissioning-desktop` |
+| `cycle_id` | `COMMISSIONING-NOT-CRIO-20260819T204518Z` |
+| Canonical `run_id` / `seq` | `8a7ba244-0535-476b-ba1c-961822e05cc9` / `1` |
+| Desktop receive advanced | yes |
+| VM `ingested_total` | advanced from 0 to 1 |
+| Desktop Convene delivered | advanced from 0 to 1 |
+| Desktop Convene failed/coalesced | `0` / `0` |
+| Durable queue / dead letter after delivery | `0` / `0` |
+| VM accepted active run | `8a7ba244-0535-476b-ba1c-961822e05cc9` |
+| cRIO peer reachability after test | `192.168.1.2`, two replies |
+
+This proves the desktop gateway's two outbound paths and the VM ingress service.
+It does **not** prove the cRIO field names/types, predictive-engine processing,
+the VM-specific `sim_` Convene writer, stale-state behavior, or restart recovery.
 
 ### 3.2 Desktop data handling order
 
@@ -419,33 +443,37 @@ token to the other endpoint.
 - Guarded HTTPS config finalizer and Windows boot-task installer.
 - Desktop Convene pairing recovery/persistence tooling.
 - Direct nonblocking `gw_` `/machine/publish` implementation.
+- Live VM HTTPS configuration with exact secret ACL repair and verification.
+- SYSTEM boot task running with cRIO-only ingress and loopback-only status.
+- One retained, explicitly synthetic dual-output commissioning pass.
 - Production loader rejects placeholder/non-TLS configuration.
 - Tests and GitHub branch publication.
 
 ### Remaining/blocking
 
-1. Confirm the cRIO/LabVIEW sender targets `192.168.1.1:9070` and emits a real
+1. Configure the cRIO/LabVIEW sender for `192.168.1.1:9070` and emit one real
    newline-delimited frame.
-2. Inventory the live VM before changing it.
-3. Confirm/start exactly one VM engine on loopback 8078.
-4. Start the guarded Cloudflare route and securely return `/ingest` URL/token.
-5. Finalize desktop config and start `RECLAIM-EdgeGateway`.
-6. Run `pi_gateway/windows/send-commissioning-frame.ps1` once to prove the
-   desktop fan-out; retain its explicitly synthetic evidence.
-7. Capture the first real frame and reconcile any schema differences.
-8. Prove the VM queue drains and predictive state correlates.
-9. Prove desktop `gw_` values change in Convene.
-10. Prove separate VM `sim_` stakeholder values change and expire safely.
-11. Record reboot recovery only after the above passes.
+2. Retain that first real frame and reconcile its names, types, units, chamber,
+   state, and cycle semantics before tightening schema enforcement.
+3. On the VM, prove the accepted run/source/sequence reaches the predictive
+   engine rather than only the `/ingest` service.
+4. Prove the VM's separate publisher writes fresh `sim_` stakeholder values to
+   its own Convene machine while the desktop continues writing only `gw_`.
+5. Decide whether to replace the temporary Quick Tunnel with a durable named
+   tunnel or document/rehearse re-finalization whenever its hostname changes.
+6. Exercise source-stop/stale behavior and confirm no stale value remains green.
+7. Record desktop and VM restart recovery only after the live path passes.
 
 ## 8. End-to-end acceptance gate
 
 Do not call the three-endpoint path live until all boxes pass:
 
 - [ ] cRIO sends to `192.168.1.1:9070`; a real typed frame appears at `/latest`.
-- [ ] Gateway `/health` shows received frames and no unexplained local drops.
-- [ ] Desktop direct Convene counters show successful `gw_` publication.
-- [ ] Gateway queue drains over TLS through the intended Cloudflare hostname.
+- [ ] Gateway `/health` shows **real cRIO** frames and no unexplained local drops.
+- [x] Desktop direct Convene counters show successful `gw_` publication for the
+      labeled synthetic commissioning frame.
+- [x] Gateway queue drained over TLS through the current Cloudflare hostname for
+      the labeled synthetic commissioning frame.
 - [ ] VM `/state` carries the same run/source/sequence and fresh source time.
 - [ ] Predictive values respond to the correct chamber and operating state.
 - [ ] VM bridge publishes the separate `sim_` stakeholder set.
@@ -453,7 +481,8 @@ Do not call the three-endpoint path live until all boxes pass:
 - [ ] `gw_` raw values and `sim_` derived values agree after documented
       conversion/aggregation.
 - [ ] Source stop produces stale/not-live behavior; no stale value remains green.
-- [ ] No command/advisory is connected to hardware actuation.
+- [x] No command/advisory is connected to hardware actuation in the deployed
+      desktop gateway path.
 - [ ] Desktop and VM services recover after an intentional reboot/restart test.
 
 ## 9. Rollback boundaries
