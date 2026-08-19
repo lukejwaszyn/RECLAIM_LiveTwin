@@ -20,7 +20,7 @@ services, or deployment procedures.
 
 | Endpoint | Platform | Owns | Sends to Convene as |
 |---|---|---|---|
-| **1 — Desktop edge gateway** | This Windows 10 laptop | cRIO TCP ingress, canonical framing, durable outbound queue, Cloudflare-bound VM delivery, raw audit publication | `gw_` |
+| **1 — Desktop edge gateway** | Dedicated Windows 10 edge-gateway laptop | cRIO TCP ingress, canonical framing, durable outbound queue, Cloudflare-bound VM delivery, raw audit publication | `gw_` |
 | **2 — Predictive-engine VM** | Cloud-hosted Windows Server 2025 | `/ingest`, predictive algorithms, derived stakeholder state, VM state bridge, separate VM Convene publisher/binding | `sim_` |
 | **3 — Convene** | External Convene service/UI | Displays the independent desktop audit and VM predictive/stakeholder views | Receives both, but does not fuse their credentials or writers |
 
@@ -114,11 +114,11 @@ be treated as a physical measurement:
 | VM accepted active run | `8a7ba244-0535-476b-ba1c-961822e05cc9` |
 | cRIO peer reachability after test | `192.168.1.2`, two replies |
 
-This proves the desktop gateway's two outbound paths and the VM ingress service.
+The commissioning record proves the desktop gateway's two outbound paths and the VM ingress service.
 It does **not** prove the cRIO field names/types, predictive-engine processing,
 the VM-specific `sim_` Convene writer, stale-state behavior, or restart recovery.
 Until a real run supersedes it, the desktop `/latest` record and VM
-`active_run_id` identify this commissioning frame; operators must continue to
+`active_run_id` identify the commissioning frame; operators must continue to
 treat it as synthetic and not as current physical process state.
 
 ### 3.2 Desktop data handling order
@@ -152,7 +152,7 @@ is not sent on every telemetry request. At runtime:
 
 The connected-machine heartbeat currently returns HTTP 500 after updating
 presence because the Convene backend lacks the Firestore composite
-`machineCommands` index over `machineId`, `status`, and `createdAt`. This degrades
+`machineCommands` index over `machineId`, `status`, and `createdAt`. The defect degrades
 the separate heartbeat/command response, but direct `/machine/publish` is a
 different route and does not depend on returned `autoVars`.
 
@@ -191,7 +191,7 @@ MW_flow_state              MW_RF
 MW_status
 ```
 
-This list is repository-derived, not live-observed. `strict_fields: false`
+The variable list is repository-derived, not live-observed. `strict_fields: false`
 preserves unexpected fields in the first real frame. Confirm names, types, units,
 and semantics before enabling a strict manifest. The predictive engine expects
 numeric values to be finite and the listed flags to be actual booleans.
@@ -205,7 +205,7 @@ The VM operator must privately return:
 3. The existing VM `RECLAIM_INGEST_TOKEN`, transferred securely and never pasted
    into chat, command history, logs, or Git.
 
-Then run from **elevated PowerShell on this desktop**:
+Then run from **elevated PowerShell on Endpoint 1, the Windows 10 edge-gateway laptop**:
 
 ```powershell
 Set-Location 'C:\Users\latitude4\Documents\Codex\2026-08-16\i\RECLAIM_LiveTwin'
@@ -267,14 +267,14 @@ The VM owns all of the following and the desktop owns none of them:
 ### 4.2 Current knowledge boundary
 
 Repository records describe a previously proven VM ingestion-to-state-to-Convene
-path, but this desktop session did **not** inspect the live VM. Treat actual VM
+path, but no authenticated live-VM inventory is captured in the current handoff. Treat actual VM
 service, tunnel, release, token, bridge, and Convene state as unknown until the
 VM inventory is run. Do not overwrite an existing service, named tunnel, or
 Convene writer.
 
 ### 4.3 First actions on the VM
 
-From elevated PowerShell in a fresh checkout/pull of this branch:
+From elevated PowerShell in a fresh checkout/pull of branch `desktop/edge-gateway`:
 
 ```powershell
 Set-Location 'C:\path\to\RECLAIM_LiveTwin'
@@ -309,7 +309,7 @@ healthy:
 .\deployment\windows-vm\Start-ReclaimQuickTunnel.ps1 -Mode Run
 ```
 
-This is a foreground temporary tunnel. Keep its PowerShell window open. It
+The Quick Tunnel is a foreground temporary process. Keep its PowerShell window open. It
 exposes only `http://127.0.0.1:8078`, writes a redacted operational log, and
 saves the generated base URL under:
 
@@ -388,14 +388,14 @@ boundary is therefore `/state` -> `RECLAIMStateBridge` -> `sim_vars.json` -> the
 VM Convene agent/bindings. A single state also becomes stale after 15 seconds and
 can expire between downstream heartbeats.
 
-After pulling this branch on the VM, run from an elevated repository shell:
+After pulling branch `desktop/edge-gateway` on the VM, run from an elevated repository shell:
 
 ```powershell
 .\deployment\windows-vm\Get-ConvenePublicationDiagnostics.ps1 `
   -ProofRun '8a7ba244-0535-476b-ba1c-961822e05cc9'
 ```
 
-This read-only command reports the authenticated engine identity/state, bridge
+The read-only command reports the authenticated engine identity/state, bridge
 payload and health, engine/bridge service states, VM Convene task state, and
 matching non-secret log lines. Do not send additional frames until it establishes
 whether the bridge and VM Convene agent are healthy.
@@ -409,8 +409,90 @@ multiple VM bridge and Convene heartbeats, then proves stale expiry:
   -PublicUrl 'https://renewal-conclude-associates-relief.trycloudflare.com'
 ```
 
-This VM-only workflow validates predictive-state publication. A later sustained
+The VM-only workflow validates predictive-state publication. A later sustained
 stream from the real cRIO must still prove the complete desktop-originated path.
+
+### 4.8 VM completion sequence
+
+Execute the following sequence on Endpoint 2. Preserve existing releases,
+services, tasks, tunnels, credentials, binding manifests, and state files until
+the relevant read-only output has been retained.
+
+1. **Synchronize and inventory.** Pull branch `desktop/edge-gateway`, record the
+   exact commit, then run:
+
+   ```powershell
+   .\deployment\windows-vm\Get-ReclaimPredictiveVmInventory.ps1
+   .\deployment\windows-vm\Start-ReclaimQuickTunnel.ps1 -Mode Audit
+   ```
+
+2. **Locate the commissioning frame.** Run the §4.7 diagnostic with proof run
+   `8a7ba244-0535-476b-ba1c-961822e05cc9`. Classify the first missing boundary:
+   authenticated engine `/state`, `RECLAIMStateBridge`, `sim_vars.json`, the
+   `ConveneAgent` scheduled task, or the environment-local variable-ID mapping.
+   Do not send more frames until the missing boundary is known.
+
+3. **Repair only the failed VM-owned boundary.** If a service or task is absent,
+   use `VM_ENGINE_RUNBOOK.md` and
+   `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`. Recovery scripts under
+   `deployment/windows-vm/recovery` are not routine installers and may be used
+   only after retaining the existing service definition and logs. Never import
+   the desktop Convene pairing credential or `gw_` mapping.
+
+4. **Prove engine ingress and restart identity.** With exactly one engine on
+   loopback 8078 and the current Cloudflare route still running, execute:
+
+   ```powershell
+   .\deployment\windows-vm\Test-EnginePublicAcceptance.ps1 `
+     -PublicUrl 'https://renewal-conclude-associates-relief.trycloudflare.com'
+   ```
+
+   Retain the 20-check result, loopback binding, public route, run/source/sequence,
+   durable duplicate result, service restart result, and state-file persistence.
+
+5. **Prove bridge freshness and expiry.** With `RECLAIMStateBridge` running and
+   `C:\ConveneAgent\sim_vars.json` owned by exactly one bridge writer, run:
+
+   ```powershell
+   .\deployment\windows-vm\Test-ConveneLiveExpiry.ps1 `
+     -PublicUrl 'https://renewal-conclude-associates-relief.trycloudflare.com'
+   ```
+
+   The workflow sends 50 frames at 900 ms, requires exact final correlation and
+   `data_live=true`, then stops the source and requires stale/data-live false.
+
+6. **Validate VM Convene publication.** Run the read-only diagnostic again with
+   the new proof run. Confirm the headless `ConveneAgent` task runs as SYSTEM,
+   consumes the bridge file, and remains independent of the desktop machine.
+   If exact Convene-generated variable IDs are already populated locally, review
+   and publish with:
+
+   ```powershell
+   .\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1 -WhatIf
+   .\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1
+   ```
+
+   Stop if the local mapping is absent, contains `_pending_`, or does not match
+   the scalar bridge fields. Never invent IDs or publish by name alone.
+
+7. **Obtain independent visual evidence.** A Convene operator must confirm fresh
+   VM-originated `sim_` values, the separate desktop `gw_` values, matching
+   run/source/sequence provenance, correct unit conversion/chamber attribution,
+   and visible DATA NOT LIVE after source expiry.
+
+8. **Choose tunnel durability.** The current Quick Tunnel is acceptable only for
+   supervised commissioning. Before unattended operation, either deploy an
+   approved named tunnel/DNS/Access policy or document and rehearse the exact
+   endpoint re-finalization procedure after every Quick Tunnel restart.
+
+9. **Defer full restart acceptance until real cRIO data.** After a real cRIO
+   stream passes the three-endpoint correlation gate, restart Endpoint 1 and
+   Endpoint 2 deliberately and prove task/service recovery, monotone identity,
+   queue drainage, bridge lease behavior, and zero duplicate writers.
+
+VM completion evidence must be copied into the operational handoff without any
+token, authorization header, token-bearing agent script, or full secret-bearing
+configuration file.
 
 ## 5. Endpoint 3 — Convene display and acceptance
 
@@ -543,3 +625,5 @@ Do not call the three-endpoint path live until all boxes pass:
 - VM Windows scripts: `deployment/windows-vm/README.md`
 - VM state bridge: `deployment/WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`
 - Convene binding contract: `convene/RECLAIM_Convene_Live_Binding.md`
+- cRIO telemetry architecture: `deployment/CRIO_TELEMETRY_LINK_HANDOFF.md`
+- cRIO architecture agent prompt: `deployment/NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md`

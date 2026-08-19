@@ -48,6 +48,8 @@ integration rather than production-grade CD.
 | Doc | Role |
 |---|---|
 | `THREE_ENDPOINT_HANDOFF.md` | **Current endpoint handoff:** strict Desktop / Windows Server 2025 VM / Convene ownership, separate `gw_` and `sim_` publishing mechanisms, present evidence, next commands, and acceptance gates. |
+| `CRIO_TELEMETRY_LINK_HANDOFF.md` | Endpoint-specific architecture, discovery, wire contract, safety, and acceptance plan for cRIO/LabVIEW telemetry into the Windows 10 edge gateway. |
+| `NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md` | Self-contained prompt for the agent assigned to inspect and design the cRIO/LabVIEW telemetry producer seam. |
 | `DEPLOYMENT_TOPOLOGY.md` | Authoritative deployment topology, OS boundaries, live data path, and ownership rules. |
 | `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |
 | `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for RT-03/RT-05 backend fixes. |
