@@ -75,19 +75,25 @@ Obtain the reviewed WinSW 3.x executable from its official release channel and
 record its version and `Get-FileHash -Algorithm SHA256` result. The executable is
 an expected external prerequisite; do not commit it.
 
-Install and pair the repository-provided VM Convene agent in headless mode:
+Install the Convene-provided, VM-specific agent in headless mode. The installer
+for `reclaim-engine-2` contains its own VM token and **does not use a pairing
+code**. Treat that script as a credential: verify its source/hash locally, never
+commit it, and use process-scoped execution-policy bypass rather than changing
+machine policy:
 
 ```powershell
-$PairingCode = Read-Host 'Convene pairing code'
-.\deployment\convene-setup-2.ps1 -PairingCode $PairingCode
-Get-ScheduledTask -TaskName Convene-Agent
+Get-FileHash -Algorithm SHA256 'C:\path\to\convene-agent-reclaim-engine-2.ps1'
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File 'C:\path\to\convene-agent-reclaim-engine-2.ps1'
+.\deployment\windows-vm\Register-ConveneAgentTask.ps1
+Get-ScheduledTask -TaskName ConveneAgent
 Get-ChildItem C:\ConveneAgent -Force
 ```
 
-The default invocation must not install or start desktop streaming. It creates
-`C:\ConveneAgent`, registers the `Convene-Agent` startup task as SYSTEM, and sends
-the JSON object in `sim_vars.json` as heartbeat `simVars`. Record the resulting
-machine registration without printing its credential.
+The final task runs as SYSTEM, remains headless, and sends the JSON object in
+`sim_vars.json` as heartbeat `simVars`. Record the machine registration without
+printing its embedded credential. The older pairing-based bootstrap remains a
+reference for other deployments, not this VM's installation path.
 
 ## 4. Stage and verify the exact release
 
@@ -247,6 +253,13 @@ Required result: all 20 checks pass. Restart `RECLAIMIngestEngine` and verify th
 last accepted frame remains a duplicate and fresh telemetry continues with durable
 identity intact.
 
+On the VM, the proven credential-safe wrapper performs both checks:
+
+```powershell
+.\deployment\windows-vm\Test-EnginePublicAcceptance.ps1 `
+  -PublicUrl 'https://<approved-engine-origin>'
+```
+
 ## 10. Install and accept the Convene state bridge
 
 Follow `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`. The bridge is a separate
@@ -269,6 +282,10 @@ through the public Cloudflare route is correlated by run/source/sequence through
 fields. Stop the source and prove the Convene view becomes `DATA NOT LIVE` after
 freshness/lease expiry. Ingress plus local `/state` without Convene evidence is
 `PARTIAL`, not `PASS`.
+
+The 2026-08-19 proof and mission-display variable decision are recorded in
+`CONVENE_MISSION_OPERATIONS_RECAP.md`. Bind sensed variables by their
+Convene-generated IDs; names alone are not a sufficient binding record.
 
 ## 11. Gateway handoff
 
