@@ -7,6 +7,7 @@ capture redacted output before using them on another VM.
 
 | Script | Purpose | Mutates state? |
 |---|---|---|
+| `Deploy-ConveneVariableBindings.ps1` | Validates the protected scalar handoff against the environment-local ID manifest, then posts type-preserved values to exact Convene variable IDs | Yes: Convene variable values only |
 | `Register-ConveneAgentTask.ps1` | Validates the VM-specific installed Convene agent, locks its ACL, and registers the headless SYSTEM startup task | Yes |
 | `Deploy-ProvenScalarStateRelease.ps1` | Transactionally deploys exact engine SHA `726804b...`, updates bridge provenance, and rolls the engine back on startup failure | Yes |
 | `Test-EnginePublicAcceptance.ps1` | Runs the public 20-check harness, restarts the engine, and proves durable duplicate detection | Yes: telemetry + one engine restart |
@@ -28,6 +29,16 @@ Use the current approved HTTPS origin; quick-tunnel hostnames are ephemeral.
 
 .\deployment\windows-vm\Get-ConvenePublicationDiagnostics.ps1 `
   -ProofRun '<correlated-run-id>'
+
+# Validate all IDs, source fields, and scalar types without transmitting values.
+.\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1 -WhatIf
+
+# Publish using the installed, token-bearing C:\ConveneAgent\agent.ps1 by default.
+.\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1
+
+# Alternatively, use a separately protected token file; the token is never printed.
+.\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1 `
+  -AgentTokenFile 'C:\secure\convene-agent-token.txt'
 ```
 
 The acceptance scripts read the ACL-protected engine secret file locally, keep

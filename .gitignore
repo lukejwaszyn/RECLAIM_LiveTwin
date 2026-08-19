@@ -37,6 +37,7 @@ reclaim-ingest.env
 .env.*
 !.env.example
 !*.env.example
+deployment/CONVENE_VARIABLE_BINDINGS.local.json
 *.pem
 *.key
 *.p12

@@ -196,6 +196,36 @@ pre-existing `sim_` prefixes, `data_live=true` during the stream, and
 `stale`/`data_live=false` after source expiry. The read-only diagnostic companion
 is `deployment\windows-vm\Get-ConvenePublicationDiagnostics.ps1`.
 
+## Per-ID Convene publication
+
+Convene's selected stakeholder variables are published to their exact generated
+IDs with the repository-owned deployer. Keep the populated mapping local:
+
+```powershell
+# Elevated PowerShell from the repository root.
+.\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1 -WhatIf
+.\deployment\windows-vm\Deploy-ConveneVariableBindings.ps1
+```
+
+The default manifest is the git-ignored
+`deployment\CONVENE_VARIABLE_BINDINGS.local.json`. The script reads the current
+flat values from `C:\ConveneAgent\sim_vars.json`, requires the exact `sim_`/source
+name relationship, preserves boolean/string/number types, rejects missing fields
+or duplicate IDs, and posts no test constants. It uses the backend paired with the
+installed agent. Override `-BackendBaseUrl` only for an explicitly approved
+environment.
+
+By default the agent token is parsed in memory from the ACL-protected
+`C:\ConveneAgent\agent.ps1`. The script does not execute or modify that file and
+does not print or persist the token. `-AgentTokenFile` and the
+`CONVENE_AGENT_TOKEN` environment variable are supported alternatives.
+
+This is a one-shot value publication, not a second state producer or hardware
+control path. There is no VM service to roll back. If a mapping is wrong, stop
+rerunning the deployer, correct the local manifest, repeat `-WhatIf`, and republish.
+Do not delete shared Convene variables as an automated rollback. The dashboard
+must still fail closed from freshness and lease state.
+
 ## Upgrade
 
 Stop the bridge, retain `config`, `secrets`, `state`, and logs, run the guarded

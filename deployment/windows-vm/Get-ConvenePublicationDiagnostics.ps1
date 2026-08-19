@@ -3,13 +3,17 @@
 Prints a non-secret engine/bridge/task diagnostic snapshot and optional correlated log lines.
 .PARAMETER ProofRun
 Optional run_id used to select matching bridge log lines.
+.PARAMETER IncludeFieldInventory
+Print every current Convene handoff field with its scalar type and example value. The
+handoff contract contains telemetry and provenance only; credentials are never included.
 .NOTES
 Read-only except for ordinary file access. Requires elevation because credentials and bridge
 artifacts are ACL-protected; the read token itself is never printed.
 #>
 [CmdletBinding()]
 param(
-    [string]$ProofRun
+    [string]$ProofRun,
+    [switch]$IncludeFieldInventory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,6 +81,42 @@ try {
         ExistingSimPrefixCount = @($bridgePayload.PSObject.Properties.Name -like 'sim_*').Count
         Utf8Bytes = (Get-Item -LiteralPath $outputPath).Length
     } | Format-List
+
+    if ($IncludeFieldInventory) {
+        $fieldInventory = foreach ($property in $bridgePayload.PSObject.Properties) {
+            $value = $property.Value
+            $scalarType = if ($null -eq $value) {
+                'null'
+            } elseif ($value -is [bool]) {
+                'boolean'
+            } elseif ($value -is [string]) {
+                'string'
+            } elseif ($value -is [byte] -or $value -is [int16] -or
+                $value -is [int32] -or $value -is [int64] -or
+                $value -is [single] -or $value -is [double] -or
+                $value -is [decimal]) {
+                'number'
+            } elseif ($value -is [System.Collections.IEnumerable]) {
+                'nested/array'
+            } else {
+                'nested/object'
+            }
+            [pscustomobject]@{
+                Field = $property.Name
+                ScalarType = $scalarType
+                ExampleValue = [string]$value
+            }
+        }
+
+        Write-Host 'CURRENT CONVENE HANDOFF FIELD INVENTORY (NON-SECRET)'
+        $fieldInventory | Sort-Object Field | Format-Table -AutoSize
+        [pscustomobject]@{
+            FieldCount = @($fieldInventory).Count
+            NullCount = @($fieldInventory | Where-Object ScalarType -eq 'null').Count
+            NestedCount = @($fieldInventory | Where-Object ScalarType -like 'nested/*').Count
+            ExistingSimPrefixCount = @($fieldInventory | Where-Object Field -like 'sim_*').Count
+        } | Format-List
+    }
 
     Write-Host 'CURRENT BRIDGE HEALTH RECORD'
     [pscustomobject]@{
