@@ -77,11 +77,12 @@ Rules:
    `gw_source_op_state`, `gw_active_chamber`, and the raw channels
    (`gw_MW_power`, `gw_PL_bottom1`, …). It never writes any `sim_` variable —
    the cloud engine's publisher remains the single writer of that set.
-2. **Read-only tap, out of the delivery path.** The Convene connection reads
-   the gateway's local loopback `/latest` endpoint through the existing laptop
-   Convene agent. Do not expose port 9080 through a status tunnel. The audit tap
-   can never block, slow, or reorder the durable queue feeding
-   the cloud.
+2. **Best-effort tap, out of the delivery path.** Immediately after durably
+   enqueuing a canonical frame for the VM, the gateway submits the same scalar
+   envelope/raw values to the desktop machine's `/machine/publish` endpoint with
+   `gw_` prefixes. Its one-slot worker coalesces during a Convene outage and can
+   never block, slow, reorder, or acknowledge the durable VM queue. `/latest`
+   remains the independent local inspection surface; do not expose port 9080.
 3. **The audit view** shows three columns per signal: LabVIEW indicator,
    `gw_*`, `sim_*`. Matching `gw_seq`/`sim_seq` and equal
    `gw_source_op_state`/`sim_source_op_state` demonstrate the chain is

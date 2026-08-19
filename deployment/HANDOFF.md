@@ -55,7 +55,7 @@ cRIO / LabVIEW ──(Ethernet 192.168.50.x, INGRESS)──► Laptop edge gatew
                                                                    installed VM Convene agent
                                                                           │ sim_ + native .stp view
 
-   Parallel audit tap:  Laptop  ──(Convene agent, gw_ set from /latest)──►  Convene
+   Parallel audit tap:  Laptop gateway ──(/machine/publish, gw_ only)──►  Convene
 ```
 
 - **Ingress** = data *in* from the cRIO to the gateway (physical Ethernet link).
@@ -125,10 +125,10 @@ appends to `C:\Users\latitude4\.convene\agent.log`. It heartbeats every 30 s.
 - It establishes a **persistent, outbound-initiated control/telemetry plane** that
   survives reboots with zero manual startup — exactly the pattern the WDAC box
   permits, and the pattern the egress (gateway→cloud) will follow.
-- It is already the transport for the **`gw_` audit tap**: once the gateway serves
-  real frames on `/latest`, the agent publishes the `gw_` set to Convene
-  (`deployment/CONVENE_GW_MAPPING.md`) for the byte-for-byte V&V — no new plumbing
-  needed.
+- Its desktop machine credential is reused by the gateway's independent
+  **`gw_` audit tap**. After each canonical frame is durably queued for the VM,
+  a nonblocking one-slot worker submits the `gw_` set directly to Convene's
+  `/machine/publish` endpoint (`deployment/CONVENE_GW_MAPPING.md`).
 - It gives us a working **remote-execution path onto the gateway** without any
   inbound listener, which the ingress/egress bring-up can lean on for adjustments.
 

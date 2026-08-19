@@ -15,9 +15,20 @@ publisher is the single writer of the `sim_` set. The `gw_` tap is read-only and
 sits outside the delivery path — it can never block, slow, or reorder the durable
 queue feeding the cloud.
 
-**Collector target:** `http://127.0.0.1:9080/latest` (HTTP GET, JSON).
-The status server binds loopback only (`status.py:84`), so the Convene agent must
-run on this laptop — it does (paired, heartbeating from `%USERPROFILE%\.convene`).
+**Audit source:** the same canonical frame exposed at
+`http://127.0.0.1:9080/latest`. After the frame is durably enqueued for VM
+delivery, `reclaim_edge.convene` flattens the nine envelope values and scalar raw
+channels with `gw_` prefixes and submits them to `/api/machine/publish` using the
+desktop machine credential. Port 9080 remains loopback-only.
+
+> **Current backend blocker (2026-08-19):** a heartbeat can update machine
+> presence but then returns HTTP 500 because the Convene backend lacks the
+> Firestore composite `machineCommands` index over `machineId`, `status`, and
+> `createdAt`. This prevents heartbeat-returned `autoVars`, but the current
+> gateway does **not** depend on that response: direct `/machine/publish` reached
+> authenticated request validation successfully. The missing index still
+> degrades the separate connected-machine heartbeat/command plane and should be
+> fixed, while `gw_` acceptance is proven from the gateway's Convene counters.
 
 **Derived from code, not invented.** Every row below traces to
 `pi_gateway/reclaim_edge/status.py`, `framer.py`, `main.py`, and

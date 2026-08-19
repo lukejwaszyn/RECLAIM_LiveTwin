@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from typing import List
+from urllib.parse import urlparse
 
 try:
     import yaml  # pyyaml
@@ -56,6 +57,13 @@ class Config:
     auth_token: str = ""                # bearer token (https) / password (mqtts)
     tls_ca: str = ""                    # path to CA bundle (optional)
     verify_tls: bool = True
+
+    # Independent best-effort gateway audit tap -> Convene (gw_ variables only).
+    # This never participates in the durable VM queue or its acknowledgements.
+    convene_enabled: bool = False
+    convene_api: str = "https://reservation-backend-25386666460.us-central1.run.app/api"
+    convene_credentials_path: str = "~/.convene_agent.json"
+    convene_timeout_s: float = 10.0
 
     # buffer (store-and-forward)
     buffer_path: str = "/var/lib/reclaim-edge/queue.db"
@@ -129,10 +137,38 @@ class Config:
                              f"got '{cfg.transport}'")
         if cfg.mode not in cls._VALID_MODES:
             raise ValueError(f"mode must be one of {cls._VALID_MODES}, got '{cfg.mode}'")
-        if cfg.transport == "https" and cfg.mode == "live" and not cfg.auth_token:
-            raise ValueError("live https transport requires auth_token "
-                             "(the cloud ingest bearer token)")
-        if not cfg.verify_tls:
+        if cfg.transport == "https":
+            parsed_url = urlparse(cfg.cloud_url)
+            if parsed_url.scheme != "https" or not parsed_url.hostname:
+                raise ValueError("https transport requires an absolute https cloud_url")
+            if parsed_url.username or parsed_url.password or parsed_url.query or parsed_url.fragment:
+                raise ValueError("cloud_url must not contain credentials, query parameters, or a fragment")
+            if parsed_url.path.rstrip("/") != "/ingest":
+                raise ValueError("cloud_url must target the production /ingest path")
+
+        if cfg.transport == "https" and cfg.mode == "live":
+            placeholder_markers = ("placeholder", "changeme", "not_provisioned", "example")
+            if not cfg.auth_token:
+                raise ValueError("live https transport requires auth_token "
+                                 "(the cloud ingest bearer token)")
+            if any(marker in cfg.auth_token.lower() for marker in placeholder_markers):
+                raise ValueError("live https auth_token is still a placeholder")
+            if any(marker in cfg.cloud_url.lower() for marker in placeholder_markers):
+                raise ValueError("live https cloud_url is still a placeholder")
+            if not cfg.verify_tls:
+                raise ValueError("live https transport requires verify_tls=true")
+        elif not cfg.verify_tls:
             log.warning("verify_tls is DISABLED — acceptable only on an isolated "
                         "bench, never for the flight/production link")
+        if cfg.convene_enabled:
+            convene_url = urlparse(cfg.convene_api)
+            if convene_url.scheme != "https" or not convene_url.hostname:
+                raise ValueError("convene_enabled requires an absolute https convene_api")
+            if (convene_url.username or convene_url.password or convene_url.query or
+                    convene_url.fragment or convene_url.path.rstrip("/") != "/api"):
+                raise ValueError("convene_api must be a credential-free HTTPS /api URL")
+            if not cfg.convene_credentials_path:
+                raise ValueError("convene_enabled requires convene_credentials_path")
+            if cfg.convene_timeout_s <= 0:
+                raise ValueError("convene_timeout_s must be positive")
         return cfg

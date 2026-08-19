@@ -19,6 +19,7 @@ import time
 
 from .buffer import Buffer
 from .config import Config
+from .convene import ConvenePublisher
 from .framer import Framer
 from .publisher import Publisher
 from .receiver import Receiver
@@ -37,7 +38,8 @@ def main() -> None:
 
     buffer = Buffer(cfg.buffer_path, cfg.buffer_max_frames)
     framer = Framer(cfg, seq_store=buffer)   # seq high-water persists across restarts
-    receiver = Receiver(cfg, framer, buffer, stop)
+    convene = ConvenePublisher(cfg, stop) if cfg.convene_enabled else None
+    receiver = Receiver(cfg, framer, buffer, stop, audit_publisher=convene)
     publisher = Publisher(cfg, buffer, stop)
 
     def _sig(*_):
@@ -49,11 +51,14 @@ def main() -> None:
 
     status = None
     if cfg.status_port:
-        status = StatusServer(cfg.status_port, receiver, publisher, buffer, cfg.src)
+        status = StatusServer(cfg.status_port, receiver, publisher, buffer, cfg.src,
+                              convene=convene)
 
     log.info("RECLAIM edge gateway starting — transport=%s src=%s", cfg.transport, cfg.src)
     receiver.start()
     publisher.start()
+    if convene:
+        convene.start()
     if status:
         status.start()
 
@@ -82,6 +87,8 @@ def main() -> None:
 
     receiver.join(timeout=3)
     publisher.join(timeout=3)
+    if convene:
+        convene.join(timeout=3)
     buffer.close()
     log.info("stopped")
     if died:

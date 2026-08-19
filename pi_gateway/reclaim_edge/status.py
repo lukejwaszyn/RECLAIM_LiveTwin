@@ -25,13 +25,14 @@ log = logging.getLogger("reclaim_edge.status")
 
 
 class StatusServer(threading.Thread):
-    def __init__(self, port, receiver, publisher, buffer, src):
+    def __init__(self, port, receiver, publisher, buffer, src, convene=None):
         super().__init__(name="status", daemon=True)
         self.port = port
         self.receiver = receiver
         self.publisher = publisher
         self.buffer = buffer
         self.src = src
+        self.convene = convene
         self.t0 = time.time()
         self._httpd = None
 
@@ -48,7 +49,7 @@ class StatusServer(threading.Thread):
             return {"command": cmd or {"note": "no command received yet"},
                     "command_age_s": round(age, 2) if age is not None else None}
         if path.startswith("/health"):
-            return {
+            health = {
                 "src": self.src,
                 "uptime_s": round(time.time() - self.t0, 1),
                 "received": self.receiver.received,
@@ -60,6 +61,21 @@ class StatusServer(threading.Thread):
                 "last_ack_age_s": round(self.publisher.last_ack_age, 2),
                 "transport": self.publisher.cfg.transport,
             }
+            if self.convene is not None:
+                health["convene"] = {
+                    "enabled": True,
+                    "machine_id": self.convene.machine_id,
+                    "delivered": self.convene.delivered,
+                    "failed": self.convene.failed,
+                    "coalesced": self.convene.coalesced,
+                    "last_success_age_s": (
+                        round(self.convene.last_success_age, 2)
+                        if self.convene.last_success_age is not None else None
+                    ),
+                }
+            else:
+                health["convene"] = {"enabled": False}
+            return health
         return {
             "service": "reclaim-edge-gateway",
             "src": self.src,
