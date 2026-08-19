@@ -378,6 +378,40 @@ deployment/WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md
 The environment-local populated variable-ID file remains git-ignored. Never
 invent IDs, copy desktop IDs, or repoint VM bindings to `gw_`.
 
+### 4.7 Immediate VM diagnostic after desktop commissioning
+
+The desktop commissioning frame was accepted by VM ingress as run
+`8a7ba244-0535-476b-ba1c-961822e05cc9`, sequence `1`, but no VM-originated
+`sim_` update was observed in Convene. An accepted frame updates engine `/state`
+immediately; the estimator does not require a warm-up series. The remaining
+boundary is therefore `/state` -> `RECLAIMStateBridge` -> `sim_vars.json` -> the
+VM Convene agent/bindings. A single state also becomes stale after 15 seconds and
+can expire between downstream heartbeats.
+
+After pulling this branch on the VM, run from an elevated repository shell:
+
+```powershell
+.\deployment\windows-vm\Get-ConvenePublicationDiagnostics.ps1 `
+  -ProofRun '8a7ba244-0535-476b-ba1c-961822e05cc9'
+```
+
+This read-only command reports the authenticated engine identity/state, bridge
+payload and health, engine/bridge service states, VM Convene task state, and
+matching non-secret log lines. Do not send additional frames until it establishes
+whether the bridge and VM Convene agent are healthy.
+
+If that path is healthy, the repository acceptance workflow deliberately sends
+50 monotonically sequenced frames at 900 ms intervals so fresh state spans
+multiple VM bridge and Convene heartbeats, then proves stale expiry:
+
+```powershell
+.\deployment\windows-vm\Test-ConveneLiveExpiry.ps1 `
+  -PublicUrl 'https://renewal-conclude-associates-relief.trycloudflare.com'
+```
+
+This VM-only workflow validates predictive-state publication. A later sustained
+stream from the real cRIO must still prove the complete desktop-originated path.
+
 ## 5. Endpoint 3 — Convene display and acceptance
 
 Convene receives two independently attributable views:
