@@ -121,6 +121,35 @@ Until a real run supersedes it, the desktop `/latest` record and VM
 `active_run_id` identify the commissioning frame; operators must continue to
 treat it as synthetic and not as current physical process state.
 
+### 3.1.2 Five-minute sustained commissioning evidence
+
+A second guarded run completed at `2026-08-19T23:59:12Z` after restarting the
+gateway to generate a fresh run identity. Every value remained explicitly
+synthetic:
+
+| Evidence | Value |
+|---|---|
+| `cycle_id` | `COMMISSIONING-STREAM-NOT-CRIO-20260819T235411Z` |
+| `source_id` | `reclaim-commissioning-desktop-stream` |
+| Canonical `run_id` | `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2` |
+| Requested / actual duration | `300 s` / `300.019 s` |
+| Cadence / frames | `1000 ms` / `300` |
+| Gateway receive delta | `300` |
+| VM ingest delta | `300` |
+| Desktop Convene delivered / coalesced | `296` / `4` |
+| Desktop Convene failed | `0` |
+| Queue depth after run | `0` |
+| New dead letters | `0` |
+| VM active run after run | `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2` |
+| Runner result | **PASS** |
+
+The retained 53 dead letters predate the successful run and came from an aborted
+attempt that reused a gateway run ID already retired by a VM-side acceptance
+run. They were preserved as evidence. The clean run minted a new gateway run ID
+and added none. The sustained proof validates cRIO-style desktop ingress, durable
+VM delivery, and desktop `gw_` Convene publication; VM `sim_` publication still
+requires independent VM/Convene correlation evidence.
+
 ### 3.2 Desktop data handling order
 
 For each valid cRIO line:
