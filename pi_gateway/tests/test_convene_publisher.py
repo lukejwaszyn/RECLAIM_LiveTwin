@@ -103,4 +103,3 @@ def test_submit_coalesces_without_blocking():
 
     assert publisher.coalesced == 1
     assert publisher._pending.get_nowait()["seq"] == 2
-
