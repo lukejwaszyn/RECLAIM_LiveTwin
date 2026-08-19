@@ -24,9 +24,10 @@ infrastructure. There is no Linux host or Raspberry Pi in the live path. See
 | **BLOCKED** | Cannot be done yet. The blocker is named. |
 | **NOT DONE — DELIBERATE** | Achievable now, intentionally withheld. The reason is a safety constraint, not a scheduling one. Do not "helpfully" complete these. |
 
-**Current overall status: NO-GO for live data.** Four independent blockers:
-no cRIO link, no cloud endpoint, no tokens, no boot task. The gateway itself is
-staged and proven healthy on this laptop.
+**Current overall status: NO-GO for live data.** The physical cRIO link and
+gateway listener are proven, but no cRIO frame has arrived yet. The cloud endpoint
+and ingest token are still placeholders, the laptop `gw_` Convene binding is not
+configured, and the boot task remains gated on manual end-to-end acceptance.
 
 ---
 
@@ -34,8 +35,8 @@ staged and proven healthy on this laptop.
 
 | # | Item | Evidence |
 |---|---|---|
-| 1.1 | Repo intact; gateway test suite green on this box | `10 passed in 1.52s` (`pi_gateway`, `PYTHONPATH=.`). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, and three H7 config fail-fast cases. `cloud_engine` suite deliberately skipped (needs scipy; not gateway staging). |
-| 1.2 | Gateway staged to its deployment location | `C:\RECLAIM\pi_gateway` — robocopy `14 files copied, 0 FAILED`, caches and `.DS_Store` excluded. Source repo untouched. |
+| 1.1 | Repo intact; gateway test suite green on this box | Refreshed suite: `11 passed in 1.43s` (`C:\RECLAIM\pi_gateway`, Python 3.13, pytest 9.1.1). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, and H7 config fail-fast cases. `cloud_engine` suite remains outside gateway staging. |
+| 1.2 | Gateway staged to its deployment location | `C:\RECLAIM\pi_gateway` — refreshed non-destructively from repository commit `a5908387451d38d5ef08d30bea66ec3aee2e2a17`; 14 files copied, 0 failed. The venv, production config, queue, and timestamped pre-refresh config backup were preserved. |
 | 1.3 | Deployment venv + runtime deps | `C:\RECLAIM\pi_gateway\.venv` (Python **3.13.0**). Installed: `pyyaml 6.0.3`, `requests 2.34.2`, `paho-mqtt 1.6.1` (correctly held `<2.0` by the M6 pin). |
 | 1.4 | Package imports from the staged tree | `import reclaim_edge, reclaim_edge.main` → OK, resolved from `C:\RECLAIM\pi_gateway\reclaim_edge\__init__.py`, version `0.1.0`. |
 | 1.5 | Durable buffer directory | `C:\ProgramData\RECLAIM` created. `queue.db` since created by the shakedown; inspected — tables `q`, `dl`, `meta`, `sqlite_sequence`, **all 0 rows**. No run/seq state carries into the live run. |
@@ -49,9 +50,9 @@ staged and proven healthy on this laptop.
 
 ## 2. BLOCKED — §4.1 cRIO physical link and static IPs
 
-**Current blocker: the physical link is proven, but the approved Private profile,
-scoped firewall rule, listener, and reverse-direction verification are not yet
-complete.**
+**Current blocker: the physical link, Private profile, scoped firewall rule, and
+gateway listener are proven, but the cRIO sender target, reverse-direction
+verification, and first real frame are not yet confirmed.**
 
 - [x] cRIO connected directly to the laptop Ethernet port
 - [x] Laptop Ethernet retains the verified laboratory address `192.168.1.1/24`
@@ -79,6 +80,15 @@ state at `C:\ProgramData\RECLAIM\crio-network-firewall-before.json`, changed onl
 the Ethernet category from Public to Private, and made no address or route change.
 Post-change laptop-to-cRIO probes again passed in 0–1 ms. The cRIO-side default
 gateway and reverse-direction ping remain unverified.
+
+**Manual listener proof 2026-08-19:** staging was refreshed from commit
+`a5908387451d38d5ef08d30bea66ec3aee2e2a17`; the active config was corrected to
+`listen_host: 192.168.1.1`. An isolated console-transport run used a separate
+diagnostic queue and proved `192.168.1.1:9070` plus loopback-only
+`127.0.0.1:9080` under one healthy process. `/health` reported zero errors and
+`/latest` reported no frame received. No cRIO connection arrived during the
+50-second window, so sender targeting/startup remains open. The diagnostic was
+stopped and the production queue was untouched.
 
 **Consequence while unassigned:** `receiver.py:37` does a bare
 `srv.bind((listen_host, listen_port))`. Binding an unassigned address raises
@@ -170,11 +180,11 @@ Withheld for this session by explicit guardrail.
 `:19` for `config.windows.yaml` (exists). The script does not merely register the
 task — line 40 **starts** it immediately.
 
-**If installed today it would enter a permanent crash loop.** The staged config
-has `listen_host: 192.168.50.1`, which is unassigned (§2), so the receiver thread
-dies on bind, the process exits non-zero, and the task's
-`-RestartCount 999 -RestartInterval 1 minute` restarts it every minute forever,
-as SYSTEM — while also attempting POSTs to a placeholder URL.
+**If installed today it would repeatedly fail cloud delivery.** The staged bind
+address is now correct, but `cloud_url` and `auth_token` remain placeholders.
+The task's `-RestartCount 999 -RestartInterval 1 minute` also makes premature
+installation harder to diagnose. Keep the task absent until a manual run receives
+a real cRIO frame and the authenticated cloud path passes.
 
 **Ordering rule: install only after §2 (cRIO IPs) AND §3 (real cloud values) are
 both complete.** Not before, and not "just to test the registration."
@@ -423,6 +433,7 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no cRIO frame arrived, so sender targeting remains open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |
 | 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. Listener, cRIO-side gateway/reverse-ping evidence, and cRIO-to-9070 reachability remain pending. |
 | 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |
 | 2026-08-15 | Handoff docs authored — `deployment/HANDOFF.md` (full project story) and `deployment/VM_ENGINE_SESSION_BRIEF.md` (turnkey brief for the cloud VM session). The Convene agent's always-on-at-boot status (§9.8) is framed there as the **architectural base** for the deferred ingress/egress build. Egress tunnel decision recorded: Cloudflare **quick tunnels** first, named tunnel + domain when interoperability warrants. Ingress/egress bring-up deliberately deferred. |
