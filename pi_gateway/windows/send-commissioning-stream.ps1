@@ -62,9 +62,10 @@ $vmBefore = Get-JsonEndpoint -Uri "$vmBase/health" -TimeoutSec 15
 if ($vmBefore.PSObject.Properties.Name -contains 'ok' -and -not $vmBefore.ok) {
     throw 'VM health endpoint reported ok=false.'
 }
-if ([int64]$before.queue_depth -ne 0 -or [int64]$before.dead_letter -ne 0) {
-    throw 'Gateway queue or dead-letter state is not clean; refusing to mix evidence.'
+if ([int64]$before.queue_depth -ne 0) {
+    throw 'Gateway queue is not empty; refusing to mix pending delivery with new evidence.'
 }
+Write-Host "Retained pre-run dead letters: $($before.dead_letter) (must not increase)"
 
 $startedAt = [DateTime]::UtcNow
 $cycleId = 'COMMISSIONING-STREAM-NOT-CRIO-' + $startedAt.ToString('yyyyMMddTHHmmssZ')

@@ -61,6 +61,8 @@ def test_commissioning_stream_is_bounded_labeled_and_credential_free():
     assert "The real cRIO attempted to connect" in script
     assert "$nextCrioCheckSeconds = 10.0" in script
     assert "gatewayProgress" not in script
+    assert "Retained pre-run dead letters" in script
+    assert "Gateway queue is not empty" in script
     assert "RECLAIM_INGEST_TOKEN" not in script
     assert "agentToken" not in script
     assert "VmIngestedDelta" in script
