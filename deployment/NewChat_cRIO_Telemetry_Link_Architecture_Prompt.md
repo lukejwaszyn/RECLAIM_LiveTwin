@@ -146,4 +146,3 @@ default, invent, or discard a live field.
 
 Do not declare the cRIO seam live until every acceptance box in
 `deployment/CRIO_TELEMETRY_LINK_HANDOFF.md` is supported by retained evidence.
-
