@@ -33,3 +33,14 @@ def test_desktop_convene_repair_does_not_use_vm_binding_backend():
     assert "MissingFirestoreIndex" in script
     assert "SystemCredentialPath" in script
     assert "autoVars" in script
+
+
+def test_commissioning_sender_is_one_frame_guarded_and_credential_free():
+    script = (WINDOWS / "send-commissioning-frame.ps1").read_text(encoding="utf-8")
+    assert "SupportsShouldProcess" in script
+    assert "The real cRIO is already connected" in script
+    assert "COMMISSIONING-NOT-CRIO-" in script
+    assert "RECLAIM_INGEST_TOKEN" not in script
+    assert "agentToken" not in script
+    assert "VmIngestedAdvanced" in script
+    assert "ConveneDeliveredAdvanced" in script

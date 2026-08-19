@@ -430,11 +430,13 @@ token to the other endpoint.
 3. Confirm/start exactly one VM engine on loopback 8078.
 4. Start the guarded Cloudflare route and securely return `/ingest` URL/token.
 5. Finalize desktop config and start `RECLAIM-EdgeGateway`.
-6. Capture the first real frame and reconcile any schema differences.
-7. Prove the VM queue drains and predictive state correlates.
-8. Prove desktop `gw_` values change in Convene.
-9. Prove separate VM `sim_` stakeholder values change and expire safely.
-10. Record reboot recovery only after the above passes.
+6. Run `pi_gateway/windows/send-commissioning-frame.ps1` once to prove the
+   desktop fan-out; retain its explicitly synthetic evidence.
+7. Capture the first real frame and reconcile any schema differences.
+8. Prove the VM queue drains and predictive state correlates.
+9. Prove desktop `gw_` values change in Convene.
+10. Prove separate VM `sim_` stakeholder values change and expire safely.
+11. Record reboot recovery only after the above passes.
 
 ## 8. End-to-end acceptance gate
 

@@ -111,6 +111,18 @@ exposed 9080 rules, and conflicting listeners.
 
 ## 6. Live acceptance evidence
 
+Before direct cRIO operation, one supervised synthetic frame may be used to prove
+both outbound paths. The script refuses to run while the real cRIO is connected:
+
+```powershell
+.\pi_gateway\windows\send-commissioning-frame.ps1 `
+  -VmBaseUrl 'https://REPLACE-WITH-CURRENT-TUNNEL.trycloudflare.com'
+```
+
+This creates explicitly labeled `COMMISSIONING-NOT-CRIO-*` data in both the VM
+and desktop Convene `gw_` view. Run it once, retain the JSON evidence, and do not
+confuse its values with physical measurements.
+
 ```powershell
 Invoke-RestMethod http://127.0.0.1:9080/health
 Invoke-RestMethod http://127.0.0.1:9080/latest
