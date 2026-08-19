@@ -24,6 +24,13 @@ auth_token: ""                # bearer token (https) / password (mqtts)
 tls_ca: ""                    # path to CA bundle, or empty for system store
 verify_tls: true
 
+# Independent desktop audit tap. Publishes only gw_ variables directly to
+# Convene; failures never block or acknowledge the durable VM queue.
+convene_enabled: false
+convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
+convene_credentials_path: C:/Windows/System32/config/systemprofile/.convene_agent.json
+convene_timeout_s: 10.0
+
 # buffer (store-and-forward)
 buffer_path: /var/lib/reclaim-edge/queue.db
 buffer_max_frames: 500000

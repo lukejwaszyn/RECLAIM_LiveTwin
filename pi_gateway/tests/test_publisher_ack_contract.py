@@ -181,3 +181,23 @@ def test_live_https_requires_tls_verification(tmp_path):
     )
     with pytest.raises(ValueError, match="verify_tls=true"):
         Config.load(str(p))
+
+
+def test_enabled_convene_requires_safe_api_and_positive_timeout(tmp_path):
+    p = tmp_path / "config.yaml"
+    p.write_text(
+        "convene_enabled: true\n"
+        "convene_api: http://backend.test/api\n"
+        "convene_credentials_path: credential.json\n"
+    )
+    with pytest.raises(ValueError, match="absolute https"):
+        Config.load(str(p))
+
+    p.write_text(
+        "convene_enabled: true\n"
+        "convene_api: https://backend.test/api\n"
+        "convene_credentials_path: credential.json\n"
+        "convene_timeout_s: 0\n"
+    )
+    with pytest.raises(ValueError, match="positive"):
+        Config.load(str(p))

@@ -26,8 +26,9 @@ infrastructure. There is no Linux host or Raspberry Pi in the live path. See
 
 **Current overall status: NO-GO for live data.** The physical cRIO link and
 gateway listener are proven, but no cRIO frame has arrived yet. The cloud endpoint
-and ingest token are still placeholders, the laptop `gw_` Convene binding is not
-configured, and the boot task remains gated on manual end-to-end acceptance.
+and ingest token are still placeholders, the direct `gw_` publisher is staged
+but has no real frame to publish, and the boot task remains gated on manual
+end-to-end acceptance.
 
 ---
 
@@ -35,7 +36,7 @@ configured, and the boot task remains gated on manual end-to-end acceptance.
 
 | # | Item | Evidence |
 |---|---|---|
-| 1.1 | Repo intact; gateway test suite green on this box | Refreshed suite: `11 passed in 1.43s` (`C:\RECLAIM\pi_gateway`, Python 3.13, pytest 9.1.1). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, and H7 config fail-fast cases. `cloud_engine` suite remains outside gateway staging. |
+| 1.1 | Repo intact; gateway test suite green on this box | Refreshed suite: `25 passed in 1.39s` (`C:\RECLAIM\pi_gateway`, Python 3.13, pytest 9.1.1). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, H7 config gates, and the nonblocking direct Convene publisher. `cloud_engine` suite remains outside gateway staging. |
 | 1.2 | Gateway staged to its deployment location | `C:\RECLAIM\pi_gateway` — refreshed non-destructively from repository commit `a5908387451d38d5ef08d30bea66ec3aee2e2a17`; 14 files copied, 0 failed. The venv, production config, queue, and timestamped pre-refresh config backup were preserved. |
 | 1.3 | Deployment venv + runtime deps | `C:\RECLAIM\pi_gateway\.venv` (Python **3.13.0**). Installed: `pyyaml 6.0.3`, `requests 2.34.2`, `paho-mqtt 1.6.1` (correctly held `<2.0` by the M6 pin). |
 | 1.4 | Package imports from the staged tree | `import reclaim_edge, reclaim_edge.main` → OK, resolved from `C:\RECLAIM\pi_gateway\reclaim_edge\__init__.py`, version `0.1.0`. |
@@ -45,6 +46,7 @@ configured, and the boot task remains gated on manual end-to-end acceptance.
 | 1.8 | Local console shakedown — process healthy without hardware or cloud | `config.console.yaml` (differs from `config.windows.yaml` on exactly two lines: `transport: console`, `listen_host: 127.0.0.1`). Ran 30 s. Clean start, no traceback. `/health`, `/latest`, `/command`, `/` all answered. `uptime_s` 5.0 → 15.2 → 26.9 with the supervisor loop polling worker liveness every 0.5 s throughout — no silent thread death (`main.py:56-66`). Health lines logged on the configured 10 s cadence. |
 | 1.9 | Loopback-only binding confirmed at the OS level | `netstat`: `127.0.0.1:9070` and `127.0.0.1:9080` LISTENING, same PID — never `0.0.0.0`. No inbound exposure created. Ports released on stop. |
 | 1.10 | Convene `gw_` audit mapping derived | `deployment/CONVENE_GW_MAPPING.md` — 36 variables (9 envelope + 27 raw channels), each with jsonPath into `http://127.0.0.1:9080/latest`, type, `sim_` counterpart, unit conversion, and code citation. Derived statically from `status.py`, `framer.py`, `receiver.py`, `labview_map.py`. |
+| 1.11 | Direct Convene `gw_` publisher implemented and staged | Convene-supplied `/api/machine/publish` contract integrated as `reclaim_edge.convene`: only scalar `gw_` names, one pending frame, nonblocking submit after durable VM enqueue, independent counters in `/health`, no `sim_` writes or VM acknowledgements. An empty-variable probe reached authenticated semantic validation (`HTTP 400 no variables to publish`, not 401) without creating a variable. Staged import/flatten gate passed. Real publish remains pending the first cRIO frame. |
 
 ---
 
@@ -404,9 +406,11 @@ heartbeat made the latter visible again, but the backend returned HTTP 500 after
 updating presence. The response exposed the exact backend defect: Firestore is
 missing the composite `machineCommands` index over `machineId`, `status`, and
 `createdAt`. Until the Convene backend owner creates that index, the heartbeat
-cannot return `autoVars`, so **visible/online does not yet prove `gw_` telemetry
-collection**. The local cRIO and Cloudflare paths are independent of this
-backend-side blocker.
+cannot return `autoVars`, so visibility alone does not prove telemetry. The
+gateway now bypasses that failed response for its audit tap by sending only
+`gw_` scalars through `/machine/publish` on a nonblocking one-frame worker. The
+Firestore index still blocks the separate heartbeat/command response and remains
+a Convene backend defect.
 
 A guarded desktop-only audit/repair tool now lives at
 `pi_gateway/windows/repair-convene-desktop-agent.ps1`. It never prints tokens,
@@ -452,8 +456,9 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-19 | Integrated Convene's supplied direct `/machine/publish` contract into the gateway. The new one-frame best-effort worker publishes only canonical `gw_` scalars after durable VM enqueue, exposes health counters, and cannot block/acknowledge the VM queue. Enabled the non-secret credential reference in staged config; production remains stopped and rejected until the real Cloudflare `/ingest` URL/token arrive. Fresh gateway suite: 25 passed. |
 | 2026-08-19 | Hardened the desktop production handoff: live HTTPS config now rejects placeholder/non-HTTPS/non-`/ingest` destinations and disabled TLS; added secret-prompting config finalization with protected backups; replaced the task installer with guarded network/firewall/ACL/config gates; and published `pi_gateway/windows/README.md`. Fresh verification: 20 gateway tests and 63 bridge/operator-workflow tests passed; all changed PowerShell parsed cleanly. |
-| 2026-08-19 | Reconciled the desktop Convene mechanism (SYSTEM connected-machine task → backend `autoVars` → loopback `/latest` → `gw_`, separate from the VM publisher). Found revoked SYSTEM credentials, a divergent newer user identity, and the backend's missing Firestore `machineCommands(machineId,status,createdAt)` index. Added secret-safe desktop audit/validate/repair tooling. Presence can show online, but `gw_` remains blocked until heartbeat returns HTTP 200 with collectors. |
+| 2026-08-19 | Reconciled the desktop Convene identity and found the backend's missing Firestore `machineCommands(machineId,status,createdAt)` index. Added secret-safe audit/repair tooling, then adopted Convene's documented direct `/machine/publish` contract for `gw_`: a bounded best-effort worker receives the same canonical frame only after durable VM enqueue and cannot block or acknowledge the VM path. Heartbeat/commands remain degraded by the backend index, while direct publish is independently testable. |
 | 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no cRIO frame arrived, so sender targeting remains open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |
 | 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. Listener, cRIO-side gateway/reverse-ping evidence, and cRIO-to-9070 reachability remain pending. |
 | 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |

@@ -15,8 +15,8 @@ Windows 10 gateway
 Windows Server 2025 predictive-engine VM
 
 Independent audit tap:
-gateway http://127.0.0.1:9080/latest
-  -> desktop Convene-Agent autoVars
+canonical gateway frame
+  -> nonblocking /machine/publish using desktop machine credential
   -> gw_ variables only
 ```
 
@@ -53,14 +53,14 @@ Use the desktop-only tool; it does not inspect or change VM bindings:
 
 As of 2026-08-19, the Convene backend updates machine presence but then returns
 HTTP 500 because its Firestore project lacks the composite `machineCommands`
-index over `machineId`, `status`, and `createdAt`. Until the backend owner creates
-that index, heartbeat cannot return `autoVars`; an ONLINE machine does not prove
-that `gw_` collectors are running.
+index over `machineId`, `status`, and `createdAt`. The backend owner should still
+create it, but direct `/machine/publish` is independent and reaches authenticated
+request validation.
 
-After the index exists, validation must return HTTP 200 and the expected
-collector count. The collectors must be HTTP/jsonPath readers of
-`http://127.0.0.1:9080/latest` matching
-`deployment/CONVENE_GW_MAPPING.md`; do not configure shell collectors.
+The production gateway enables a nonblocking one-frame worker that publishes the
+same canonical frame as `gw_` scalars directly. Verify its delivered/failed/
+coalesced counters under `/health` and compare its names with
+`deployment/CONVENE_GW_MAPPING.md`. Do not configure shell collectors.
 
 ## 3. VM and Cloudflare handoff
 
@@ -90,8 +90,9 @@ Back on this desktop, from elevated PowerShell:
 ```
 
 The script prompts invisibly for the ingest token, backs up the prior config,
-updates only `cloud_url` and `auth_token`, validates through the deployed Python
-loader, and restricts the config to SYSTEM and Administrators.
+updates `cloud_url`/`auth_token`, enables the credential-reference-only direct
+Convene `gw_` publisher, validates through the deployed Python loader, and
+restricts the config to SYSTEM and Administrators.
 
 ## 5. Install and start the gateway
 
@@ -121,7 +122,7 @@ Do not claim cutover until all are factual:
   state/chamber, and raw variables.
 - The durable queue drains through authenticated TLS with no unexpected drops or
   dead letters, and the VM state reflects the same sequence.
-- The desktop Convene heartbeat returns HTTP 200 with the expected `gw_`
-  collectors, and `gw_` agrees with the independent cRIO/VM evidence.
+- `/health` reports successful direct Convene publishes with no unexplained
+  failures/coalescing, and `gw_` agrees with the independent cRIO/VM evidence.
 - The VM remains the sole `sim_` publisher.
 - `/command` remains advisory and disconnected from every actuator/control path.

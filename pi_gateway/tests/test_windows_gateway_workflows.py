@@ -11,6 +11,8 @@ def test_https_finalizer_prompts_for_secret_and_enforces_ingest_tls():
     assert '$uri.AbsolutePath.TrimEnd(\'/\') -ne "/ingest"' in script
     assert '"*S-1-5-18:(F)"' in script
     assert '"*S-1-5-32-544:(F)"' in script
+    assert "convene_enabled' -SerializedValue 'true'" in script
+    assert "convene_credentials_path" in script
 
 
 def test_task_installer_is_guarded_and_does_not_start_by_default():
@@ -21,6 +23,7 @@ def test_task_installer_is_guarded_and_does_not_start_by_default():
     assert 'Assert-ConfigAcl -Path $configPath' in script
     assert 'exposes loopback-only status port 9080' in script
     assert 'Get-NetRoute -InterfaceAlias $InterfaceAlias' in script
+    assert "c.convene_enabled" in script
 
 
 def test_desktop_convene_repair_does_not_use_vm_binding_backend():

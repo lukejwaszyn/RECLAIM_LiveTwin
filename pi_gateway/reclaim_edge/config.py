@@ -58,6 +58,13 @@ class Config:
     tls_ca: str = ""                    # path to CA bundle (optional)
     verify_tls: bool = True
 
+    # Independent best-effort gateway audit tap -> Convene (gw_ variables only).
+    # This never participates in the durable VM queue or its acknowledgements.
+    convene_enabled: bool = False
+    convene_api: str = "https://reservation-backend-25386666460.us-central1.run.app/api"
+    convene_credentials_path: str = "~/.convene_agent.json"
+    convene_timeout_s: float = 10.0
+
     # buffer (store-and-forward)
     buffer_path: str = "/var/lib/reclaim-edge/queue.db"
     buffer_max_frames: int = 500_000    # drop-oldest beyond this
@@ -153,4 +160,15 @@ class Config:
         elif not cfg.verify_tls:
             log.warning("verify_tls is DISABLED — acceptable only on an isolated "
                         "bench, never for the flight/production link")
+        if cfg.convene_enabled:
+            convene_url = urlparse(cfg.convene_api)
+            if convene_url.scheme != "https" or not convene_url.hostname:
+                raise ValueError("convene_enabled requires an absolute https convene_api")
+            if (convene_url.username or convene_url.password or convene_url.query or
+                    convene_url.fragment or convene_url.path.rstrip("/") != "/api"):
+                raise ValueError("convene_api must be a credential-free HTTPS /api URL")
+            if not cfg.convene_credentials_path:
+                raise ValueError("convene_enabled requires convene_credentials_path")
+            if cfg.convene_timeout_s <= 0:
+                raise ValueError("convene_timeout_s must be positive")
         return cfg

@@ -22,12 +22,14 @@ log = logging.getLogger("reclaim_edge.receiver")
 
 
 class Receiver(threading.Thread):
-    def __init__(self, cfg: Config, framer: Framer, buffer: Buffer, stop: threading.Event):
+    def __init__(self, cfg: Config, framer: Framer, buffer: Buffer,
+                 stop: threading.Event, audit_publisher=None):
         super().__init__(name="receiver", daemon=True)
         self.cfg = cfg
         self.framer = framer
         self.buffer = buffer
         self.stop = stop
+        self.audit_publisher = audit_publisher
         self.received = 0
         self.last_frame = None   # most recent canonical frame (for the status endpoint)
 
@@ -106,3 +108,5 @@ class Receiver(threading.Thread):
                             meta_value=str(frame["seq"]))
         self.last_frame = frame
         self.received += 1
+        if self.audit_publisher is not None:
+            self.audit_publisher.submit(frame)

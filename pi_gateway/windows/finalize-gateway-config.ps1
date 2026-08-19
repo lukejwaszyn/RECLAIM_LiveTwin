@@ -6,15 +6,18 @@ Finalizes the Windows gateway HTTPS destination and secret-bearing config.
 Run from elevated PowerShell after the predictive-engine operator privately
 provides the final HTTPS /ingest URL and ingest token. The token is prompted as a
 SecureString, never accepted on the command line, and never printed. The script
-backs up the prior config under an ACL-protected directory, updates only
-cloud_url/auth_token, validates through the deployed Python loader, and restricts
-the active config to SYSTEM and Administrators.
+backs up the prior config under an ACL-protected directory, updates the VM
+cloud_url/auth_token plus the credential-reference-only Convene gw_ audit path,
+validates through the deployed Python loader, and restricts the active config to
+SYSTEM and Administrators.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
 param(
     [Parameter(Mandatory = $true)]
     [string]$CloudUrl,
+    [string]$ConveneApi = "https://reservation-backend-25386666460.us-central1.run.app/api",
+    [string]$ConveneCredentialPath = "C:/Windows/System32/config/systemprofile/.convene_agent.json",
     [string]$GatewayDirectory = "C:\RECLAIM\pi_gateway",
     [string]$BackupDirectory = "C:\ProgramData\RECLAIM\gateway-config-backups"
 )
@@ -37,6 +40,26 @@ function Set-SecretAcl {
     if ($LASTEXITCODE -ne 0) { throw "Failed to restrict ACL on $Path" }
 }
 
+function Set-YamlScalar {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Key,
+        [Parameter(Mandatory = $true)][string]$SerializedValue
+    )
+    $pattern = "(?m)^\s*$([regex]::Escape($Key))\s*:.*$"
+    $count = [regex]::Matches($Text, $pattern).Count
+    if ($count -gt 1) { throw "Expected at most one $Key key in the gateway config." }
+    if ($count -eq 1) {
+        $replacement = "$Key`: $SerializedValue"
+        return [regex]::Replace(
+            $Text,
+            $pattern,
+            [Text.RegularExpressions.MatchEvaluator]{ param($match) $replacement }
+        )
+    }
+    return $Text.TrimEnd() + "`r`n$Key`: $SerializedValue`r`n"
+}
+
 if (-not (Test-IsAdministrator)) {
     throw "Run this script from an elevated PowerShell session."
 }
@@ -56,6 +79,17 @@ if ($uri.UserInfo -or $uri.Query -or $uri.Fragment -or $uri.AbsolutePath.TrimEnd
 }
 if ($CloudUrl -match "(?i)placeholder|changeme|not.provisioned|example") {
     throw "CloudUrl still looks like a placeholder."
+}
+
+try { $conveneUri = [Uri]$ConveneApi } catch { throw "ConveneApi is not a valid absolute URI." }
+if (-not $conveneUri.IsAbsoluteUri -or $conveneUri.Scheme -ne "https" -or
+    $conveneUri.UserInfo -or $conveneUri.Query -or $conveneUri.Fragment -or
+    $conveneUri.AbsolutePath.TrimEnd('/') -ne "/api") {
+    throw "ConveneApi must be a credential-free HTTPS URL ending exactly in /api."
+}
+$nativeConveneCredentialPath = $ConveneCredentialPath -replace '/', '\'
+if (-not (Test-Path -LiteralPath $nativeConveneCredentialPath -PathType Leaf)) {
+    throw "Desktop Convene SYSTEM credential not found: $nativeConveneCredentialPath"
 }
 
 if ($WhatIfPreference) {
@@ -86,17 +120,16 @@ try {
     Set-SecretAcl -Path $backupPath
 
     $text = Get-Content -Raw -LiteralPath $configPath
-    if ([regex]::Matches($text, '(?m)^\s*cloud_url\s*:').Count -ne 1) {
-        throw "Expected exactly one cloud_url key in $configPath"
-    }
-    if ([regex]::Matches($text, '(?m)^\s*auth_token\s*:').Count -ne 1) {
-        throw "Expected exactly one auth_token key in $configPath"
-    }
-
     $quotedUrl = $CloudUrl.TrimEnd('/') | ConvertTo-Json -Compress
     $quotedToken = $plainToken | ConvertTo-Json -Compress
-    $text = [regex]::Replace($text, '(?m)^\s*cloud_url\s*:.*$', "cloud_url: $quotedUrl")
-    $text = [regex]::Replace($text, '(?m)^\s*auth_token\s*:.*$', "auth_token: $quotedToken")
+    $quotedConveneApi = $ConveneApi.TrimEnd('/') | ConvertTo-Json -Compress
+    $quotedConveneCredential = $ConveneCredentialPath | ConvertTo-Json -Compress
+    $text = Set-YamlScalar -Text $text -Key 'cloud_url' -SerializedValue $quotedUrl
+    $text = Set-YamlScalar -Text $text -Key 'auth_token' -SerializedValue $quotedToken
+    $text = Set-YamlScalar -Text $text -Key 'convene_enabled' -SerializedValue 'true'
+    $text = Set-YamlScalar -Text $text -Key 'convene_api' -SerializedValue $quotedConveneApi
+    $text = Set-YamlScalar -Text $text -Key 'convene_credentials_path' -SerializedValue $quotedConveneCredential
+    $text = Set-YamlScalar -Text $text -Key 'convene_timeout_s' -SerializedValue '10.0'
     Set-Content -LiteralPath $configPath -Value $text -Encoding UTF8
     Set-SecretAcl -Path $configPath
 
@@ -104,7 +137,7 @@ try {
     try {
         $env:PYTHONPATH = $GatewayDirectory
         & $python -c `
-            "from reclaim_edge.config import Config; c=Config.load(r'$configPath'); assert c.transport == 'https' and c.mode == 'live'; print('Gateway HTTPS config validation: PASS')"
+            "from reclaim_edge.config import Config; c=Config.load(r'$configPath'); assert c.transport == 'https' and c.mode == 'live' and c.convene_enabled; print('Gateway dual-publish config validation: PASS')"
         if ($LASTEXITCODE -ne 0) { throw "Deployed config validation failed." }
     } catch {
         Copy-Item -LiteralPath $backupPath -Destination $configPath -Force
@@ -120,6 +153,7 @@ try {
 
     Write-Host "Gateway config finalized and validated."
     Write-Host "Destination: $($CloudUrl.TrimEnd('/'))"
+    Write-Host "Convene audit: $($ConveneApi.TrimEnd('/'))/machine/publish (gw_ only)"
     Write-Host "Credential: stored but not displayed"
     Write-Host "ACL: SYSTEM and Administrators only"
     Write-Host "Backup: $backupPath"

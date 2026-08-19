@@ -89,7 +89,7 @@ $oldPythonPath = $env:PYTHONPATH
 try {
     $env:PYTHONPATH = $GatewayDirectory
     & $python -c `
-        "from reclaim_edge.config import Config; c=Config.load(r'$configPath'); assert c.transport == 'https' and c.mode == 'live' and c.listen_host == '$LaptopAddress' and c.listen_port == 9070 and c.status_port == 9080; print('Gateway production config gate: PASS')"
+        "import os; from reclaim_edge.config import Config; c=Config.load(r'$configPath'); assert c.transport == 'https' and c.mode == 'live' and c.listen_host == '$LaptopAddress' and c.listen_port == 9070 and c.status_port == 9080 and c.convene_enabled and os.path.isfile(os.path.expandvars(os.path.expanduser(c.convene_credentials_path))); print('Gateway dual-publish config gate: PASS')"
     if ($LASTEXITCODE -ne 0) { throw "Production config gate failed." }
 } finally {
     if ($null -eq $oldPythonPath) {
