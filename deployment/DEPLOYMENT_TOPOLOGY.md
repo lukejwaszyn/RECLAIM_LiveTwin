@@ -38,8 +38,8 @@ Windows state bridge
 Headless VM Convene agent installed during bootstrap
   -> Convene sim_ namespace
 
-Windows 10 gateway GET 127.0.0.1:9080/latest
-  -> existing laptop Convene agent
+Windows 10 gateway canonical frame (also visible at 127.0.0.1:9080/latest)
+  -> nonblocking direct /api/machine/publish using the paired desktop credential
   -> separate Convene gw_ audit namespace
 ```
 
