@@ -2,7 +2,7 @@
 
 > **Evidence window:** 2026-08-18 through 2026-08-19 UTC
 > **VM registration:** `reclaim-engine-2`
-> **Status:** VM ingestion-to-Convene sensing path proven; platform-ID binding and visible dashboard configuration remain
+> **Status:** VM ingestion, selected platform-ID mapping, and per-ID publication proven; visible dashboard configuration and UI live/stale capture remain
 
 ## Executive outcome
 
@@ -250,9 +250,40 @@ After binding, rerun `windows-vm/Test-ConveneLiveExpiry.ps1` and capture the sam
 run/source/sequence on the visible overview. The final UI acceptance evidence must
 show both `DATA IS LIVE` during the stream and `DATA NOT LIVE` after expiry.
 
+### Proven stakeholder ID publication
+
+On 2026-08-19 the operator supplied and verified 24 unique Convene IDs for the
+initial stakeholder view. The selection covers:
+
+- the trust strip: `sim_data_live`, `sim_bridge_status`, `sim_state_age_ms`,
+  `sim_bridge_valid_until`, `sim_op_state`, and `sim_active_chamber`;
+- measured and estimated bed temperature, estimate uncertainty, thermal margin,
+  wall margin, model trust, unexplained heating rate, advisory severity, and
+  advisory action for both PL and MT.
+
+The populated environment-local mapping is stored only in the git-ignored
+`deployment/CONVENE_VARIABLE_BINDINGS.local.json`. The sanitized, versioned
+shape and display policy are in `deployment/CONVENE_VARIABLE_BINDINGS.example.json`.
+The IDs are not authentication credentials, but keeping the populated mapping
+local prevents an environment-specific binding from being promoted accidentally.
+
+`windows-vm/Deploy-ConveneVariableBindings.ps1` validates every name, prefix,
+ID, source field, and scalar type before sending anything. It reads the installed
+agent credential from `C:\ConveneAgent\agent.ps1` using the PowerShell parser;
+the agent script is never executed, modified, or printed. After a successful
+24-binding `-WhatIf` validation, the operator confirmed successful publication to
+the Convene backend used by the installed agent. The initial attempt against an
+older backend hostname correctly failed authentication; the deployed workflow now
+uses the installed agent's backend and reports backend/token mismatches explicitly.
+
+This proves the VM-side ID publication mechanism. It does not by itself prove the
+visible dashboard's complete live predicate or stale presentation. Those remain
+Convene UI acceptance steps.
+
 ## Remaining work and explicit limits
 
-- Bind sensed variables by their Convene IDs and implement the four-screen layout.
+- Add IDs for the remaining full-predicate and correlation fields, then implement
+  the visible four-screen layout. The 24-variable stakeholder subset is published.
 - Capture visible Convene correlation and the full lease-aware live predicate.
 - Replace the ephemeral quick tunnel with an approved named route/DNS decision for
   durable operations.
