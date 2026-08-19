@@ -117,6 +117,9 @@ be treated as a physical measurement:
 This proves the desktop gateway's two outbound paths and the VM ingress service.
 It does **not** prove the cRIO field names/types, predictive-engine processing,
 the VM-specific `sim_` Convene writer, stale-state behavior, or restart recovery.
+Until a real run supersedes it, the desktop `/latest` record and VM
+`active_run_id` identify this commissioning frame; operators must continue to
+treat it as synthetic and not as current physical process state.
 
 ### 3.2 Desktop data handling order
 
