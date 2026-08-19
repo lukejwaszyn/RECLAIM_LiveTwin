@@ -49,19 +49,36 @@ staged and proven healthy on this laptop.
 
 ## 2. BLOCKED — §4.1 cRIO physical link and static IPs
 
-**Blocker: the cRIO is not connected.**
+**Current blocker: the physical link is proven, but the approved Private profile,
+scoped firewall rule, listener, and reverse-direction verification are not yet
+complete.**
 
-- [ ] cRIO connected directly to the laptop Ethernet port
-- [ ] Laptop Ethernet set to `192.168.50.1/24`
-- [ ] cRIO Ethernet set to `192.168.50.10/24`
+- [x] cRIO connected directly to the laptop Ethernet port
+- [x] Laptop Ethernet retains the verified laboratory address `192.168.1.1/24`
+- [x] cRIO Ethernet confirmed at `192.168.1.2/24`
 - [ ] **No default gateway on either direct-link interface** — Wi-Fi remains
       Windows' default Internet route
-- [ ] cRIO TCP target configured as `192.168.50.1:9070`
+- [ ] cRIO TCP target confirmed as `192.168.1.1:9070`
 - [ ] Link verified (ping both directions) before starting the gateway
 
 **Recorded state on 2026-08-14:** Ethernet is `192.168.1.1/24`; `192.168.50.1`
 is **not assigned** to any interface. Wi-Fi `104.39.44.203`, Tailscale
 `100.103.166.57`, plus Hyper-V vSwitch `192.168.96.1` and link-local addresses.
+
+**Onsite evidence 2026-08-19:** the direct cable negotiated **1 Gbps**. Windows
+reported laptop `192.168.1.1/24` (manual) and resolved `192.168.1.2` to peer MAC
+`00-80-2F-13-C9-10`; three laptop-to-cRIO probes succeeded in 0–2 ms. Wi-Fi
+remained the only IPv4 default route and was associated over 802.11ac on channel
+124 (5 GHz). The operator confirmed `192.168.1.2` is the cRIO and approved
+preserving this working lab subnet instead of renumbering it to the originally
+planned `192.168.50.0/24`. Ethernet was still **Public**, no process listened on
+9070/9080, and no RECLAIM firewall rule existed. The reviewed, rollback-capable
+script `pi_gateway/windows/configure-crio-network-firewall.ps1` was created but
+has now been run from an elevated PowerShell session. It recorded the pre-change
+state at `C:\ProgramData\RECLAIM\crio-network-firewall-before.json`, changed only
+the Ethernet category from Public to Private, and made no address or route change.
+Post-change laptop-to-cRIO probes again passed in 0–1 ms. The cRIO-side default
+gateway and reverse-direction ping remain unverified.
 
 **Consequence while unassigned:** `receiver.py:37` does a bare
 `srv.bind((listen_host, listen_port))`. Binding an unassigned address raises
@@ -118,16 +135,29 @@ Command for the day it is authorized (do not run before §2 is complete):
 ```powershell
 New-NetFirewallRule -DisplayName "RECLAIM cRIO telemetry (9070)" `
     -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9070 `
-    -Profile Private -LocalAddress 192.168.50.1 -RemoteAddress 192.168.50.10
+    -Profile Private -InterfaceAlias Ethernet `
+    -LocalAddress 192.168.1.1 -RemoteAddress 192.168.1.2
 ```
 
-- [ ] Rule created, Private profile only
-- [ ] Verified the Ethernet interface is classified **Private**, not Public
+- [x] Rule created, Private profile only
+- [x] Verified the Ethernet interface is classified **Private**, not Public
 - [ ] Verified from the cRIO that 9070 is reachable
-- [ ] Confirmed the rule does **not** apply to the Wi-Fi profile
+- [x] Confirmed the rule is restricted to interface alias `Ethernet`, so it does
+      **not** apply to Wi-Fi even though Wi-Fi is also currently Private
 
 Note: 9080 (status endpoint) must **never** get an inbound rule. It binds
 loopback by design (`status.py:84`) and has no authentication (§9.4).
+
+**Rule evidence 2026-08-19:** enabled inbound TCP 9070, local
+`192.168.1.1`, remote `192.168.1.2`, Private profile, interface alias
+`Ethernet`; no explicit inbound 9080 rule and no 9070/9080 listener yet.
+Rollback is `configure-crio-network-firewall.ps1 -Mode Rollback` from an elevated
+PowerShell. Two pre-existing broad Private allow rules named `python.exe` target
+the user Python at
+`C:\Users\latitude4\AppData\Local\Programs\Python\Python313\python.exe`, which
+is used by the SYSTEM Convene agent, **not** the staged gateway venv executable.
+They do not broaden this gateway rule but compound the open GW-01 management-plane
+risk and must be dispositioned before a control-connected role.
 
 ---
 
@@ -393,6 +423,7 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. Listener, cRIO-side gateway/reverse-ping evidence, and cRIO-to-9070 reachability remain pending. |
 | 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |
 | 2026-08-15 | Handoff docs authored — `deployment/HANDOFF.md` (full project story) and `deployment/VM_ENGINE_SESSION_BRIEF.md` (turnkey brief for the cloud VM session). The Convene agent's always-on-at-boot status (§9.8) is framed there as the **architectural base** for the deferred ingress/egress build. Egress tunnel decision recorded: Cloudflare **quick tunnels** first, named tunnel + domain when interoperability warrants. Ingress/egress bring-up deliberately deferred. |
 | 2026-08-15 | Convene agent started and made boot-persistent as SYSTEM (task `Convene-Agent`); §9.8 closed, §9.9 added recording its remote-shell capability. |

@@ -230,12 +230,19 @@ named tunnel if discovery found one. For the demonstration, a foreground quick
 tunnel is an acceptable temporary route:
 
 ```powershell
-cloudflared tunnel --url http://127.0.0.1:8078 --no-autoupdate
+.\deployment\windows-vm\Get-ReclaimPredictiveVmInventory.ps1
+.\deployment\windows-vm\Start-ReclaimQuickTunnel.ps1 -Mode Audit
+.\deployment\windows-vm\Start-ReclaimQuickTunnel.ps1 -Mode Run
 ```
 
 Its hostname is ephemeral and bearer credentials are the only application-layer
 protection. A named tunnel with an approved DNS name and Access policy is preferred
 for durable interoperability. Never route synthetic ports 8177–8179.
+The launcher refuses a competing cloudflared service/process or existing
+configuration, saves the generated base URL to
+`C:\ProgramData\RECLAIM\cloudflared-quick\public-url.txt`, and prints the exact
+gateway `cloud_url` ending in `/ingest`. It never reads credentials or touches the
+Convene bridge/agent.
 
 ## 9. Run endpoint acceptance
 
