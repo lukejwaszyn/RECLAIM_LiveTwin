@@ -16,13 +16,24 @@ def test_atomic_replacement_remains_complete_under_concurrent_reader(tmp_path):
     writer.write({"seq": 0, "blob": "x" * 10_000})
     stop = threading.Event()
     failures: list[Exception] = []
+    successful_reads = 0
 
     def read_repeatedly():
+        nonlocal successful_reads
         while not stop.is_set():
             try:
                 payload = json.loads(destination.read_text(encoding="utf-8"))
                 assert isinstance(payload["seq"], int)
                 assert len(payload["blob"]) == 10_000
+                successful_reads += 1
+            except (FileNotFoundError, PermissionError) as exc:
+                # Windows rename primitives can briefly reject or miss a new
+                # path open during replacement. The agent retries on its next
+                # heartbeat; atomicity requires every successful read to be a
+                # complete old or new document, not continuous path availability.
+                if os.name != "nt":
+                    failures.append(exc)
+                    stop.set()
             except Exception as exc:  # captured for assertion in the parent thread
                 failures.append(exc)
                 stop.set()
@@ -36,6 +47,7 @@ def test_atomic_replacement_remains_complete_under_concurrent_reader(tmp_path):
         stop.set()
         reader.join(timeout=5)
     assert not failures
+    assert successful_reads > 0
     assert json.loads(destination.read_text(encoding="utf-8"))["seq"] == 100
 
 

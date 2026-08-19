@@ -27,6 +27,7 @@ $ServiceXml = Join-Path $InstallRoot "service\reclaim-state-bridge.xml"
 $ConfigPath = Join-Path $InstallRoot "config\bridge.yaml"
 $SecretPath = Join-Path $InstallRoot "secrets\read-token.txt"
 $AppDir = Join-Path $InstallRoot "app"
+$LogDir = Join-Path $InstallRoot "logs"
 $PythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
 
 function Show-Discovery {
@@ -126,6 +127,7 @@ $XmlTemplate = Get-Content -Raw (Join-Path $SourcePackage "windows\reclaim-state
 $Xml = $XmlTemplate.Replace("{{PYTHON_EXE}}", $PythonExe)
 $Xml = $Xml.Replace("{{CONFIG_PATH}}", $ConfigPath)
 $Xml = $Xml.Replace("{{APP_DIR}}", $AppDir)
+$Xml = $Xml.Replace("{{LOG_DIR}}", $LogDir)
 $Xml = $Xml.Replace("{{SERVICE_ACCOUNT}}", $ServiceAccount)
 $Xml | Set-Content -Encoding UTF8 $ServiceXml
 

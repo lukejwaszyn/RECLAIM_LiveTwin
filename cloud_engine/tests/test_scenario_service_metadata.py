@@ -50,6 +50,8 @@ def test_state_and_history_retain_rehearsal_identity():
     assert state["environment"] == "lunar_surface"
     assert state["speed"] == 6.0
     assert state["status"] == "running"
-    assert service.history(1) == [state]
+    history_state = service.history(1)[0]
+    assert history_state["events"] == []
+    assert {key: value for key, value in history_state.items() if key != "events"} == state
     assert service.health()["cycle"] == 1
     assert service.health()["status"] == "running"

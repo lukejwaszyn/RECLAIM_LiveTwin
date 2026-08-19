@@ -107,7 +107,15 @@ class TwinStateService:
 
     def state(self) -> dict:
         with self._lock:
-            return dict(self._latest)
+            # /state is the scalar digital-thread surface. Structured event
+            # detail remains available from /history, while event_count and
+            # last_event carry the current summary for scalar-only consumers
+            # such as the Convene shared-file agent.
+            return {
+                key: value
+                for key, value in self._latest.items()
+                if value is None or isinstance(value, (str, bool, int, float))
+            }
 
     def history(self, n: int) -> list:
         with self._lock:

@@ -16,6 +16,7 @@
     <username>{{SERVICE_ACCOUNT}}</username>
     <allowservicelogon>true</allowservicelogon>
   </serviceaccount>
+  <logpath>{{LOG_DIR}}</logpath>
   <log mode="roll-by-size-time">
     <sizeThreshold>10240</sizeThreshold>
     <pattern>yyyyMMdd</pattern>

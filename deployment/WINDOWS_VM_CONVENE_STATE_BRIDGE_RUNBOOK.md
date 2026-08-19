@@ -5,7 +5,11 @@ predictive-engine VM only. The VM is hosted by Kubernetes-managed infrastructure
 all guest procedures in this runbook use Windows services, PowerShell, NTFS paths,
 and ACLs.
 **Target machine registration:** `reclaim-engine-2`
-**Installation status:** not performed by repository implementation
+**Installation status:** installed and accepted on `reclaim-engine-2` on
+2026-08-19. Engine SHA `726804b012279a0f3c675c4d9d3e76b16cf18d46`;
+bridge SHA `1d7512346806d994cd95a1b485f4f500f650286d`. See
+`CONVENE_MISSION_OPERATIONS_RECAP.md` for correlated evidence and remaining
+platform-ID binding work.
 
 See `DEPLOYMENT_TOPOLOGY.md` for the authoritative end-to-end platform boundary.
 
@@ -179,6 +183,18 @@ Logs contain identity/sequence/status information but no token or full state dum
    prefix. Record the result.
 7. Confirm the installed Convene agent still owns its heartbeat and that no other
    device, task, machine registration, `/ingest` route, or command path changed.
+
+The proven automated live/expiry workflow is:
+
+```powershell
+.\deployment\windows-vm\Test-ConveneLiveExpiry.ps1 `
+  -PublicUrl 'https://<approved-engine-origin>'
+```
+
+It requires exact final run/source/sequence correlation, flat scalar output, zero
+pre-existing `sim_` prefixes, `data_live=true` during the stream, and
+`stale`/`data_live=false` after source expiry. The read-only diagnostic companion
+is `deployment\windows-vm\Get-ConvenePublicationDiagnostics.ps1`.
 
 ## Upgrade
 

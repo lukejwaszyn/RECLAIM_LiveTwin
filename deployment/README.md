@@ -17,15 +17,19 @@ full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 
 ## Integration stages
 
-| Stage | Scope | Status (2026-08-15) |
+| Stage | Scope | Status (2026-08-19) |
 |---|---|---|
 | **0** | Offline gateway staging + outbound access base (Convene agent always-on at boot) | DONE |
-| **1** | Cloud predictive engine on the VM + egress Cloudflare Tunnel + tokens | **IN PROGRESS (current)** |
+| **1** | Cloud predictive engine on the VM + egress Cloudflare Tunnel + tokens | **VM PATH PROVEN**; durable named route pending |
 | **2** | cRIO ingress link (static IPs) + inbound firewall | NOT STARTED |
-| **3** | Six contract gates + three-column V&V (uses the `gw_` audit mapping) | BLOCKED on 1 & 2 |
-| **4** | Convene cutover (one publisher) + Convene-native `.stp` visualization | FUTURE |
+| **3** | Six contract gates + three-column V&V (uses the `gw_` audit mapping) | Synthetic public path PASS; live cRIO/gateway still blocked on 2 |
+| **4** | Convene cutover (one publisher) + Convene-native `.stp` visualization | Variables sensed; ID binding and visible UI acceptance in progress |
 
-Overall system status remains **NO-GO for live data** until Stages 1–3 close.
+The VM ingestion-to-Convene sensing path is proven, including fail-closed expiry.
+Overall hardware/live-cRIO status remains **NO-GO** until Stages 2–3 and visible
+Convene ID binding close. See
+[`CONVENE_MISSION_OPERATIONS_RECAP.md`](CONVENE_MISSION_OPERATIONS_RECAP.md) for
+the evidence and display decision.
 
 The executable plan for the next endpoint session is
 [`NEXT_SESSION_CD_REHEARSAL_PLAN.md`](NEXT_SESSION_CD_REHEARSAL_PLAN.md). It
@@ -46,6 +50,7 @@ integration rather than production-grade CD.
 | `ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the focused backend implementation session. |
 | `HANDOFF.md` | Full project story and current pickup point. Authoritative narrative. |
 | `GATEWAY_GO_LIVE.md` | Living go/no-go punch list across all stages. Authoritative status. |
+| `CONVENE_MISSION_OPERATIONS_RECAP.md` | 2026-08-18/19 VM integration evidence, root causes, stakeholder display taxonomy, variable types, and binding-ID worksheet. |
 
 ### Stage 1 — Cloud engine + egress (CURRENT)
 
@@ -70,6 +75,7 @@ integration rather than production-grade CD.
 | `WINDOWS_VM_CONVENE_STATE_BRIDGE_HANDOFF.md` | Approved architecture and implementation contract for the independent Windows VM `/state` → `sim_vars.json` bridge. |
 | `NewChat_Windows_VM_Convene_State_Bridge_Prompt.md` | Turnkey fresh-agent prompt to implement and test the Windows VM state bridge without mutating the VM. |
 | `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md` | Lease-aware Windows service configuration, guarded installation, verification, logging, acceptance, and rollback procedure. |
+| `windows-vm/README.md` | Index and security contract for the proven Windows VM deployment, recovery, diagnostics, and acceptance scripts. |
 
 ### Stage 0 — Base tooling / installers (reference)
 

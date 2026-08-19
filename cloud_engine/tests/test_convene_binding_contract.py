@@ -67,6 +67,11 @@ def test_cloud_state_exposes_typed_convene_binding_contract():
     assert isinstance(state["cmd_mode"], str)
     assert isinstance(state["cmd_power_setpoint_W"], (int, float))
     assert isinstance(state["cmd_safe_state_armed"], bool)
+    assert "events" not in state
+    assert all(
+        value is None or isinstance(value, (str, bool, int, float))
+        for value in state.values()
+    )
 
     manifest_names = {item["name"] for item in engine.svc.manifest()["variables"]}
     assert {
