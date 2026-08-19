@@ -397,6 +397,25 @@ the pairing, not of any ongoing heartbeat.
       registered but has not yet survived an actual restart
 - [ ] Confirm in Convene that the machine shows as connected
 
+**2026-08-19 desktop re-audit:** the persisted task and interactive profile had
+diverged. SYSTEM still used revoked machine `6xaiDIfauON8lGDVy2s1` (heartbeat
+HTTP 401), while the user profile held `NziS5l2uUARcPa8DUtQn`. A validation
+heartbeat made the latter visible again, but the backend returned HTTP 500 after
+updating presence. The response exposed the exact backend defect: Firestore is
+missing the composite `machineCommands` index over `machineId`, `status`, and
+`createdAt`. Until the Convene backend owner creates that index, the heartbeat
+cannot return `autoVars`, so **visible/online does not yet prove `gw_` telemetry
+collection**. The local cRIO and Cloudflare paths are independent of this
+backend-side blocker.
+
+A guarded desktop-only audit/repair tool now lives at
+`pi_gateway/windows/repair-convene-desktop-agent.ps1`. It never prints tokens,
+does not touch VM bindings, and can persist an existing desktop identity for the
+SYSTEM task with an explicit degraded-heartbeat acknowledgement. A test pairing
+created machine `2rItUt06wMkwtuexiy89`, which Convene detected, but its one-time
+token was intentionally not retained after the failed first heartbeat; remove
+that unused record from Convene when practical.
+
 **Logging:** the task appends to `C:\Users\latitude4\.convene\agent.log`
 (`python -u`, unbuffered). This did not exist before and is the only on-disk
 evidence the agent is alive — it grows unbounded, so rotate or truncate it
@@ -433,6 +452,8 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-19 | Hardened the desktop production handoff: live HTTPS config now rejects placeholder/non-HTTPS/non-`/ingest` destinations and disabled TLS; added secret-prompting config finalization with protected backups; replaced the task installer with guarded network/firewall/ACL/config gates; and published `pi_gateway/windows/README.md`. Fresh verification: 20 gateway tests and 63 bridge/operator-workflow tests passed; all changed PowerShell parsed cleanly. |
+| 2026-08-19 | Reconciled the desktop Convene mechanism (SYSTEM connected-machine task → backend `autoVars` → loopback `/latest` → `gw_`, separate from the VM publisher). Found revoked SYSTEM credentials, a divergent newer user identity, and the backend's missing Firestore `machineCommands(machineId,status,createdAt)` index. Added secret-safe desktop audit/validate/repair tooling. Presence can show online, but `gw_` remains blocked until heartbeat returns HTTP 200 with collectors. |
 | 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no cRIO frame arrived, so sender targeting remains open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |
 | 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. Listener, cRIO-side gateway/reverse-ping evidence, and cRIO-to-9070 reachability remain pending. |
 | 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |

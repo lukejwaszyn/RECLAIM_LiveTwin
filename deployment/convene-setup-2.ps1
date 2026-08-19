@@ -540,6 +540,8 @@ def heartbeat_loop(token):
                         except Exception as e:
                             print(f"[source {col.get('type')}] {e}")
                     threading.Thread(target=_run, daemon=True).start()
+            else:
+                print(f"[Heartbeat] HTTP {r.status_code}; collectors were not returned")
         except Exception as e:
             print(f"[Heartbeat] {e}")
         time.sleep(HEARTBEAT_SEC)

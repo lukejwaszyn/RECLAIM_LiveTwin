@@ -19,6 +19,14 @@ queue feeding the cloud.
 The status server binds loopback only (`status.py:84`), so the Convene agent must
 run on this laptop — it does (paired, heartbeating from `%USERPROFILE%\.convene`).
 
+> **Current backend blocker (2026-08-19):** a heartbeat can update machine
+> presence but then returns HTTP 500 because the Convene backend lacks the
+> Firestore composite `machineCommands` index over `machineId`, `status`, and
+> `createdAt`. The failed response contains no `autoVars`, so no mapping below is
+> operational merely because the machine appears online. Require an HTTP 200
+> heartbeat and a nonzero/expected collector count after the backend index is
+> created.
+
 **Derived from code, not invented.** Every row below traces to
 `pi_gateway/reclaim_edge/status.py`, `framer.py`, `main.py`, and
 `cloud_engine/labview_map.py`. No field is listed that the code cannot produce.

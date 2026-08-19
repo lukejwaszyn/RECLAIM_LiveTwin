@@ -146,6 +146,38 @@ def test_config_load_rejects_typo_keys(tmp_path):
 
 def test_config_load_requires_token_for_live_https(tmp_path):
     p = tmp_path / "config.yaml"
-    p.write_text("transport: https\nmode: live\n")
+    p.write_text("transport: https\nmode: live\ncloud_url: https://engine.test/ingest\n")
     with pytest.raises(ValueError, match="auth_token"):
+        Config.load(str(p))
+
+
+@pytest.mark.parametrize(
+    ("cloud_url", "auth_token", "message"),
+    [
+        ("PLACEHOLDER_CLOUD_INGRESS_NOT_PROVISIONED", "real-token", "absolute https"),
+        ("http://engine.test/ingest", "real-token", "absolute https"),
+        ("https://engine.test/state", "real-token", "/ingest"),
+        ("https://engine.test/ingest?token=bad", "real-token", "query"),
+        ("https://engine.test/ingest", "PLACEHOLDER_TOKEN", "placeholder"),
+    ],
+)
+def test_live_https_rejects_unsafe_or_placeholder_endpoint_config(
+        tmp_path, cloud_url, auth_token, message):
+    p = tmp_path / "config.yaml"
+    p.write_text(
+        f"transport: https\nmode: live\ncloud_url: {cloud_url}\n"
+        f"auth_token: {auth_token}\n"
+    )
+    with pytest.raises(ValueError, match=message):
+        Config.load(str(p))
+
+
+def test_live_https_requires_tls_verification(tmp_path):
+    p = tmp_path / "config.yaml"
+    p.write_text(
+        "transport: https\nmode: live\n"
+        "cloud_url: https://engine.test/ingest\n"
+        "auth_token: real-token\nverify_tls: false\n"
+    )
+    with pytest.raises(ValueError, match="verify_tls=true"):
         Config.load(str(p))
