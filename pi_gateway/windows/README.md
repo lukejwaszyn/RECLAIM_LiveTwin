@@ -94,6 +94,13 @@ updates `cloud_url`/`auth_token`, enables the credential-reference-only direct
 Convene `gw_` publisher, validates through the deployed Python loader, and
 restricts the config to SYSTEM and Administrators.
 
+If the installer reports an unexpected config ACL entry, repair the active file
+and every token-bearing backup without re-entering the token:
+
+```powershell
+.\pi_gateway\windows\finalize-gateway-config.ps1 -RepairAclOnly
+```
+
 ## 5. Install and start the gateway
 
 Registration is deliberately separate from startup:
@@ -110,6 +117,18 @@ placeholder/non-TLS config, broad config ACLs, unsafe network/firewall state,
 exposed 9080 rules, and conflicting listeners.
 
 ## 6. Live acceptance evidence
+
+Before direct cRIO operation, one supervised synthetic frame may be used to prove
+both outbound paths. The script refuses to run while the real cRIO is connected:
+
+```powershell
+.\pi_gateway\windows\send-commissioning-frame.ps1 `
+  -VmBaseUrl 'https://REPLACE-WITH-CURRENT-TUNNEL.trycloudflare.com'
+```
+
+This creates explicitly labeled `COMMISSIONING-NOT-CRIO-*` data in both the VM
+and desktop Convene `gw_` view. Run it once, retain the JSON evidence, and do not
+confuse its values with physical measurements.
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:9080/health

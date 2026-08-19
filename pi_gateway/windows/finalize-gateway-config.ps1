@@ -12,10 +12,16 @@ validates through the deployed Python loader, and restricts the active config to
 SYSTEM and Administrators.
 #>
 
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
+[CmdletBinding(
+    SupportsShouldProcess = $true,
+    ConfirmImpact = "High",
+    DefaultParameterSetName = "Finalize"
+)]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Finalize")]
     [string]$CloudUrl,
+    [Parameter(Mandatory = $true, ParameterSetName = "RepairAcl")]
+    [switch]$RepairAclOnly,
     [string]$ConveneApi = "https://reservation-backend-25386666460.us-central1.run.app/api",
     [string]$ConveneCredentialPath = "C:/Windows/System32/config/systemprofile/.convene_agent.json",
     [string]$GatewayDirectory = "C:\RECLAIM\pi_gateway",
@@ -34,10 +40,55 @@ function Test-IsAdministrator {
 function Set-SecretAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
     $item = Get-Item -LiteralPath $Path
-    $systemGrant = if ($item.PSIsContainer) { "*S-1-5-18:(OI)(CI)(F)" } else { "*S-1-5-18:(F)" }
-    $adminGrant = if ($item.PSIsContainer) { "*S-1-5-32-544:(OI)(CI)(F)" } else { "*S-1-5-32-544:(F)" }
-    & icacls.exe $Path /inheritance:r /grant:r $systemGrant $adminGrant | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Failed to restrict ACL on $Path" }
+    $trustedSids = @("S-1-5-18", "S-1-5-32-544")
+    $acl = Get-Acl -LiteralPath $Path
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($rule in @($acl.Access)) {
+        [void]$acl.RemoveAccessRuleSpecific($rule)
+    }
+    foreach ($sidText in $trustedSids) {
+        $sid = [Security.Principal.SecurityIdentifier]::new($sidText)
+        if ($item.PSIsContainer) {
+            $rule = [Security.AccessControl.FileSystemAccessRule]::new(
+                $sid,
+                [Security.AccessControl.FileSystemRights]::FullControl,
+                [Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+                    [Security.AccessControl.InheritanceFlags]::ObjectInherit,
+                [Security.AccessControl.PropagationFlags]::None,
+                [Security.AccessControl.AccessControlType]::Allow
+            )
+        } else {
+            $rule = [Security.AccessControl.FileSystemAccessRule]::new(
+                $sid,
+                [Security.AccessControl.FileSystemRights]::FullControl,
+                [Security.AccessControl.AccessControlType]::Allow
+            )
+        }
+        $acl.AddAccessRule($rule)
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
+
+    $verifiedAcl = Get-Acl -LiteralPath $Path
+    if (-not $verifiedAcl.AreAccessRulesProtected) {
+        throw "ACL inheritance remains enabled on $Path"
+    }
+    $presentSids = [Collections.Generic.HashSet[string]]::new()
+    foreach ($entry in @($verifiedAcl.Access)) {
+        $sid = $entry.IdentityReference.Translate(
+            [Security.Principal.SecurityIdentifier]
+        ).Value
+        if ($entry.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
+            $sid -notin $trustedSids -or
+            ($entry.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+                [Security.AccessControl.FileSystemRights]::FullControl) {
+            throw "ACL verification found an unexpected entry for '$($entry.IdentityReference)' on $Path"
+        }
+        [void]$presentSids.Add($sid)
+    }
+    if ($presentSids.Count -ne $trustedSids.Count -or
+        @($trustedSids | Where-Object { -not $presentSids.Contains($_) }).Count -gt 0) {
+        throw "ACL verification did not find exactly SYSTEM and Administrators on $Path"
+    }
 }
 
 function Set-YamlScalar {
@@ -68,6 +119,43 @@ $configPath = Join-Path $GatewayDirectory "config.windows.yaml"
 $python = Join-Path $GatewayDirectory ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $configPath)) { throw "Gateway config not found: $configPath" }
 if (-not (Test-Path -LiteralPath $python)) { throw "Gateway Python not found: $python" }
+
+if ($RepairAclOnly) {
+    if (-not $PSCmdlet.ShouldProcess(
+        "$configPath and $BackupDirectory",
+        "Rebuild and verify the gateway secret ACLs without reading or changing credentials"
+    )) { return }
+
+    Set-SecretAcl -Path $configPath
+    $backupCount = 0
+    if (Test-Path -LiteralPath $BackupDirectory -PathType Container) {
+        foreach ($backup in @(Get-ChildItem -LiteralPath $BackupDirectory `
+                -Filter "config.windows.*.yaml" -File)) {
+            Set-SecretAcl -Path $backup.FullName
+            $backupCount++
+        }
+        Set-SecretAcl -Path $BackupDirectory
+    }
+
+    $oldPythonPath = $env:PYTHONPATH
+    try {
+        $env:PYTHONPATH = $GatewayDirectory
+        & $python -c `
+            "from reclaim_edge.config import Config; c=Config.load(r'$configPath'); assert c.transport == 'https' and c.mode == 'live' and c.convene_enabled; print('Gateway dual-publish config validation: PASS')"
+        if ($LASTEXITCODE -ne 0) { throw "Deployed config validation failed." }
+    } finally {
+        if ($null -eq $oldPythonPath) {
+            Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+        } else {
+            $env:PYTHONPATH = $oldPythonPath
+        }
+    }
+
+    Write-Host "Gateway secret ACL repair: PASS"
+    Write-Host "ACL: SYSTEM and Administrators only"
+    Write-Host "Backup files repaired: $backupCount"
+    return
+}
 
 try { $uri = [Uri]$CloudUrl } catch { throw "CloudUrl is not a valid absolute URI." }
 if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne "https" -or

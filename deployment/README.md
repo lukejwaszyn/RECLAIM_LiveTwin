@@ -4,7 +4,10 @@ This folder holds the deployment and handoff documentation for the RECLAIM Live
 Twin. Every doc carries a **stage/status banner** under its title so you can tell,
 at a glance, which phase of integration it belongs to. This index sorts them.
 
-**Where to start:** for the immediate 72-hour demo and backend remediation, read
+**Where to start for endpoint execution:** read
+`THREE_ENDPOINT_HANDOFF.md`; it is the current strict Desktop / Windows Server
+2025 VM / Convene boundary and pickup point. For the immediate 72-hour demo and
+backend remediation, read
 `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md`, then
 `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md`. The implementation-session prompt is
 `NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md`, which includes the backend,
@@ -19,15 +22,16 @@ full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 
 | Stage | Scope | Status (2026-08-19) |
 |---|---|---|
-| **0** | Offline gateway staging + outbound access base (Convene agent always-on at boot) | DONE |
-| **1** | Cloud predictive engine on the VM + egress Cloudflare Tunnel + tokens | **VM PATH PROVEN**; durable named route pending |
-| **2** | cRIO ingress link (static IPs) + inbound firewall | NOT STARTED |
-| **3** | Six contract gates + three-column V&V (uses the `gw_` audit mapping) | Synthetic public path PASS; live cRIO/gateway still blocked on 2 |
-| **4** | Convene cutover (one publisher) + Convene-native `.stp` visualization | Variables sensed; ID binding and visible UI acceptance in progress |
+| **0** | Offline gateway staging + outbound access base | DONE |
+| **1** | Cloud predictive engine on the VM + Cloudflare route + tokens | Repository records prior proof; live VM inventory and current route handback pending |
+| **2** | cRIO ingress link + scoped firewall | Desktop IP/link/firewall DONE; cRIO sender target and first real frame pending |
+| **3** | Contract gates + three-column V&V (`gw_` audit) | Direct desktop publisher staged/tested; real cRIO-to-VM correlation pending |
+| **4** | Separate desktop `gw_` and VM `sim_` Convene views | Mechanisms are distinct and documented; visible live-value acceptance pending |
 
-The VM ingestion-to-Convene sensing path is proven, including fail-closed expiry.
-Overall hardware/live-cRIO status remains **NO-GO** until Stages 2–3 and visible
-Convene ID binding close. See
+Repository evidence records a proven VM ingestion-to-Convene sensing path,
+including fail-closed expiry, but this desktop session did not inventory the live
+VM. Overall hardware/live-cRIO status remains **NO-GO** until Stages 2–4 pass
+with one real correlated frame. See
 [`CONVENE_MISSION_OPERATIONS_RECAP.md`](CONVENE_MISSION_OPERATIONS_RECAP.md) for
 the evidence and display decision.
 
@@ -43,6 +47,9 @@ integration rather than production-grade CD.
 
 | Doc | Role |
 |---|---|
+| `THREE_ENDPOINT_HANDOFF.md` | **Current endpoint handoff:** strict Desktop / Windows Server 2025 VM / Convene ownership, separate `gw_` and `sim_` publishing mechanisms, present evidence, next commands, and acceptance gates. |
+| `CRIO_TELEMETRY_LINK_HANDOFF.md` | Endpoint-specific architecture, discovery, wire contract, safety, and acceptance plan for cRIO/LabVIEW telemetry into the Windows 10 edge gateway. |
+| `NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md` | Self-contained prompt for the agent assigned to inspect and design the cRIO/LabVIEW telemetry producer seam. |
 | `DEPLOYMENT_TOPOLOGY.md` | Authoritative deployment topology, OS boundaries, live data path, and ownership rules. |
 | `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |
 | `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for RT-03/RT-05 backend fixes. |
