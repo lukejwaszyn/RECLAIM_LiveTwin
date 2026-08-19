@@ -9,8 +9,14 @@ def test_https_finalizer_prompts_for_secret_and_enforces_ingest_tls():
     assert 'Read-Host "Enter the VM RECLAIM_INGEST_TOKEN (input is hidden)" -AsSecureString' in script
     assert '$uri.Scheme -ne "https"' in script
     assert '$uri.AbsolutePath.TrimEnd(\'/\') -ne "/ingest"' in script
-    assert '"*S-1-5-18:(F)"' in script
-    assert '"*S-1-5-32-544:(F)"' in script
+    assert '$acl.SetAccessRuleProtection($true, $false)' in script
+    assert '$acl.RemoveAccessRuleSpecific($rule)' in script
+    assert 'Set-Acl -LiteralPath $Path -AclObject $acl' in script
+    assert 'ACL verification did not find exactly SYSTEM and Administrators' in script
+    assert '"S-1-5-18", "S-1-5-32-544"' in script
+    assert '[switch]$RepairAclOnly' in script
+    assert 'Gateway secret ACL repair: PASS' in script
+    assert 'Get-ChildItem -LiteralPath $BackupDirectory' in script
     assert "convene_enabled' -SerializedValue 'true'" in script
     assert "convene_credentials_path" in script
 

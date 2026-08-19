@@ -94,6 +94,13 @@ updates `cloud_url`/`auth_token`, enables the credential-reference-only direct
 Convene `gw_` publisher, validates through the deployed Python loader, and
 restricts the config to SYSTEM and Administrators.
 
+If the installer reports an unexpected config ACL entry, repair the active file
+and every token-bearing backup without re-entering the token:
+
+```powershell
+.\pi_gateway\windows\finalize-gateway-config.ps1 -RepairAclOnly
+```
+
 ## 5. Install and start the gateway
 
 Registration is deliberately separate from startup:
