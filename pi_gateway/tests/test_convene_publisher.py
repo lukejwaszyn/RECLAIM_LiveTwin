@@ -89,7 +89,9 @@ def test_receiver_durably_enqueues_before_best_effort_audit_submit():
         threading.Event(),
         audit_publisher=Audit(),
     )
-    receiver._handle_line('{"op_state":"S_Evacuate","MW_power":50.0}')
+    receiver._handle_line(
+        '{"source_op_state":"S_Evacuate","vars":{"MW_power":50.0}}'
+    )
 
     assert buffer.depth() == 1
     assert events[0][0] == 1

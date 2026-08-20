@@ -21,7 +21,8 @@ class BridgeConfig:
     poll_interval_s: float = 1.0
     request_timeout_s: float = 3.0
     freshness_limit_ms: int = 15_000
-    lease_duration_ms: int = 5_000
+    publisher_heartbeat_ms: int = 30_000
+    lease_duration_ms: int = 45_000
     output_path: str = r"C:\ConveneAgent\sim_vars.json"
     prefix_mode: str = "passthrough"
     environment: str = "earth_lab"
@@ -69,10 +70,19 @@ class BridgeConfig:
             raise ValueError("freshness_limit_ms must be a non-negative integer")
         if isinstance(self.lease_duration_ms, bool) or self.lease_duration_ms <= 0:
             raise ValueError("lease_duration_ms must be a positive integer")
-        minimum_lease = (self.poll_interval_s + self.request_timeout_s) * 1000
+        if (
+            isinstance(self.publisher_heartbeat_ms, bool)
+            or self.publisher_heartbeat_ms <= 0
+        ):
+            raise ValueError("publisher_heartbeat_ms must be a positive integer")
+        minimum_lease = max(
+            (self.poll_interval_s + self.request_timeout_s) * 1000,
+            self.publisher_heartbeat_ms,
+        )
         if self.lease_duration_ms <= minimum_lease:
             raise ValueError(
-                "lease_duration_ms must exceed one poll interval plus request timeout"
+                "lease_duration_ms must exceed both the downstream publisher heartbeat "
+                "and one poll interval plus request timeout"
             )
         if self.replace_retry_timeout_s < 0 or self.replace_retry_interval_s <= 0:
             raise ValueError("replacement retry settings must be positive")

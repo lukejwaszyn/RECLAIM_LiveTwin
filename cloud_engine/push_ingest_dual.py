@@ -87,6 +87,14 @@ _PASSTHROUGH = ("O2_pct", "mass_in_g", "mass_out_g", "T_bed_surf",
                 "T_cond_top", "T_cond_bottom",
                 "process", "preprocess", "postprocess",
                 "chamber_pump", "purge_pump")
+_BOOLEAN_PASSTHROUGH = {
+    "process", "preprocess", "postprocess", "chamber_pump", "purge_pump",
+}
+
+
+def _passthrough_value(name: str, value):
+    """Preserve the declared scalar type of plant readbacks in /state."""
+    return bool(value) if name in _BOOLEAN_PASSTHROUGH else float(value)
 
 TELEMETRY_SCHEMA = "reclaim.telemetry.v1"
 STATE_SCHEMA = "reclaim.state.v1"
@@ -291,7 +299,7 @@ class ChamberEngine:
                           "P_fwd": p_fwd, "P_refl": p_refl}
             for k in _PASSTHROUGH:
                 if v.get(k) is not None:
-                    vals[k] = float(v[k])
+                    vals[k] = _passthrough_value(k, v[k])
             return vals, []
 
         z = np.array([zb, zw])
@@ -305,7 +313,7 @@ class ChamberEngine:
         vals = dict(out.frame.values)
         for k in _PASSTHROUGH:                      # plant-only observables ride through
             if v.get(k) is not None:
-                vals[k] = float(v[k])
+                vals[k] = _passthrough_value(k, v[k])
         vals["op_state"] = op
         vals["sensor_valid"] = True
         return vals, list(out.frame.events)
@@ -339,16 +347,75 @@ class DualPushEngine:
 
     def _set_manifest(self):
         base = json.loads(default_manifest().to_json())
-        names = [x.get("name") for x in base.get("variables", [])] if isinstance(base, dict) else []
-        names = [n for n in names if n] + ["sensor_valid"]
-        provenance = ["schema_version", "mode", "run_id", "source_id", "seq", "ts_source",
-                      "ts_engine", "cycle_id", "active_chamber", "source_op_state", "op_state",
-                      "ingest_status", "ingest_age_ms", "state_age_ms", "last_event", "event_count",
-                      "gap_count"]
-        command = ["cmd_chamber", "cmd_mode", "cmd_power_setpoint_W", "cmd_safe_state_armed"]
-        variables = ([{"name": "PL_" + n} for n in names]
-                     + [{"name": "MT_" + n} for n in names]
-                     + [{"name": n} for n in provenance + command])
+        base_variables = [
+            dict(item) for item in base.get("variables", [])
+            if isinstance(item, dict) and item.get("name")
+        ]
+
+        def descriptor(name, unit="-", dtype="float", role="state", description=""):
+            return {
+                "name": name, "unit": unit, "dtype": dtype, "role": role,
+                "sysml_id": "", "channel": "", "min": None, "max": None,
+                "description": description,
+            }
+
+        # Preserve every descriptor's units/type/role while adding the chamber
+        # prefix. The former name-only manifest could not serve as a binding or
+        # conversion contract.
+        chamber_descriptors = base_variables + [
+            descriptor("sensor_valid", dtype="bool", description="complete chamber measurement vector is available"),
+            descriptor("O2_pct", "%", role="measurement", description="oxygen indication"),
+            descriptor("mass_in_g", "g", role="measurement", description="input mass"),
+            descriptor("mass_out_g", "g", role="measurement", description="output mass"),
+            descriptor("T_bed_surf", "K", role="measurement", description="bed surface temperature"),
+            descriptor("P_chamber", "kPa", role="measurement", description="chamber pressure"),
+            descriptor("P_downstream", "kPa", role="measurement", description="downstream pressure"),
+            descriptor("Q_vent", "provisional", role="measurement", description="vent flow; unit awaiting controls approval"),
+            descriptor("Q_purge", "provisional", role="measurement", description="purge flow; unit awaiting controls approval"),
+            descriptor("T_cond_top", "K", role="measurement", description="top condenser temperature"),
+            descriptor("T_cond_bottom", "K", role="measurement", description="bottom condenser temperature"),
+            *[
+                descriptor(name, dtype="bool", description="controls readback")
+                for name in sorted(_BOOLEAN_PASSTHROUGH)
+            ],
+        ]
+        variables = []
+        for prefix in ("PL_", "MT_"):
+            for item in chamber_descriptors:
+                prefixed = dict(item)
+                prefixed["name"] = prefix + item["name"]
+                variables.append(prefixed)
+
+        shared_specs = {
+            "MW_freq": ("Hz", "float"), "MW_width": ("provisional", "float"),
+            "MW_period": ("provisional", "float"), "MW_water_temp": ("degC", "float"),
+            "MW_flow_rate": ("provisional", "float"),
+            "MW_water_state": ("-", "bool"), "MW_flow_state": ("-", "bool"),
+            "MW_RF": ("-", "bool"), "MW_status": ("-", "bool"),
+        }
+        variables.extend(
+            descriptor(name, unit, dtype, role="measurement" if dtype == "float" else "state",
+                       description="shared microwave readback")
+            for name, (unit, dtype) in shared_specs.items()
+        )
+        provenance_specs = {
+            "schema_version": ("-", "string"), "mode": ("-", "string"),
+            "run_id": ("-", "string"), "source_id": ("-", "string"),
+            "seq": ("-", "int"), "ts_source": ("UTC", "string"),
+            "ts_engine": ("UTC", "string"), "cycle_id": ("-", "string"),
+            "active_chamber": ("-", "string"), "source_op_state": ("-", "string"),
+            "op_state": ("-", "string"), "ingest_status": ("-", "string"),
+            "ingest_age_ms": ("ms", "int"), "state_age_ms": ("ms", "int"),
+            "last_event": ("-", "string"), "event_count": ("-", "int"),
+            "gap_count": ("-", "int"),
+            "cmd_chamber": ("-", "string"), "cmd_mode": ("-", "string"),
+            "cmd_power_setpoint_W": ("W", "float"),
+            "cmd_safe_state_armed": ("-", "bool"),
+        }
+        variables.extend(
+            descriptor(name, unit, dtype, description="state/output contract field")
+            for name, (unit, dtype) in provenance_specs.items()
+        )
         self.svc.set_manifest(json.dumps({
             "type": "manifest", "schema_version": STATE_SCHEMA,
             "model_ref": base.get("model_ref"), "chambers": ["PL", "MT"],
@@ -690,18 +757,21 @@ class DualPushEngine:
         self.t += dt
         combined, events = {}, []
         cid = meta["cycle_id"]
-        if pl_v:
-            vals, ev = self.pl.step(pl_v, op, dt, cycle_id=cid)
-            combined.update({"PL_" + k: val for k, val in vals.items()})
-            events += [("PL", e) for e in ev]
-            if vals.get("sensor_valid") is False and meta["active_chamber"] == "PL":
-                events.append(("PL", "SENSOR_MISSING"))
-        if mt_v:
-            vals, ev = self.mt.step(mt_v, op, dt, cycle_id=cid)
-            combined.update({"MT_" + k: val for k, val in vals.items()})
-            events += [("MT", e) for e in ev]
-            if vals.get("sensor_valid") is False and meta["active_chamber"] == "MT":
-                events.append(("MT", "SENSOR_MISSING"))
+        # Always publish an explicit availability gate for both chambers. A
+        # partially mapped live source must clear retained downstream displays
+        # with sensor_valid=false instead of omitting the absent chamber and
+        # leaving an older true/measurement value visible.
+        vals, ev = self.pl.step(pl_v, op, dt, cycle_id=cid)
+        combined.update({"PL_" + k: val for k, val in vals.items()})
+        events += [("PL", e) for e in ev]
+        if vals.get("sensor_valid") is False and meta["active_chamber"] == "PL":
+            events.append(("PL", "SENSOR_MISSING"))
+
+        vals, ev = self.mt.step(mt_v, op, dt, cycle_id=cid)
+        combined.update({"MT_" + k: val for k, val in vals.items()})
+        events += [("MT", e) for e in ev]
+        if vals.get("sensor_valid") is False and meta["active_chamber"] == "MT":
+            events.append(("MT", "SENSOR_MISSING"))
 
         # plausibility cross-check (diagnostic, never an override — fix C7):
         # what the sensors imply vs what the sequencer declared.

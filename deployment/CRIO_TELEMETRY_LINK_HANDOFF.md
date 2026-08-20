@@ -3,8 +3,9 @@
 > **Scope:** produce real, read-only telemetry from the cRIO/LabVIEW application
 > and deliver it over the isolated Ethernet seam to the Windows 10 edge gateway.
 >
-> **Status:** architecture and source-discovery work pending; physical link and
-> receiving endpoint are ready, but no real cRIO frame has been observed.
+> **Status:** existing NI-PSP read seam discovered; the selected implementation
+> is a new input-only Windows adapter. Channel mapping, Torr conversion, source
+> metadata, implementation approval, and real-frame acceptance remain pending.
 >
 > **Branch:** `desktop/edge-gateway`
 
@@ -34,35 +35,39 @@ behavior. Returned gateway/cloud commands remain disconnected from hardware.
 | Gateway listener | SYSTEM-owned process on `192.168.1.1:9070` |
 | Firewall | Allows inbound TCP 9070 only from `192.168.1.2` on the Ethernet/Private seam |
 | Gateway status | Loopback only at `127.0.0.1:9080` |
+| Existing read seam | LabVIEW 2019 on the Windows 10 edge gateway held an established connection to cRIO TCP 2343; NI Variable Engine and PSP services were running |
+| Discovered project | `C:\Users\latitude4\Desktop\Read Only\Read Only Sensors.lvproj`; project metadata identifies cRIO-9024/VxWorks/PowerPC, cRIO-9111, NI-9474, NI-9213, NI-9205, and NI-9263 |
+| Raw units clarified | Operator states temperature is degrees Celsius and pressure is Torr; the current cloud mbar conversion is not valid for the real source |
 | Synthetic proof | One labeled frame traversed gateway -> VM and gateway -> desktop Convene |
 | Sustained downstream proof | 300/300 frames reached VM; predictive processing plus separate `gw_` and `sim_` Convene displays were operator-confirmed |
 | Real source proof | None; gateway receive count has not advanced from a cRIO frame |
 
-The actual cRIO model, operating system image, LabVIEW version, deployed startup
-VI, project source location, deployment owner, time source, telemetry loop rate,
-and existing data-export mechanisms have not been captured in the repository.
-Do not assume they exist or are modifiable.
+The discovered desktop project is evidence of the target and read seam, but it
+does not prove the currently deployed startup application or an authoritative
+controls source revision. Project metadata refers to `startup.rtexe`; deployment
+identity, source authority, time source, exact channel semantics, and deployment
+ownership remain unknown.
 
-## 3. Preferred architecture
+## 3. Selected architecture
 
-When the LabVIEW project source and safe deployment authority are available, use
-a producer-initiated persistent TCP client on the cRIO:
+Use the existing network-published Scan Engine values through a new input-only
+subscriber on the Windows 10 edge gateway:
 
 ```text
-deterministic acquisition/sequencer loop
-  -> bounded RT-safe queue containing a telemetry snapshot
-  -> lower-priority telemetry/network loop
+cRIO Scan Engine / NI-PSP network-published values
+  -> input-only Windows telemetry adapter
+  -> bounded latest-value snapshot
   -> serialize one UTF-8 JSON object
   -> append LF (0x0A)
-  -> persistent TCP connection to 192.168.1.1:9070
+  -> one persistent client connection to 192.168.1.1:9070
   -> reconnect with bounded backoff after disconnect
 ```
 
-Network connection, JSON formatting, DNS, retries, and blocking writes must never
-run in the deterministic control loop. The telemetry queue must be bounded and
-must expose a local drop/error counter; telemetry backpressure must not delay or
-change physical control. A connection failure is an observability fault, not a
-reason to change process commands.
+Do not modify or redeploy the cRIO startup application for this path. The adapter
+must use an explicit allowlist and input-only APIs. Discovery found analog/digital
+output references and RF/serial dependencies in the existing desktop VIs, so
+their `Read Only` folder name is not sufficient evidence of safety; treat them as
+mapping evidence, not trusted adapter code.
 
 The edge receiver is single-client and supplies no application-level cRIO ACK.
 Use a single telemetry writer. Do not add an unbounded cRIO retry queue or replay
@@ -76,7 +81,7 @@ the receiver's legacy flat or `k=v` compatibility formats:
 
 ```json
 {
-  "source_id": "reclaim-crio-01",
+  "source_id": "reclaim-crio-psp-01",
   "cycle_id": "<stable physical cycle identity>",
   "ts": "<UTC ISO-8601 source timestamp>",
   "source_op_state": "S_MicrowaveHeating",
@@ -145,10 +150,12 @@ MW_RF
 MW_status
 ```
 
-Current mapping assumptions are raw temperatures in degrees Celsius, pressures
-in mbar, microwave power in watts, and exact `0.0` on an unwired temperature or
-pressure channel meaning missing/unwired. Confirm every name, type, unit, range,
-and unwired convention against LabVIEW indicators and controls-team evidence.
+Raw temperatures are degrees Celsius and raw pressures are Torr. The cloud must
+convert them with `K = degC + 273.15` and `kPa = Torr * 0.1333224`. Microwave
+power remains provisionally watts. Do not treat exact `0.0` as missing/unwired
+without controls evidence: zero Torr and zero degrees Celsius can be valid.
+Confirm every name, type, remaining unit, range, validity indicator, and unwired
+convention against same-time LabVIEW indicators and controls-team evidence.
 
 ## 6. Required discovery before design approval
 
@@ -176,28 +183,27 @@ capturing secrets. Do not infer the deployed VI from a similarly named local fil
 
 ## 7. Architecture decision tree
 
-### Option A — cRIO TCP producer (preferred)
+### Option A — cRIO TCP producer (not selected)
 
 Use when the authoritative LabVIEW project is available and a supervised deploy
 is approved. Reuse a single existing telemetry snapshot if available, queue it to
 a lower-priority sender loop, and target `192.168.1.1:9070`.
 
-### Option B — read-only desktop adapter
+### Option B — read-only desktop adapter (selected)
 
-Use only when the cRIO already exposes the complete telemetry set through a
-proven read-only NI Network Stream, shared-variable service, OPC UA endpoint, or
-controls-owned host process and modifying the startup VI is riskier. The adapter
-must be designed as a separate Windows service and feed the existing gateway
-without broadening the cRIO firewall rule or creating a second `gw_` writer.
-The current repository does not contain such an adapter.
+The cRIO already exposes network-published Scan Engine values over NI-PSP and the
+Windows 10 edge gateway already reads that seam. Build a new input-only Windows
+subscriber and feed the existing gateway without broadening the firewall rule or
+creating a second `gw_` writer. Implementation, mapping, and deployment details
+are in `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`.
 
 ### Option C — file/log extraction
 
 Acceptable only for offline schema discovery. It is not a live-twin transport and
 cannot satisfy freshness, source-time, or loss accounting requirements.
 
-Do not select an option until discovery establishes what the deployed LabVIEW
-application already provides.
+Option B is selected for development. It is not approved for deployment until
+the mapping, validity, coherence, unit-conversion, and no-write gates pass.
 
 ## 8. Phased implementation and evidence
 

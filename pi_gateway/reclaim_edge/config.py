@@ -83,6 +83,10 @@ class Config:
     # Set to at least several telemetry periods; 0 disables the idle drop.
     conn_idle_timeout_s: float = 30.0
 
+    # Maximum UTF-8 source line size including its terminating LF. The receiver
+    # enforces this while buffering, before an LF is allowed to arrive.
+    max_line_bytes: int = 8192
+
     # read-only loopback status endpoint; do not expose it through a tunnel; 0 = off
     status_port: int = 9080
 
@@ -137,6 +141,10 @@ class Config:
                              f"got '{cfg.transport}'")
         if cfg.mode not in cls._VALID_MODES:
             raise ValueError(f"mode must be one of {cls._VALID_MODES}, got '{cfg.mode}'")
+        if (isinstance(cfg.max_line_bytes, bool) or
+                not isinstance(cfg.max_line_bytes, int) or
+                not 128 <= cfg.max_line_bytes <= 1_048_576):
+            raise ValueError("max_line_bytes must be an integer from 128 through 1048576")
         if cfg.transport == "https":
             parsed_url = urlparse(cfg.cloud_url)
             if parsed_url.scheme != "https" or not parsed_url.hostname:

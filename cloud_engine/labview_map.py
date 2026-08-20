@@ -8,7 +8,7 @@ block-diagram export) + the LabVIEW "concatenated string" indicator. The physica
 twin streams names, units, and a channel topology that DO NOT match the estimator's
 internal contract, so this adapter is the single translation seam:
 
-    raw LabVIEW frame  (real names, degC, mbar, one shared SSMG power)
+    raw LabVIEW frame  (real names, degC, Torr, one shared SSMG power)
         |  normalize()
         v
     canonical frame    (PL_/MT_ prefixed engine names, KELVIN, kPa, power attributed
@@ -29,7 +29,7 @@ TOPOLOGY (from the docx, NI-9213 TC0..TC7 + NI-9205 AI0..AI2):
 
 UNITS (real -> engine):
     temperatures  degC -> K   (+273.15)
-    pressures     mbar -> kPa  (/10)          [1013 mbar ~ 101.3 kPa cross-checks]
+    pressures     Torr -> kPa  (*0.1333224)    [760 Torr = 101.325024 kPa]
     power         W    -> W    (identity, assumed watts — REVIEW FLAG LV-1)
 
 REVIEW FLAGS (see the review package): the two-temperature filter is fed
@@ -44,8 +44,10 @@ RECLAIM Digital Twin. Author: LJW.
 """
 from __future__ import annotations
 
+import math
+
 C_TO_K = 273.15
-MBAR_TO_KPA = 0.1  # 1 mbar = 0.1 kPa
+TORR_TO_KPA = 0.1333224  # 1 Torr = 0.1333224 kPa
 
 # Plastics bed-core hot-spot thermocouples -> canonical bed bank.
 _PL_BED = ("PL_bottom1", "PL_bottom2", "PL_bottom3", "PL_bottom4")
@@ -60,32 +62,30 @@ _PL_FLAGS = ("PL_process", "PL_preprocess", "PL_postprocess",
 
 
 def _temp_K(v):
-    """degC -> K. A raw EXACT 0.0 is the LabVIEW default for an unwired TC channel
-    (condenser/metals read 0.000000 in the current stream), so it is treated as
-    'no reading' (None) rather than a bogus 0 degC. Real sub-zero data is out of
-    scope for this lab (REVIEW FLAG LV-5)."""
+    """degC -> K. Exact zero is a valid measurement unless a separate,
+    controls-approved quality indication says otherwise."""
     if v is None:
         return None
     try:
         f = float(v)
     except (TypeError, ValueError):
         return None
-    if f == 0.0:
+    if not math.isfinite(f):
         return None
     return f + C_TO_K
 
 
 def _press_kPa(v):
-    """mbar -> kPa. 0.0 (unwired) -> None."""
+    """Torr -> kPa. Exact zero is a valid vacuum measurement."""
     if v is None:
         return None
     try:
         f = float(v)
     except (TypeError, ValueError):
         return None
-    if f == 0.0:
+    if not math.isfinite(f):
         return None
-    return f * MBAR_TO_KPA
+    return f * TORR_TO_KPA
 
 
 def looks_like_labview(raw: dict) -> bool:
@@ -202,7 +202,8 @@ def normalize(raw: dict) -> tuple[dict, dict, str | None]:
 
 
 if __name__ == "__main__":
-    # self-check against the docx concatenated-string sample (RF off, condenser/MT unwired).
+    # Self-check against the legacy sample. Zeroes are retained pending an
+    # explicit controls-approved quality or invalid indicator.
     sample = {
         "PL_surface_temp": 22.599389, "PL_output_pressure": 1032.422165,
         "PL_chamber_pressure": 1047.721528, "PL_top_condenser_temp": 0.0,
@@ -219,10 +220,10 @@ if __name__ == "__main__":
     print("active:", act)
     print("engine_vars:", json.dumps(ev, indent=2))
     print("mw_globals:", json.dumps(mw, indent=2))
-    # expectations: surface 22.6C -> 295.75K as PL_T_wall_meas; pressures ~104.8/103.2 kPa;
-    # all 0.0 temps dropped; RF on + PL_process False -> active MT.
+    # expectations: surface 22.6C -> 295.75K; pressures use Torr -> kPa;
+    # zero temperatures remain 273.15 K; RF on + PL_process False -> active MT.
     assert abs(ev["PL_T_wall_meas"] - 295.749) < 0.01, ev.get("PL_T_wall_meas")
-    assert abs(ev["PL_P_chamber"] - 104.7722) < 0.01, ev.get("PL_P_chamber")
-    assert "PL_T_bed_tc1" not in ev, "0.0 bed TCs must be dropped as unwired"
+    assert abs(ev["PL_P_chamber"] - 139.6986) < 0.01, ev.get("PL_P_chamber")
+    assert ev["PL_T_bed_tc1"] == 273.15, "0 degC must be retained"
     assert act == "MT", act
     print("OK labview_map self-check passed")

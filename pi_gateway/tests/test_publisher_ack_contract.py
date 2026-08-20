@@ -144,6 +144,15 @@ def test_config_load_rejects_typo_keys(tmp_path):
         Config.load(str(p))
 
 
+@pytest.mark.parametrize("value", [0, 127, 1048577, "eight-kilobytes", True])
+def test_config_load_rejects_invalid_max_line_bytes(tmp_path, value):
+    p = tmp_path / "config.yaml"
+    p.write_text(f"max_line_bytes: {str(value).lower()}\n")
+
+    with pytest.raises(ValueError, match="max_line_bytes"):
+        Config.load(str(p))
+
+
 def test_config_load_requires_token_for_live_https(tmp_path):
     p = tmp_path / "config.yaml"
     p.write_text("transport: https\nmode: live\ncloud_url: https://engine.test/ingest\n")

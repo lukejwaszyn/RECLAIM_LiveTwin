@@ -4,6 +4,10 @@
 > **Status:** LIVING reference. Confirm the 27 raw `vars` names against the first
 > real cRIO frame before trusting the mapping (GO_LIVE §9.5).
 
+> **Pressure-unit release status (2026-08-19):** repository source, fixtures,
+> tests, and this mapping use `kPa = Torr * 0.1333224`. The corresponding VM
+> release remains a separate supervised deployment gate.
+
 **Purpose.** Wire the laptop gateway into Convene as its **own machine**, publishing
 the `gw_` audit set defined in `convene/RECLAIM_Convene_Live_Binding.md`
 ("Gateway audit machine"). This is the §6 losslessness audit of the preflight:
@@ -58,10 +62,11 @@ to the framer's output. So `/latest` **is** the canonical wire frame built at
 ```
 
 `vars` content is governed by `framer.py:58-76`. With `strict_fields: false` (the
-staged configuration, per preflight §4.2) **every raw cRIO key is preserved under
-its original LabVIEW name**; only envelope aliases are stripped (`framer.py:60-63`).
-Normalization to engine names and SI units happens later, in the cloud
-(`labview_map.py`) — never here.
+staged configuration, per preflight §4.2), every adapter-provided key is
+preserved; only envelope aliases are stripped (`framer.py:60-63`). The current
+evidence-gated PSP profile deliberately provides module/channel audit names,
+not unapproved LabVIEW process aliases. Normalization to engine names and SI
+units happens later, in the cloud (`labview_map.py`) — never here.
 
 **Before the first frame arrives,** `/latest` returns:
 
@@ -95,13 +100,16 @@ state transition — that equality is the losslessness proof.
 
 ---
 
-## 3. Raw channel variables (27)
+## 3. Target raw channel variables (27)
 
-All paths are `$.vars.<name>`. The authoritative raw-name list is the docx
-concatenated-string export reproduced at `labview_map.py:206-216`; the count
-independently matches `CODE_REVIEW.md` M5 ("~27 warnings/frame").
+All paths are `$.vars.<name>`. This is the target contract/reference mapping,
+not the active PSP POC shape. The raw-name list is the docx concatenated-string
+export reproduced at `labview_map.py:206-216`; the count independently matches
+`CODE_REVIEW.md` M5 ("~27 warnings/frame"). It becomes live only after an
+approved, versioned channel/scaling/quality profile binds physical scan
+resources to these process names.
 
-**Units here are RAW LabVIEW units — °C, mbar, W — not the SI units of `sim_`.**
+**Units here are RAW LabVIEW units — °C, Torr, and provisionally W — not the SI units of `sim_`.**
 See §4.
 
 ### Plastics chamber — temperatures (°C)
@@ -116,16 +124,18 @@ See §4.
 | `gw_PL_top_condenser_temp` | `$.vars.PL_top_condenser_temp` | `sim_PL_T_cond_top` | +273.15 |
 | `gw_PL_bottom_condenser_temp` | `$.vars.PL_bottom_condenser_temp` | `sim_PL_T_cond_bottom` | +273.15 |
 
-Bed TCs are NI-9213 TC4..TC7 ("Hot Spot 1..4"); `PL_surface_temp` is the AI2
-IR pyrometer, mapped to the **wall/outer node**, not the bed (modeling choice
-LV-2, `labview_map.py:168`).
+The target worksheet associates the bed bank with NI-9213 TC4..TC7 ("Hot Spot
+1..4"); that association is not active in the evidence-gated POC. In the
+target model, `PL_surface_temp` is the AI2 IR pyrometer, mapped to the
+**wall/outer node**, not the bed (modeling choice LV-2,
+`labview_map.py:168`).
 
-### Plastics chamber — pressures (mbar)
+### Plastics chamber — pressures (Torr)
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_PL_chamber_pressure` | `$.vars.PL_chamber_pressure` | `sim_PL_P_chamber` | ×0.1 (mbar→kPa) |
-| `gw_PL_output_pressure` | `$.vars.PL_output_pressure` | `sim_PL_P_downstream` | ×0.1 |
+| `gw_PL_chamber_pressure` | `$.vars.PL_chamber_pressure` | `sim_PL_P_chamber` | ×0.1333224 (Torr→kPa) |
+| `gw_PL_output_pressure` | `$.vars.PL_output_pressure` | `sim_PL_P_downstream` | ×0.1333224 |
 
 ### Plastics chamber — process flags (boolean)
 
@@ -187,13 +197,12 @@ The audit view compares **unlike units**. A bed TC at 100.2 °C appears as
 `sim_PL_T_bed_tc1..4` fields. Compare the converted bank mean, not each raw TC,
 and apply the pressure conversion column above before declaring a mismatch.
 
-### 4.2 Exact `0.0` means "unwired", and only `gw_` shows it
+### 4.2 Exact `0.0` remains a measurement
 
-`_temp_K` and `_press_kPa` (`labview_map.py:62-88`) treat an exact `0.0` as the
-LabVIEW default for an unwired channel (REVIEW FLAG LV-5) and **drop it**. So a
-channel reading `gw_MT_top = 0.0` has **no `sim_` counterpart at all** — the
-variable is absent downstream, not zero. That absence is correct behavior, not
-data loss. In the current stream the condenser and metals TCs read `0.000000`.
+Without an explicit controls-approved validity/status signal, fault sentinel, or
+range-and-quality rule, exact zero is preserved. Thus `0 degC` becomes `273.15 K`
+and `0 Torr` becomes `0 kPa`. A later approved quality channel may mark a zero
+invalid, but neither the adapter nor cloud infers that from the numeric value.
 
 ### 4.3 `gw_MW_power` is shared and unattributed
 
@@ -208,12 +217,32 @@ There is one SSMG serving both chambers. The cloud attributes its power to the
 So `gw_MW_power` will not equal either `sim_*_P_fwd` unless you account for the
 attribution. Gate the comparison on `gw_active_chamber`.
 
-### 4.4 Missing channels simply do not appear
+### 4.4 Missing channels do not refresh; retained values are not live
 
 `strict_fields: false` preserves whatever the cRIO sends; it never injects a
-field the cRIO omitted. A jsonPath for an absent channel returns nothing rather
-than a default. If a `gw_` variable stays permanently empty, the channel is
-missing from the cRIO stream — check LabVIEW, not the gateway.
+field the cRIO omitted. `/latest` and the VM frame therefore contain no value for
+an absent channel. The Convene connected-machine store is last-value retained,
+however, so a value written by an older commissioning source can remain visible
+even though the current source no longer publishes that name. That is exactly
+what happened for `gw_MW_width`, `gw_MW_period`, `gw_MW_flow_rate`,
+`gw_MW_flow_state`, `gw_MW_status`, the other `gw_MW_*` fields, and
+`gw_PL_purge_pump`: they came from the synthetic commissioning shape and are not
+present in the current PSP scan stream.
+
+Never refresh these names with fabricated zero/false values. The audit view must
+gate them unavailable unless their update carries the current `gw_source_id`,
+`gw_run_id`, `gw_seq`, and fresh `gw_ts` from a source profile that actually
+contains them. Until the approved PSP/readback mapping supplies those fields,
+their retained values are historical, not telemetry.
+
+The evidence-gated PSP profile also withholds every earlier semantic TC alias.
+Its current audit values are `gw_scan_Mod2_TC0_degC` through
+`gw_scan_Mod2_TC7_degC` and `gw_scan_Mod3_AI0_raw` through
+`gw_scan_Mod3_AI2_raw`. They have no `sim_` counterpart and must not enter PL or
+MT normalization until the approved profile exists. Any retained
+`gw_PL_top_condenser_temp`, `gw_PL_bottom_condenser_temp`, `gw_MT_top`,
+`gw_MT_bottom`, or `gw_PL_bottom1..4` value is therefore historical when this
+profile is the active source.
 
 ---
 
@@ -230,13 +259,25 @@ Cloudflare Access policy). Do not add an inbound firewall rule for 9080.
 
 ## 6. Status of this mapping
 
-Derived statically on 2026-08-14 during gateway staging, with the cRIO
-disconnected and the cloud endpoint not yet provisioned.
+Initially derived statically on 2026-08-14. A real input-only Windows PSP scan
+stream was observed on 2026-08-19 and narrows—but does not complete—the mapping.
 
-- **Verified:** endpoint shape, envelope keys, jsonPaths, and the null/empty
-  behaviors — confirmed against a live `/latest` during the console shakedown
-  (returned `{"note": "no frame received yet"}`, as documented).
-- **Not yet verified:** the `vars` key set, which no live frame has exercised.
-  The 27 names come from the docx export in `labview_map.py:206-216`. Confirm
-  them against the first real cRIO frame and correct this table if the stream
-  differs — that check is a §6 V&V entry, not an assumption to carry forward.
+- **Live transport verified:** the gateway received Mod2 thermocouple and Mod3
+  analog scan values. The evidence-gated source shape is eight audit-only
+  `scan_Mod2_TC0_degC..TC7_degC` values plus three deliberately unscaled
+  `scan_Mod3_AI0_raw..AI2_raw` values. This describes repository source; it is
+  not a claim that the revised profile has been deployed.
+- **Why semantic aliases are quarantined:** the operator-panel screenshot at
+  2026-08-19 22:37:54 EDT and sequence 1984 about 97 seconds later contradicted
+  the former `TC2 -> MT_top` and `TC5..TC7 -> PL_bottom2..4` assignments.
+  Repeated values near 1379 did not identify a channel and do not establish
+  invalid semantics. Offline replay showed the old TC2/TC3 aliases could form a
+  false complete MT measurement and drive `CRITICAL`/`SAFE_STATE`, so all eight
+  Mod2 semantic aliases are withheld pending the approved profile.
+- **Not verified or present:** scaled pressure/surface-temperature fields, every
+  `MW_*` field, `PL_purge_pump` and the remaining process flags, authoritative
+  state/chamber/cycle identity, source time, ranges, and invalid semantics.
+- The 27-name table remains the target worksheet, not a claim about the current
+  live frame. None of the eleven audit-only scan values may be treated as a
+  canonical PL/MT measurement; Mod2 units are known °C, while Mod3 engineering
+  units and scaling remain unapproved.

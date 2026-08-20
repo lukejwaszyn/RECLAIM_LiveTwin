@@ -70,11 +70,18 @@ class Receiver(threading.Thread):
             pass
         idle_limit = float(self.cfg.conn_idle_timeout_s)
         last_data = time.time()
-        buf = b""
+        # max_line_bytes includes the terminating LF, matching the adapter's
+        # framing limit. Keep at most max_line_bytes - 1 pre-LF payload bytes.
+        max_line_bytes = int(self.cfg.max_line_bytes)
+        buf = bytearray()
         with conn:
             while not self.stop.is_set():
                 try:
-                    chunk = conn.recv(4096)
+                    # Never read more bytes than can fit in the reviewed line
+                    # bound. This keeps the pre-LF allocation itself bounded,
+                    # rather than detecting an oversized allocation afterward.
+                    read_size = min(4096, max_line_bytes - len(buf))
+                    chunk = conn.recv(read_size)
                 except socket.timeout:
                     if idle_limit > 0 and time.time() - last_data > idle_limit:
                         log.warning("cRIO connection idle for %.0fs — dropping so a "
@@ -86,27 +93,46 @@ class Receiver(threading.Thread):
                 if not chunk:
                     break
                 last_data = time.time()
-                buf += chunk
-                while b"\n" in buf:
-                    line, buf = buf.split(b"\n", 1)
-                    self._handle_line(line.decode("utf-8", "replace"))
+                buf.extend(chunk)
+                while True:
+                    lf = buf.find(b"\n")
+                    if lf < 0:
+                        if len(buf) >= max_line_bytes:
+                            log.warning(
+                                "frame exceeded %d-byte line limit before LF — "
+                                "dropping connection", max_line_bytes,
+                            )
+                            return
+                        break
 
-    def _handle_line(self, line: str) -> None:
+                    line = bytes(buf[:lf])
+                    del buf[:lf + 1]
+                    if lf + 1 > max_line_bytes:
+                        log.warning("frame exceeded %d-byte line limit — dropped",
+                                    max_line_bytes)
+                        continue
+                    self._handle_line(line)
+
+    def _handle_line(self, line: bytes | str) -> bool:
+        """Validate and enqueue one line; contract failures are line-local."""
         try:
-            raw = parse_line(line)
-        except Exception as exc:  # malformed line — log and skip
+            text = line.decode("utf-8", "strict") if isinstance(line, bytes) else line
+            raw = parse_line(text)
+            if not raw:
+                return False
+            frame, warnings = self.framer.build(raw)
+            payload = self.framer.dumps(frame)
+        except (UnicodeDecodeError, ValueError) as exc:
             log.warning("bad frame: %s", exc)
-            return
-        if not raw:
-            return
-        frame, warnings = self.framer.build(raw)
+            return False
         for w in warnings:
             log.warning("frame warning: %s", w)
         # frame + seq high-water mark persist in ONE transaction (fix M7)
-        self.buffer.enqueue(self.framer.dumps(frame),
+        self.buffer.enqueue(payload,
                             meta_key=f"seq:{frame['run_id']}",
                             meta_value=str(frame["seq"]))
         self.last_frame = frame
         self.received += 1
         if self.audit_publisher is not None:
             self.audit_publisher.submit(frame)
+        return True

@@ -24,12 +24,17 @@ infrastructure. There is no Linux host or Raspberry Pi in the live path. See
 | **BLOCKED** | Cannot be done yet. The blocker is named. |
 | **NOT DONE — DELIBERATE** | Achievable now, intentionally withheld. The reason is a safety constraint, not a scheduling one. Do not "helpfully" complete these. |
 
-**Current overall status: NO-GO only for real cRIO data.** The physical link,
-gateway listener/task, protected cloud configuration, sustained gateway-to-VM
-delivery, predictive processing, and independent Convene `gw_`/`sim_` displays
-are commissioned with synthetic input. No real cRIO frame has arrived; the
-remaining live gate is the LabVIEW telemetry producer plus real-source contract,
-three-column correlation, stale behavior, and restart evidence.
+**Current overall status: partial live PSP engineering POC; full live remains
+NO-GO.** The physical link, gateway listener/task, protected cloud configuration,
+sustained gateway-to-VM delivery, predictive processing, and independent Convene
+`gw_`/`sim_` displays are commissioned with synthetic input. An input-only
+Windows PSP adapter has also sent a partial live engineering stream: eight
+NI-9213 thermocouple scans plus three raw NI-9205 scans. The evidence-gated
+source profile exposes all eleven under audit-only scan names and supplies no
+canonical PL/MT model measurement. The
+remaining live gate is the authoritative mapping/scaling/metadata contract,
+three-column correlation, stale behavior, and restart evidence across a full
+physical cycle.
 
 ---
 
@@ -47,23 +52,25 @@ three-column correlation, stale behavior, and restart evidence.
 | 1.8 | Local console shakedown — process healthy without hardware or cloud | `config.console.yaml` (differs from `config.windows.yaml` on exactly two lines: `transport: console`, `listen_host: 127.0.0.1`). Ran 30 s. Clean start, no traceback. `/health`, `/latest`, `/command`, `/` all answered. `uptime_s` 5.0 → 15.2 → 26.9 with the supervisor loop polling worker liveness every 0.5 s throughout — no silent thread death (`main.py:56-66`). Health lines logged on the configured 10 s cadence. |
 | 1.9 | Loopback-only binding confirmed at the OS level | `netstat`: `127.0.0.1:9070` and `127.0.0.1:9080` LISTENING, same PID — never `0.0.0.0`. No inbound exposure created. Ports released on stop. |
 | 1.10 | Convene `gw_` audit mapping derived | `deployment/CONVENE_GW_MAPPING.md` — 36 variables (9 envelope + 27 raw channels), each with jsonPath into `http://127.0.0.1:9080/latest`, type, `sim_` counterpart, unit conversion, and code citation. Derived statically from `status.py`, `framer.py`, `receiver.py`, `labview_map.py`. |
-| 1.11 | Direct Convene `gw_` publisher implemented and commissioned | Convene-supplied `/api/machine/publish` contract integrated as `reclaim_edge.convene`: only scalar `gw_` names, one pending frame, nonblocking submit after durable VM enqueue, independent counters in `/health`, no `sim_` writes or VM acknowledgements. The five-minute proof delivered 296 audit updates and coalesced four while reporting zero failures. Real-source publication remains pending the first cRIO frame. |
+| 1.11 | Direct Convene `gw_` publisher implemented and commissioned | Convene-supplied `/api/machine/publish` contract integrated as `reclaim_edge.convene`: only scalar `gw_` names, one pending frame, nonblocking submit after durable VM enqueue, independent counters in `/health`, no `sim_` writes or VM acknowledgements. The five-minute synthetic proof delivered 296 audit updates and coalesced four while reporting zero failures. A partial live PSP engineering stream has since exercised the path; full-contract publication remains pending. |
 
 ---
 
-## 2. BLOCKED only on sender — §4.1 cRIO telemetry interface
+## 2. PARTIAL — §4.1 input-only Windows PSP telemetry interface
 
-**Current blocker: the physical link, Private profile, scoped firewall rule, and
-gateway listener are proven, but the cRIO sender target, reverse-direction
-verification, and first real frame are not yet confirmed.**
+**Selected topology:** the cRIO keeps its existing Scan Engine/network-published
+variables. A separate input-only Windows adapter subscribes over NI-PSP and is
+the sole TCP writer to the gateway on the same desktop. Do not configure or
+deploy a new cRIO/LabVIEW TCP sender.
 
 - [x] cRIO connected directly to the laptop Ethernet port
 - [x] Laptop Ethernet retains the verified laboratory address `192.168.1.1/24`
 - [x] cRIO Ethernet confirmed at `192.168.1.2/24`
 - [ ] **No default gateway on either direct-link interface** — Wi-Fi remains
       Windows' default Internet route
-- [ ] cRIO TCP target confirmed as `192.168.1.1:9070`
-- [ ] Link verified (ping both directions) before starting the gateway
+- [x] Windows adapter PSP target confirmed as `192.168.1.2`; live values observed
+- [x] Windows adapter TCP target confirmed as `192.168.1.1:9070`
+- [x] Desktop-to-cRIO link and NI-PSP read path exercised without a cRIO deploy
 
 **Recorded state on 2026-08-14:** Ethernet is `192.168.1.1/24`; `192.168.50.1`
 is **not assigned** to any interface. Wi-Fi `104.39.44.203`, Tailscale
@@ -82,16 +89,19 @@ has now been run from an elevated PowerShell session. It recorded the pre-change
 state at `C:\ProgramData\RECLAIM\crio-network-firewall-before.json`, changed only
 the Ethernet category from Public to Private, and made no address or route change.
 Post-change laptop-to-cRIO probes again passed in 0–1 ms. The cRIO-side default
-gateway and reverse-direction ping remain unverified.
+gateway remains unverified. Reverse-direction ping and cRIO-to-9070 reachability
+are not requirements of the selected desktop-subscriber design.
 
 **Manual listener proof 2026-08-19:** staging was refreshed from commit
 `a5908387451d38d5ef08d30bea66ec3aee2e2a17`; the active config was corrected to
 `listen_host: 192.168.1.1`. An isolated console-transport run used a separate
 diagnostic queue and proved `192.168.1.1:9070` plus loopback-only
 `127.0.0.1:9080` under one healthy process. `/health` reported zero errors and
-`/latest` reported no frame received. No cRIO connection arrived during the
-50-second window, so sender targeting/startup remains open. The diagnostic was
-stopped and the production queue was untouched.
+`/latest` reported no frame received. No direct cRIO TCP connection arrived
+during the 50-second window; that historical result is consistent with the
+later-selected desktop PSP-subscriber topology. The diagnostic was stopped and
+the production queue was untouched. A later foreground adapter POC exercised the
+local TCP ingress, but no adapter startup task was installed.
 
 **Consequence while unassigned:** `receiver.py:37` does a bare
 `srv.bind((listen_host, listen_port))`. Binding an unassigned address raises
@@ -122,11 +132,13 @@ unattended operation.
 
 ---
 
-## 4. DONE — Windows Firewall inbound TCP 9070
+## 4. DONE — narrow defensive Windows Firewall rule for TCP 9070
 
 The reviewed rule is active only on the Private direct-link Ethernet interface,
-with local `192.168.1.1`, remote `192.168.1.2`, and TCP 9070. Port 9080 remains
-loopback-only with no inbound allow rule.
+with local `192.168.1.1`, remote `192.168.1.2`, and TCP 9070. It is preserved as
+narrow defensive configuration, but the selected Windows PSP adapter reaches
+the gateway locally and does not require the cRIO to initiate TCP 9070. Port 9080
+remains loopback-only with no inbound allow rule.
 
 Applied rule shape (do not broaden):
 
@@ -139,7 +151,7 @@ New-NetFirewallRule -DisplayName "RECLAIM cRIO telemetry (9070)" `
 
 - [x] Rule created, Private profile only
 - [x] Verified the Ethernet interface is classified **Private**, not Public
-- [ ] Verified from the cRIO that 9070 is reachable
+- [x] Verified the selected Windows adapter can reach the local 9070 listener
 - [x] Confirmed the rule is restricted to interface alias `Ethernet`, so it does
       **not** apply to Wi-Fi even though Wi-Fi is also currently Private
 
@@ -176,6 +188,10 @@ acceptance run retired the prior identity; the VM then accepted all 300 frames.
 - [ ] Failure restart verified (kill the process → returns within 1 min)
 - [x] Clean stop/start verified with queue preservation
 
+This section applies only to the existing gateway task. The PSP adapter remains
+a foreground engineering POC and has not been installed or approved as a startup
+task.
+
 Side effect to be aware of: the installer sets `RECLAIM_EDGE_CONFIG` as a
 **machine-level** environment variable (`:22`), which persists beyond the task.
 
@@ -184,15 +200,25 @@ Side effect to be aware of: the installer sets `RECLAIM_EDGE_CONFIG` as a
 ## 6. PARTIAL — §5 contract gates
 
 Fresh sustained ingress, gateway-run supersession, VM predictive processing,
-and both Convene views are proven synthetically. Duplicate/cloud-restart and
-real-source freshness evidence remain open.
+and both Convene views are proven synthetically. A partial cRIO-derived PSP
+stream also traversed the live seam. Duplicate/cloud-restart, full-contract
+source, and accepted-cadence freshness evidence remain open.
 
 - [x] **Synthetic fresh-stream gate** — 300 fresh frames accepted in the
       sustained proof; Endpoint 2 processing and `sim_` display operator-confirmed.
-- [ ] **Real fresh frame** — one cRIO v1 frame accepted; `/state` shows
+- [x] **Engineering PSP transport gate** — eight Mod2 TC scans plus three Mod3
+      analog scans reached the gateway from the input-only Windows subscriber.
+      The evidence-gated source profile names them only
+      `scan_Mod2_TC0_degC..TC7_degC` and `scan_Mod3_AI0_raw..AI2_raw`; its
+      deployment is not claimed here. One frame every 3 seconds was observed as
+      sustainable; nominal 1 Hz produced `timestamp_stale` rejection.
+- [ ] **Full-contract real fresh frame** — one PSP-adapter v1 frame accepted;
+      `/state` shows
       `schema_version: reclaim.state.v1`, `mode: live`, `run_id`, `source_id`,
       `seq`, `ts_source`, `cycle_id`, `source_op_state`, singular `op_state`,
       `PL_op_state`, `MT_op_state`, `ingest_status: accepted`
+- [ ] **Cadence gate** — agree and sustain a source cadence without
+      `timestamp_stale`; resolve why nominal 1 Hz failed before approving it
 - [ ] **Duplicate** — repost the same frame → `duplicate`, ingestion count does
       not increment
 - [ ] **Harness reject** — post `mode: harness` → rejected. The live-only proof
@@ -211,11 +237,12 @@ real-source freshness evidence remain open.
 
 ---
 
-## 7. BLOCKED only on real-source V&V — §6 three-column audit
+## 7. BLOCKED on full-contract real-source V&V — §6 three-column audit
 
-**Blocker: needs the real cRIO/LabVIEW producer.** Cloud, predictive processing,
-and both Convene mechanisms are commissioned synthetically; formal validation of
-names, units, state, chamber, cadence, and physical values needs the real source.
+**Blocker:** the selected PSP subscriber is live only as a partial engineering
+POC. Formal validation still needs the approved channel/scaling/validity map and
+authoritative state, chamber, cycle, and time sources. Cloud, predictive
+processing, and both Convene mechanisms are commissioned synthetically.
 
 - [x] Gateway running against the current authenticated cloud endpoint
 - [x] Laptop registered as its own Convene machine publishing the `gw_` set
@@ -223,9 +250,13 @@ names, units, state, chamber, cadence, and physical values needs the real source
       tap, never in the delivery path, **never writes `sim_*`**
 - [x] Separate desktop `gw_` and VM `sim_` Convene displays confirmed for the
       sustained synthetic stream
-- [ ] **Confirm the 27 raw `vars` names against the first real frame** and
-      correct the mapping table if the stream differs (see §9.5)
-- [ ] Unit conversions applied in the view (°C→K, mbar→kPa) so unlike units do
+- [x] **Record the evidence-gated partial key set:** eight audit-only
+      `scan_Mod2_TCn_degC` names and three `scan_Mod3_AIn_raw` names (see §9.5)
+- [ ] **Confirm the complete raw `vars` contract against a full live frame** and
+      correct the mapping table if the stream differs
+- [ ] Gate every absent field unavailable in Convene; retained `gw_MW_*`,
+      `gw_PL_purge_pump`, or other older values must not appear current
+- [ ] Unit conversions applied in the view (°C→K, Torr→kPa) so unlike units do
       not read as mismatches (`CONVENE_GW_MAPPING.md` §4.1)
 - [ ] One full controlled sequence
       `S_BatchLoad → S_Evacuate → S_MicrowaveHeating → S_CoolDown → S_Complete`
@@ -234,21 +265,25 @@ names, units, state, chamber, cadence, and physical values needs the real source
 - [ ] §4.5 RF coexistence check: Wi-Fi pinned to 5 GHz, `last_ack_age_s` and
       `dead_letter` watched **during** `S_MicrowaveHeating`
 
-Both separate Convene writers are commissioned synthetically. Real-source
-three-column acceptance remains blocked on the cRIO/LabVIEW producer.
+Both separate Convene writers are commissioned synthetically. Full-contract
+three-column acceptance remains blocked on the authoritative PSP mapping and
+metadata sources, not on deployment of a cRIO TCP sender.
 
 ---
 
 ## 8. Critical path
 
-```
-§2 cRIO link ─┐
-              ├─→ §4 firewall ─→ §5 boot task ─→ §6 contract gates ─→ §7 V&V ─→ Convene cutover
-§3 cloud+tokens ┘
+```text
+§2 cRIO PSP link + Windows adapter ──┐
+                                    ├─→ §4 listener/network safety
+§3 cloud + tokens ───────────────────┘       │
+                                             v
+§5 gateway task ─→ §6 contract gates ─→ §7 V&V ─→ Convene cutover
 ```
 
-Sections 3–5 and the downstream synthetic path are complete. Section 2 now owns
-the critical path; real-source §6/§7 evidence follows the first cRIO frame.
+Sections 3–5 and the downstream synthetic path are complete. Section 2 has a
+partial live engineering proof; the critical path is now its full approved
+mapping, scaling, metadata, cadence, and §6/§7 correlation evidence.
 
 ---
 
@@ -306,17 +341,39 @@ tunnelled, the tunnel must carry the authentication.
 
 - [ ] Decide and document the policy before any tunnel exposes 9080
 
-### 9.5 The 27 raw channel names are unverified against a real stream
+### 9.5 The full raw channel contract is only partially observed
 
-`CONVENE_GW_MAPPING.md` §3 lists the `vars` keys from the docx export
-reproduced at `labview_map.py:206-216`. No live cRIO frame has confirmed them.
-With `strict_fields: false` the gateway forwards whatever arrives, so a name
-mismatch would not error — it would silently produce empty `gw_` variables and
-absent `sim_` fields.
+`CONVENE_GW_MAPPING.md` §3 lists the target `vars` keys from the docx export
+reproduced at `labview_map.py:206-216`. The live PSP transport POC observed only
+eight Mod2 thermocouple scans and three Mod3 analog scans. The evidence-gated
+source profile names them `scan_Mod2_TC0_degC` through
+`scan_Mod2_TC7_degC` and `scan_Mod3_AI0_raw` through
+`scan_Mod3_AI2_raw`; it supplies no canonical `PL_*`, `MT_*`, `MW_*`, process
+flag, or authoritative metadata source. With `strict_fields: false` the gateway
+forwards whatever arrives, so absent or mismatched names do not error;
+corresponding canonical `gw_`/`sim_` fields are absent from the current frame.
 
-- [ ] Capture the first real frame from `/latest`, diff its `vars` keys against
-      the mapping table, correct the table, and only then consider
+The raw-name quarantine follows new controls evidence. The operator-panel
+screenshot at 2026-08-19 22:37:54 EDT and sequence 1984 about 97 seconds later
+contradicted the former `TC2 -> MT_top` and `TC5..TC7 -> PL_bottom2..4`
+assignments. Repeated values near 1379 were non-identifying and do not establish
+invalid semantics. An offline replay showed that old TC2/TC3 aliases could form
+a false complete MT measurement and drive `CRITICAL`/`SAFE_STATE`, so all eight
+Mod2 process aliases are withheld until an approved, versioned mapping/quality
+profile exists. This is a source/review correction, not a deployment claim.
+
+Convene can retain a value from an older synthetic or prior frame even when the
+current canonical frame omits that field. Availability must therefore be gated
+on current-frame presence plus matching provenance/freshness. In particular,
+retained `gw_MW_*` and `gw_PL_purge_pump` values are unavailable, not live POC
+measurements.
+
+- [x] Retain and document the partial 8-raw-Mod2 + 3-raw-Mod3 key set
+- [ ] Capture a full-contract adapter frame from `/latest`, diff its `vars` keys
+      against the mapping table, correct the table, and only then consider
       `strict_fields: true`
+- [ ] Approve scaling and renaming for the three NI-9205 scan values
+- [ ] Prove absent-field unavailable gating in both audit and stakeholder views
 
 ### 9.6 Historical Pi-vs-laptop naming drift (`CODE_REVIEW.md` H6) — CLOSED
 
@@ -434,12 +491,13 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
-| 2026-08-19 | Downstream synthetic commissioning PASS: after an intentional gateway restart generated fresh run `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2`, the guarded five-minute stream sent 300 frames in 300.019 s; gateway receive and VM ingest deltas were both 300, desktop Convene delivered 296 and coalesced four, with zero failures, zero new dead letters, and an empty final queue. The operator confirmed VM predictive processing and the separate `sim_` Convene display. Only the real cRIO/LabVIEW producer and real-source correlation/recovery gates remain NO-GO. |
+| 2026-08-19 | Reconciled the selected live-source topology to the new input-only Windows NI-PSP subscriber: the cRIO remains unchanged and publishes existing Scan Engine variables; the desktop adapter is the sole TCP writer to the gateway. Recorded transport of eight Mod2 TCs plus three `scan_Mod3_AIn_raw` values at an observed sustainable three-second cadence. Later panel/sequence correlation contradicted several provisional process aliases, and offline replay exposed a false MT critical/safe-state path, so the evidence-gated source profile now quarantines all eleven as `scan_Mod2_TCn_degC`/`scan_Mod3_AIn_raw`; revised-profile deployment is not claimed. No `MW_*`, process fields, or authoritative cycle/state/chamber metadata were proven. Full-cycle acceptance and adapter deployment remain NO-GO, and retained Convene values for absent fields must be gated unavailable. |
+| 2026-08-19 | Downstream synthetic commissioning PASS: after an intentional gateway restart generated fresh run `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2`, the guarded five-minute stream sent 300 frames in 300.019 s; gateway receive and VM ingest deltas were both 300, desktop Convene delivered 296 and coalesced four, with zero failures, zero new dead letters, and an empty final queue. The operator confirmed VM predictive processing and the separate `sim_` Convene display. Full-contract PSP-adapter input and real-source correlation/recovery gates remained NO-GO. |
 | 2026-08-19 | Integrated Convene's supplied direct `/machine/publish` contract into the gateway. The one-frame best-effort worker publishes only canonical `gw_` scalars after durable VM enqueue, exposes health counters, and cannot block/acknowledge the VM queue. The initial staging note was later superseded by the live protected configuration and sustained commissioning proof above. |
 | 2026-08-19 | Hardened the desktop production handoff: live HTTPS config now rejects placeholder/non-HTTPS/non-`/ingest` destinations and disabled TLS; added secret-prompting config finalization with protected backups; replaced the task installer with guarded network/firewall/ACL/config gates; and published `pi_gateway/windows/README.md`. Fresh verification: 20 gateway tests and 63 bridge/operator-workflow tests passed; all changed PowerShell parsed cleanly. |
 | 2026-08-19 | Reconciled the desktop Convene identity and found the backend's missing Firestore `machineCommands(machineId,status,createdAt)` index. Added secret-safe audit/repair tooling, then adopted Convene's documented direct `/machine/publish` contract for `gw_`: a bounded best-effort worker receives the same canonical frame only after durable VM enqueue and cannot block or acknowledge the VM path. Heartbeat/commands remain degraded by the backend index, while direct publish is independently testable. |
-| 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no cRIO frame arrived, so sender targeting remains open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |
-| 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. Listener, cRIO-side gateway/reverse-ping evidence, and cRIO-to-9070 reachability remain pending. |
+| 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no source frame arrived, so the source-adapter seam remained open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |
+| 2026-08-19 | Onsite physical link established at 1 Gbps; laptop `192.168.1.1/24` and operator-confirmed cRIO `192.168.1.2/24` preserved as the approved lab subnet. Laptop-to-cRIO ping passed; Wi-Fi remained the only default route on 5 GHz. Applied the rollback-capable network script: Ethernet is Private and TCP 9070 is allowed only from the cRIO to the laptop on that interface; 9080 remains unopened. This record predates selection of the desktop PSP subscriber; reverse ping and cRIO-to-9070 reachability are not requirements of that selected topology. |
 | 2026-08-17 | Corrected the authoritative live topology to a cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure and a Windows 10 gateway laptop; retired Linux service units, rewrote VM/preflight procedures for Windows, and closed §9.1/§9.2 documentation decisions. |
 | 2026-08-15 | Handoff docs authored — `deployment/HANDOFF.md` (full project story) and `deployment/VM_ENGINE_SESSION_BRIEF.md` (turnkey brief for the cloud VM session). The Convene agent's always-on-at-boot status (§9.8) is framed there as the **architectural base** for the deferred ingress/egress build. Egress tunnel decision recorded: Cloudflare **quick tunnels** first, named tunnel + domain when interoperability warrants. Ingress/egress bring-up deliberately deferred. |
 | 2026-08-15 | Convene agent started and made boot-persistent as SYSTEM (task `Convene-Agent`); §9.8 closed, §9.9 added recording its remote-shell capability. |

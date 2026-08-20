@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
+import re
 
 import pytest
 
@@ -60,4 +62,22 @@ def test_placeholder_sha_and_short_lease_are_rejected(bridge_config):
     with pytest.raises(ValueError, match="bridge_source_sha"):
         replace(bridge_config, bridge_source_sha="REPLACE_WITH_FULL_SHA").validate()
     with pytest.raises(ValueError, match="lease"):
-        replace(bridge_config, lease_duration_ms=4_000).validate()
+        replace(bridge_config, lease_duration_ms=30_000).validate()
+
+
+def test_lease_covers_the_repository_publisher_heartbeat():
+    setup = (
+        Path(__file__).resolve().parents[2] / "deployment" / "convene-setup-2.ps1"
+    ).read_text(encoding="utf-8-sig")
+    match = re.search(r"(?m)^HEARTBEAT_SEC\s*=\s*(\d+)\s*$", setup)
+    assert match, "publisher heartbeat was not found in the VM agent bootstrap"
+
+    config = BridgeConfig()
+    assert config.publisher_heartbeat_ms == int(match.group(1)) * 1000
+    assert config.lease_duration_ms > config.publisher_heartbeat_ms
+
+
+@pytest.mark.parametrize("bad_heartbeat", [0, -1, True])
+def test_invalid_publisher_heartbeat_is_rejected(bridge_config, bad_heartbeat):
+    with pytest.raises(ValueError, match="publisher_heartbeat_ms"):
+        replace(bridge_config, publisher_heartbeat_ms=bad_heartbeat).validate()

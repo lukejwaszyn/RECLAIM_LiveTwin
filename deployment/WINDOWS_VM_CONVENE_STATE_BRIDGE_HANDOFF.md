@@ -232,6 +232,8 @@ engine_state_url: http://127.0.0.1:8078/state
 poll_interval_s: 1.0
 request_timeout_s: 3.0
 freshness_limit_ms: 15000
+publisher_heartbeat_ms: 30000
+lease_duration_ms: 45000
 output_path: C:\ConveneAgent\sim_vars.json
 prefix_mode: passthrough
 environment: earth_lab
@@ -361,8 +363,12 @@ Stop rather than improvising if:
 
 The repository implementation adds `bridge_valid_until` to every publication.
 Convene must compare its own current UTC clock to this deadline as part of the
-effective live-data predicate. Fail-closed payloads expire immediately; successful
-live payloads use the configured short lease.
+effective live-data predicate. Fail-closed payloads expire immediately. The
+installed publisher heartbeats every 30 seconds, so successful live payloads
+use a 45-second lease; a shorter lease could expire healthy data before the next
+publisher read. The bridge still fails closed on the independent
+`freshness_limit_ms: 15000` engine-state threshold. The 45-second lease does not
+make state older than 15 seconds live.
 
 This resolves the Windows sharing-violation edge case: if `os.replace` ultimately
 cannot replace a previously live file, the last complete destination remains intact

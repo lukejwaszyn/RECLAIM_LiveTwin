@@ -15,11 +15,50 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Iterable, Tuple
+from typing import Any, Dict, Tuple
 
 from .config import Config
+
+
+class FrameContractError(ValueError):
+    """An inbound source line does not satisfy the telemetry wire contract."""
+
+
+_ENVELOPE_FIELDS = {
+    "schema_version", "mode", "run_id", "source_id", "src", "cycle_id",
+    "seq", "ts", "source_op_state", "op_state", "active_chamber", "active",
+    "chamber",
+}
+
+
+def _reject_json_constant(value: str) -> None:
+    """Reject JavaScript constants that Python's JSON decoder accepts by default."""
+    raise FrameContractError(f"non-finite JSON number '{value}' is not allowed")
+
+
+def _validate_variables(variables: Any, *, flat: bool = False) -> None:
+    if not isinstance(variables, dict):
+        raise FrameContractError("'vars' must be a JSON object")
+
+    for name, value in variables.items():
+        if flat and name in _ENVELOPE_FIELDS:
+            continue
+        if not isinstance(name, str) or not name:
+            raise FrameContractError("variable names must be non-empty strings")
+        if name in _ENVELOPE_FIELDS:
+            raise FrameContractError(f"variable name '{name}' is reserved for the envelope")
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            continue
+        if isinstance(value, float) and math.isfinite(value):
+            continue
+        raise FrameContractError(
+            f"variable '{name}' must be a finite JSON number or boolean scalar"
+        )
 
 
 class Framer:
@@ -52,14 +91,19 @@ class Framer:
         `raw` is the normalized dict parsed from the cRIO line. It may carry its own
         `ts`/`cycle_id`; if so we keep them (timing measured at the source).
         """
-        warnings = []
-        incoming = raw.get("vars", raw)  # accept either {vars:{...}} or a flat dict
+        if not isinstance(raw, dict):
+            raise FrameContractError("top-level telemetry value must be a JSON object")
 
-        vars_out: Dict[str, float] = {}
+        warnings = []
+        structured = "vars" in raw
+        incoming = raw["vars"] if structured else raw
+        # Direct callers retain the legacy flat-dict API. Network input is stricter:
+        # parse_line() requires an explicit vars object before build() is reached.
+        _validate_variables(incoming, flat=not structured)
+
+        vars_out: Dict[str, Any] = {}
         for k, v in incoming.items():
-            if k in ("schema_version", "mode", "run_id", "source_id", "src",
-                     "cycle_id", "seq", "ts", "source_op_state", "op_state",
-                     "active_chamber", "active", "chamber"):
+            if k in _ENVELOPE_FIELDS:
                 continue
             if k not in self._allowed:
                 if self.cfg.strict_fields:
@@ -97,19 +141,21 @@ class Framer:
 
     @staticmethod
     def dumps(frame: Dict) -> str:
-        return json.dumps(frame, separators=(",", ":"))
+        return json.dumps(frame, separators=(",", ":"), allow_nan=False)
 
 
 def parse_line(line: str) -> Dict:
-    """Parse an inbound cRIO line. JSON preferred; CSV 'k=v,k=v' tolerated."""
+    """Parse and validate one inbound structured telemetry JSON object."""
     line = line.strip()
     if not line:
         return {}
-    if line[0] in "{[":
-        return json.loads(line)
-    out: Dict = {}
-    for tok in line.split(","):
-        if "=" in tok:
-            k, v = tok.split("=", 1)
-            out[k.strip()] = v.strip()
-    return out
+    try:
+        raw = json.loads(line, parse_constant=_reject_json_constant)
+    except json.JSONDecodeError as exc:
+        raise FrameContractError(f"invalid telemetry JSON: {exc.msg}") from exc
+    if not isinstance(raw, dict):
+        raise FrameContractError("top-level telemetry value must be a JSON object")
+    if "vars" not in raw:
+        raise FrameContractError("top-level telemetry object must contain a 'vars' object")
+    _validate_variables(raw["vars"])
+    return raw

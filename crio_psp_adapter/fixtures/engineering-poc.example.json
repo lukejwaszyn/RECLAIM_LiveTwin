@@ -1,0 +1,15 @@
+{
+  "vars": {
+    "PL_top_condenser_temp": 0.0,
+    "PL_bottom_condenser_temp": 0.0,
+    "MT_top": 0.0,
+    "MT_bottom": 0.0,
+    "PL_bottom1": 0.0,
+    "PL_bottom2": 0.0,
+    "PL_bottom3": 0.0,
+    "PL_bottom4": 0.0,
+    "PL_chamber_pressure": 760.0,
+    "PL_output_pressure": 0.0,
+    "PL_surface_temp": 20.0
+  }
+}

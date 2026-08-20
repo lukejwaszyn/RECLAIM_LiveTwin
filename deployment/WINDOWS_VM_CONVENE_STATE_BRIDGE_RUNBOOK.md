@@ -22,10 +22,17 @@ telemetry producer or control system.
 
 ## Safety contract and publication lease
 
-Every successful live payload includes `bridge_valid_until`, normally five seconds
-after `bridge_observed_at`. Convene must compare its own current UTC clock to this
-deadline. This is required because a persistent Windows sharing violation can stop
-the bridge from replacing the last complete file.
+Every successful live payload includes `bridge_valid_until`, normally 45 seconds
+after `bridge_observed_at`. The VM publisher reads the file on a 30-second
+heartbeat, so a lease shorter than that heartbeat can expire a healthy payload
+before its next publication. Convene must compare its own current UTC clock to
+this deadline. This is required because a persistent Windows sharing violation
+can stop the bridge from replacing the last complete file.
+
+The 45-second lease is only a downstream publication fallback. It does not
+extend telemetry freshness: the bridge still evaluates
+`freshness_limit_ms: 15000`, polls the engine independently, and publishes
+`data_live=false` when engine state exceeds 15 seconds.
 
 The operator view's single effective predicate is:
 
@@ -147,7 +154,9 @@ Required review points:
 - `bridge_source_sha` is the exact reviewed bridge SHA and `engine_source_sha` is
   the exact deployed engine SHA;
 - `freshness_limit_ms` is `15000` unless a reviewed decision changes it;
-- `lease_duration_ms` remains longer than poll interval plus request timeout;
+- `publisher_heartbeat_ms` is `30000`, matching the installed publisher;
+- `lease_duration_ms` is `45000` and remains greater than
+  `publisher_heartbeat_ms`; this lease does not relax `freshness_limit_ms`;
 - prefix starts as `passthrough`; and
 - output remains the installed VM agent's `C:\ConveneAgent\sim_vars.json`.
 
@@ -171,8 +180,9 @@ Logs contain identity/sequence/status information but no token or full state dum
 1. Confirm startup publishes `data_live=false` before the first valid poll.
 2. Confirm valid synthetic live state advances run/source/sequence and produces
    `data_live=true` with a future `bridge_valid_until`.
-3. Stop telemetry and prove the view becomes `DATA NOT LIVE` within the approved
-   freshness window.
+3. Stop telemetry and prove the bridge publishes `data_live=false` when engine
+   state exceeds the 15-second freshness window. Do not wait 45 seconds: the
+   lease is not the engine-freshness threshold.
 4. Hold an exclusive lock that forces replacement beyond the retry interval. Prove
    the local health record reports `write_failed` and the Convene view becomes
    `DATA NOT LIVE` when the last published lease expires.
