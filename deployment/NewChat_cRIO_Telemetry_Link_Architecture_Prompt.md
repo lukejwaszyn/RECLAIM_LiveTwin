@@ -40,6 +40,9 @@ Name the cRIO, Windows 10 edge gateway, Windows Server 2025 VM, or Convene.
   interface; port 9080 remains loopback-only.
 - A synthetic frame already proved edge gateway -> VM and edge gateway -> desktop
   Convene `gw_` fan-out.
+- A later five-minute stream delivered 300/300 frames to the VM; the operator
+  confirmed predictive processing and the separate VM `sim_` Convene display.
+  Treat every downstream boundary as commissioned for synthetic input.
 - No real cRIO frame has reached the gateway.
 - The repository does not establish the cRIO model, LabVIEW version, deployed
   startup VI, project source/revision, current data-export seam, or deployment

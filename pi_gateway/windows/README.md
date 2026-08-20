@@ -130,6 +130,19 @@ This creates explicitly labeled `COMMISSIONING-NOT-CRIO-*` data in both the VM
 and desktop Convene `gw_` view. Run it once, retain the JSON evidence, and do not
 confuse its values with physical measurements.
 
+To span the predictive-state bridge and multiple Convene heartbeats, run a
+bounded five-minute, 1 Hz stream through the same guarded ingress:
+
+```powershell
+.\pi_gateway\windows\send-commissioning-stream.ps1 `
+  -VmBaseUrl 'https://REPLACE-WITH-CURRENT-TUNNEL.trycloudflare.com'
+```
+
+Every frame is labeled `COMMISSIONING-STREAM-NOT-CRIO-*`; the script aborts if a
+real cRIO session is present or attempts to connect, then requires exact desktop
+receive and VM-ingest counts, a Convene delivery advance, an empty queue, and no
+new dead letters.
+
 ```powershell
 Invoke-RestMethod http://127.0.0.1:9080/health
 Invoke-RestMethod http://127.0.0.1:9080/latest

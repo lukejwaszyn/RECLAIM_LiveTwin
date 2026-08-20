@@ -10,8 +10,10 @@
 >
 > **Commissioning baseline commit:** `322d333`
 >
-> **Overall live status:** **NO-GO** until a real cRIO frame traverses all three
-> endpoints and the evidence in §8 passes.
+> **Overall live status:** downstream synthetic commissioning is **PASS** from
+> Endpoint 1 through both Convene views; physical/live status remains **NO-GO**
+> until a real cRIO frame traverses all three endpoints and the evidence in §8
+> passes.
 
 ## 1. The three endpoints are distinct
 
@@ -93,8 +95,9 @@ The two arrows into Convene are intentionally independent:
 | VM route | Current Quick Tunnel is `https://renewal-conclude-associates-relief.trycloudflare.com/ingest`; temporary and must be re-finalized if restarted |
 | Production config | Live HTTPS URL/token finalized; active file and one token-bearing backup verified as SYSTEM/Administrators only |
 | Synthetic fan-out | **PASS** at `2026-08-19T20:45:20Z`; desktop receive, VM ingest, and desktop Convene publish all advanced once |
+| VM predictive/`sim_` display | Operator-confirmed working after the five-minute sustained synthetic run |
 | Real cRIO frame | **Not yet observed** |
-| Tests | 26 gateway tests and 63 bridge/operator-workflow tests passed |
+| Tests | 27 gateway tests and 63 bridge/operator-workflow tests passed |
 
 ### 3.1.1 Retained commissioning evidence
 
@@ -114,12 +117,47 @@ be treated as a physical measurement:
 | VM accepted active run | `8a7ba244-0535-476b-ba1c-961822e05cc9` |
 | cRIO peer reachability after test | `192.168.1.2`, two replies |
 
-The commissioning record proves the desktop gateway's two outbound paths and the VM ingress service.
-It does **not** prove the cRIO field names/types, predictive-engine processing,
-the VM-specific `sim_` Convene writer, stale-state behavior, or restart recovery.
-Until a real run supersedes it, the desktop `/latest` record and VM
-`active_run_id` identify the commissioning frame; operators must continue to
-treat it as synthetic and not as current physical process state.
+The one-frame record proves the desktop gateway's two outbound paths and the VM
+ingress service. On its own it does **not** prove the cRIO field names/types,
+predictive-engine processing, the VM-specific `sim_` Convene writer, stale-state
+behavior, or restart recovery; later sustained evidence closes the downstream
+synthetic-processing and `sim_` publication boundaries.
+At the time of the one-frame proof, the desktop `/latest` record and VM
+`active_run_id` identified that commissioning frame. Every later commissioning
+run remained synthetic and must not be treated as physical process state.
+
+### 3.1.2 Five-minute sustained commissioning evidence
+
+A second guarded run completed at `2026-08-19T23:59:12Z` after restarting the
+gateway to generate a fresh run identity. Every value remained explicitly
+synthetic:
+
+| Evidence | Value |
+|---|---|
+| `cycle_id` | `COMMISSIONING-STREAM-NOT-CRIO-20260819T235411Z` |
+| `source_id` | `reclaim-commissioning-desktop-stream` |
+| Canonical `run_id` | `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2` |
+| Requested / actual duration | `300 s` / `300.019 s` |
+| Cadence / frames | `1000 ms` / `300` |
+| Gateway receive delta | `300` |
+| VM ingest delta | `300` |
+| Desktop Convene delivered / coalesced | `296` / `4` |
+| Desktop Convene failed | `0` |
+| Queue depth after run | `0` |
+| New dead letters | `0` |
+| VM active run after run | `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2` |
+| Runner result | **PASS** |
+
+The retained 53 dead letters predate the successful run and came from an aborted
+attempt that reused a gateway run ID already retired by a VM-side acceptance
+run. They were preserved as evidence. The clean run minted a new gateway run ID
+and added none. The sustained proof validates cRIO-style desktop ingress, durable
+VM delivery, and desktop `gw_` Convene publication. The operator subsequently
+confirmed that predictive processing and the separate VM-originated `sim_`
+Convene display also worked during the synthetic stream. Together, those
+observations commission every downstream boundary starting at Endpoint 1. They
+do not validate the real cRIO/LabVIEW producer, its schema, units, cadence, or
+live three-column agreement.
 
 ### 3.2 Desktop data handling order
 
@@ -568,20 +606,26 @@ token to the other endpoint.
 - Production loader rejects placeholder/non-TLS configuration.
 - Tests and GitHub branch publication.
 
+### Complete downstream of the cRIO seam
+
+- Five-minute synthetic stream delivered exactly 300 of 300 frames to the VM.
+- Predictive processing was reported active on Endpoint 2.
+- Desktop `gw_` and VM `sim_` displays were both confirmed in Convene.
+- Independent credentials, namespaces, and writers remained separated.
+- Queue drained to zero with no new dead letters or Convene failures.
+
 ### Remaining/blocking
 
 1. Configure the cRIO/LabVIEW sender for `192.168.1.1:9070` and emit one real
    newline-delimited frame.
 2. Retain that first real frame and reconcile its names, types, units, chamber,
    state, and cycle semantics before tightening schema enforcement.
-3. On the VM, prove the accepted run/source/sequence reaches the predictive
-   engine rather than only the `/ingest` service.
-4. Prove the VM's separate publisher writes fresh `sim_` stakeholder values to
-   its own Convene machine while the desktop continues writing only `gw_`.
-5. Decide whether to replace the temporary Quick Tunnel with a durable named
+3. Sustain the real source long enough to correlate LabVIEW indicators, desktop
+   `gw_`, VM predictive state, and VM `sim_` through state transitions.
+4. Decide whether to replace the temporary Quick Tunnel with a durable named
    tunnel or document/rehearse re-finalization whenever its hostname changes.
-6. Exercise source-stop/stale behavior and confirm no stale value remains green.
-7. Record desktop and VM restart recovery only after the live path passes.
+5. Exercise real-source stop/stale behavior and confirm no stale value remains green.
+6. Record cRIO, desktop, and VM restart recovery only after the live path passes.
 
 ## 8. End-to-end acceptance gate
 
@@ -595,8 +639,10 @@ Do not call the three-endpoint path live until all boxes pass:
       the labeled synthetic commissioning frame.
 - [ ] VM `/state` carries the same run/source/sequence and fresh source time.
 - [ ] Predictive values respond to the correct chamber and operating state.
-- [ ] VM bridge publishes the separate `sim_` stakeholder set.
-- [ ] Convene shows both distinct machines/namespaces with no duplicate writer.
+- [x] VM bridge publishes the separate `sim_` stakeholder set for the synthetic
+      commissioning stream; operator-confirmed in Convene.
+- [x] Convene shows the distinct desktop `gw_` and VM `sim_` views for synthetic
+      commissioning with no reported duplicate writer.
 - [ ] `gw_` raw values and `sim_` derived values agree after documented
       conversion/aggregation.
 - [ ] Source stop produces stale/not-live behavior; no stale value remains green.

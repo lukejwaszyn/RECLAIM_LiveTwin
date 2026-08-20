@@ -50,3 +50,20 @@ def test_commissioning_sender_is_one_frame_guarded_and_credential_free():
     assert "agentToken" not in script
     assert "VmIngestedAdvanced" in script
     assert "ConveneDeliveredAdvanced" in script
+
+
+def test_commissioning_stream_is_bounded_labeled_and_credential_free():
+    script = (WINDOWS / "send-commissioning-stream.ps1").read_text(encoding="utf-8")
+    assert "SupportsShouldProcess" in script
+    assert "COMMISSIONING-STREAM-NOT-CRIO-" in script
+    assert "DurationSeconds = 300" in script
+    assert "FrameIntervalMilliseconds = 1000" in script
+    assert "The real cRIO attempted to connect" in script
+    assert "$nextCrioCheckSeconds = 10.0" in script
+    assert "gatewayProgress" not in script
+    assert "Retained pre-run dead letters" in script
+    assert "Gateway queue is not empty" in script
+    assert "RECLAIM_INGEST_TOKEN" not in script
+    assert "agentToken" not in script
+    assert "VmIngestedDelta" in script
+    assert "ConveneDeliveredDelta" in script
