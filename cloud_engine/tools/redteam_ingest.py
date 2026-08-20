@@ -3,8 +3,8 @@
 redteam_ingest.py — live acceptance harness for the RECLAIM cloud engine endpoint.
 
 A fake edge gateway that emits `reclaim.telemetry.v1` envelopes carrying the REAL
-cRIO/LabVIEW terminology (MW_power in W, PL_bottom1..4 / PL_surface_temp in degC,
-PL_chamber_pressure in mbar), pushes them at the engine (ideally THROUGH the
+cRIO/LabVIEW terminology (MW_power in provisionally W,
+PL_bottom1..4 / PL_surface_temp in degC, PL_chamber_pressure in Torr), pushes them at the engine (ideally THROUGH the
 Cloudflare tunnel), and asserts two things end to end:
 
   A. INGEST PIPELINE CONTRACT is intact — auth on /ingest, read-token gating on
@@ -66,14 +66,15 @@ def main() -> int:
     def now(off=0.0):
         return (datetime.now(timezone.utc) + timedelta(seconds=off)).isoformat().replace("+00:00", "Z")
 
-    def lv(bed_c, wall_c, mw, process=True, p_mbar=50.0):
-        # raw LabVIEW channel names + degC/mbar/W, pre-normalization (labview_map.py)
+    def lv(bed_c, wall_c, mw, process=True, p_torr=37.5031):
+        # Raw LabVIEW names + degC/Torr/provisional-W, pre-normalization.
+        # 37.5031 Torr retains the former fixture's physical intent of ~5 kPa.
         pre = "PL_" if CH == "PL" else "MT_"
         d = {"MW_power": mw, "MW_reverse": mw * 0.02, "MW_RF": True, "MW_status": True, "MW_freq": 2.45e9}
         if CH == "PL":
             d.update({"PL_bottom1": bed_c, "PL_bottom2": bed_c + 1, "PL_bottom3": bed_c - 1,
                       "PL_bottom4": bed_c, "PL_surface_temp": wall_c,
-                      "PL_chamber_pressure": p_mbar, "PL_output_pressure": p_mbar * 1.02,
+                      "PL_chamber_pressure": p_torr, "PL_output_pressure": p_torr * 1.02,
                       "PL_process": process, "PL_chamber_pump": True})
         else:
             d.update({"MT_bottom": bed_c, "MT_top": wall_c})

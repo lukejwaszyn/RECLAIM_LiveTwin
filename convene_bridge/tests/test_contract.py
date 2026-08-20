@@ -99,7 +99,7 @@ def test_enrichment_adds_live_metadata_and_expiring_lease(
     )
     assert result["data_live"] is True
     assert result["bridge_status"] == "ok"
-    assert result["bridge_valid_until"] == "2026-08-17T12:00:06.000Z"
+    assert result["bridge_valid_until"] == "2026-08-17T12:00:46.000Z"
     assert result["engine_source_sha"] == "a" * 40
     assert result["bridge_source_sha"] == "b" * 40
     assert result["freshness_limit_ms"] == 15_000

@@ -137,4 +137,4 @@ def test_write_failure_relies_on_previously_published_expiring_lease(
     assert bridge.run_once() is False
     retained = writer.payloads[0]
     assert retained["data_live"] is True
-    assert retained["bridge_valid_until"] == "2026-08-17T12:00:06.000Z"
+    assert retained["bridge_valid_until"] == "2026-08-17T12:00:46.000Z"

@@ -175,14 +175,14 @@ def test_restart_with_state_file_does_not_double_step(tmp_path):
 
 # --------------------------------------------- C6: no fabricated measurements
 
-def test_unwired_chamber_is_not_stepped_and_publishes_no_invented_temperature():
+def test_zero_celsius_is_a_valid_measurement_without_quality_evidence():
     engine = DualPushEngine(production=True)
-    out = engine.ingest(_frame())    # all MT TCs read 0.0 (unwired)
+    out = engine.ingest(_frame())
 
-    assert out["MT_sensor_valid"] is False
-    assert "MT_T_bed_meas" not in out            # no fabricated 300 K
-    assert "MT_T_bed_est" not in out
-    assert out["PL_sensor_valid"] is True        # PL stepped normally
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_T_bed_meas"] == 273.15
+    assert out["MT_T_wall_meas"] == 273.15
+    assert out["PL_sensor_valid"] is True
     assert out["PL_T_bed_est"] > 0
 
 
@@ -190,6 +190,8 @@ def test_active_chamber_with_no_sensors_raises_sensor_missing_event():
     engine = DualPushEngine(production=True)
     f = _frame(active_chamber="MT")
     f["vars"]["PL_process"] = False
+    del f["vars"]["MT_top"]
+    del f["vars"]["MT_bottom"]
     out = engine.ingest(f)
     assert "MT:SENSOR_MISSING" in out["last_event"]
 
@@ -214,11 +216,11 @@ def test_explicit_none_active_chamber_is_never_overridden_by_inference():
 def test_seal_leak_detected_during_evacuate_with_kpa_input():
     engine = DualPushEngine(production=True)
     base = _now()
-    # chamber stuck at ~1 atm (1013 mbar -> 101.3 kPa) while evacuating: leak.
+    # Chamber stuck at ~1 atm (760 Torr -> 101.325 kPa) while evacuating: leak.
     for i, seq in enumerate([1, 2, 3], start=0):
         f = _frame(seq=seq, source_op_state="S_Evacuate",
                    ts=(base + timedelta(seconds=2 * i)).isoformat())
-        f["vars"]["PL_chamber_pressure"] = 1013.0
+        f["vars"]["PL_chamber_pressure"] = 760.0
         f["vars"]["MW_power"] = 0.0
         out = engine.ingest(f)
     assert out["PL_seal_residual"] > 500          # sensible Pa-scale residual
@@ -230,7 +232,7 @@ def test_seal_monitor_silent_outside_evacuation_phase():
     base = _now()
     for i, seq in enumerate([1, 2, 3], start=0):
         f = _frame(seq=seq, ts=(base + timedelta(seconds=2 * i)).isoformat())
-        f["vars"]["PL_chamber_pressure"] = 1013.0   # atmospheric during heating
+        f["vars"]["PL_chamber_pressure"] = 760.0   # atmospheric during heating
         out = engine.ingest(f)
     assert out["PL_seal_residual"] == 0.0
     assert "SEAL_LEAK" not in out["last_event"]

@@ -7,9 +7,11 @@ live path.
 ## Fixed topology
 
 ```text
-cRIO 192.168.1.2
-  -> TCP 192.168.1.1:9070
-Windows 10 gateway
+cRIO 192.168.1.2 / Scan Engine network-published variables
+  -> NI-PSP read over the isolated Ethernet link
+Windows 10 input-only PSP adapter
+  -> compact LF-delimited TCP to 192.168.1.1:9070 on the same desktop
+Windows 10 gateway process
   -> durable SQLite queue
   -> authenticated HTTPS /ingest through the VM Cloudflare hostname
 Windows Server 2025 predictive-engine VM
@@ -39,8 +41,14 @@ Re-audit or idempotently reapply from elevated PowerShell:
 .\pi_gateway\windows\configure-crio-network-firewall.ps1 -Mode Apply
 ```
 
-Configure the cRIO/LabVIEW sender to `192.168.1.1:9070`. Do not add a gateway to
-the cRIO-facing Ethernet interface.
+Do not configure or deploy a cRIO/LabVIEW TCP sender. The selected source is the
+separate input-only Windows subscriber in `crio_psp_adapter`, which reads an
+explicit POC allowlist and is the sole TCP writer to `192.168.1.1:9070`. Replace
+that POC allowlist with the controls-approved production allowlist only after the
+mapping gate passes.
+The narrow inbound cRIO firewall rule remains unchanged as defensive historical
+configuration, but it is not evidence of the selected adapter path. Do not add a
+default gateway to the cRIO-facing Ethernet interface.
 
 ## 2. Desktop Convene identity and `gw_` audit tap
 
@@ -118,8 +126,9 @@ exposed 9080 rules, and conflicting listeners.
 
 ## 6. Live acceptance evidence
 
-Before direct cRIO operation, one supervised synthetic frame may be used to prove
-both outbound paths. The script refuses to run while the real cRIO is connected:
+Before the PSP adapter is connected to the gateway, one supervised synthetic
+frame may be used to prove both outbound paths. The script refuses to run while
+a live source session is connected:
 
 ```powershell
 .\pi_gateway\windows\send-commissioning-frame.ps1 `
@@ -139,19 +148,40 @@ bounded five-minute, 1 Hz stream through the same guarded ingress:
 ```
 
 Every frame is labeled `COMMISSIONING-STREAM-NOT-CRIO-*`; the script aborts if a
-real cRIO session is present or attempts to connect, then requires exact desktop
+live adapter session is present or attempts to connect, then requires exact desktop
 receive and VM-ingest counts, a Convene delivery advance, an empty queue, and no
 new dead letters.
+
+### Current live PSP engineering POC
+
+The input-only Windows adapter has exercised the selected live seam at an
+observed sustainable cadence of one frame every three seconds. Nominal 1 Hz
+produced downstream `timestamp_stale` rejections and is not an accepted live
+cadence. Current source coverage is eight provisional contract-named
+thermocouples plus `scan_Mod3_AI0_raw`, `scan_Mod3_AI1_raw`, and
+`scan_Mod3_AI2_raw`. It does not provide `MW_*`, `PL_purge_pump`, the remaining
+process fields, or authoritative state/chamber/cycle metadata.
+
+The gateway forwards only fields present in the current frame. A Convene `gw_`
+value retained from an earlier synthetic or live frame must be shown unavailable
+when its source field is absent or its provenance/freshness does not match the
+current frame. In particular, do not interpret retained `gw_MW_*` or
+`gw_PL_purge_pump` values as current live telemetry.
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:9080/health
 Invoke-RestMethod http://127.0.0.1:9080/latest
 ```
 
-Do not claim cutover until all are factual:
+Do not claim cutover or full-cycle operation until all are factual:
 
-- A real cRIO frame appears at `/latest` with live mode, source/run/sequence,
-  state/chamber, and raw variables.
+- A full-contract PSP-adapter frame appears at `/latest` with live mode,
+  source/run/sequence, authoritative state/chamber/cycle/time, and the approved
+  raw variables.
+- Every required contract name is present with approved units, types, scaling,
+  range, and invalid semantics; absent fields are explicitly unavailable rather
+  than displaying retained values.
+- The approved cadence remains fresh without `timestamp_stale` rejection.
 - The durable queue drains through authenticated TLS with no unexpected drops or
   dead letters, and the VM state reflects the same sequence.
 - `/health` reports successful direct Convene publishes with no unexplained

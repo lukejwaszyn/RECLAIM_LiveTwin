@@ -11,9 +11,10 @@
 > **Commissioning baseline commit:** `322d333`
 >
 > **Overall live status:** downstream synthetic commissioning is **PASS** from
-> Endpoint 1 through both Convene views; physical/live status remains **NO-GO**
-> until a real cRIO frame traverses all three endpoints and the evidence in §8
-> passes.
+> Endpoint 1 through both Convene views, and the Windows input-only PSP adapter
+> has passed a partial engineering transport POC. Full physical/live status
+> remains **NO-GO** until an authoritative full-contract adapter stream traverses
+> all three endpoints and the evidence in §8 passes.
 
 ## 1. The three endpoints are distinct
 
@@ -22,16 +23,20 @@ services, or deployment procedures.
 
 | Endpoint | Platform | Owns | Sends to Convene as |
 |---|---|---|---|
-| **1 — Desktop edge gateway** | Dedicated Windows 10 edge-gateway laptop | cRIO TCP ingress, canonical framing, durable outbound queue, Cloudflare-bound VM delivery, raw audit publication | `gw_` |
+| **1 — Desktop edge gateway** | Dedicated Windows 10 edge-gateway laptop | input-only cRIO PSP subscription, local adapter TCP ingress, canonical framing, durable outbound queue, Cloudflare-bound VM delivery, raw audit publication | `gw_` |
 | **2 — Predictive-engine VM** | Cloud-hosted Windows Server 2025 | `/ingest`, predictive algorithms, derived stakeholder state, VM state bridge, separate VM Convene publisher/binding | `sim_` |
 | **3 — Convene** | External Convene service/UI | Displays the independent desktop audit and VM predictive/stakeholder views | Receives both, but does not fuse their credentials or writers |
 
 ### Non-negotiable topology
 
 ```text
-cRIO / LabVIEW (authoritative raw telemetry)
+cRIO / Scan Engine (authoritative raw telemetry)
   |
-  | direct Ethernet, newline-delimited TCP to 192.168.1.1:9070
+  | NI-PSP read over the isolated Ethernet link
+  v
+WINDOWS INPUT-ONLY PSP ADAPTER (on Endpoint 1; no cRIO deploy or write API)
+  |
+  | compact newline-delimited TCP to 192.168.1.1:9070 on the same desktop
   v
 ENDPOINT 1 — WINDOWS 10 DESKTOP EDGE GATEWAY
   |
@@ -54,6 +59,12 @@ ENDPOINT 3 — CONVENE
   - VM machine/view: sim_ estimates, margins, health, advisories, stakeholder values
 ```
 
+The Windows adapter, not the cRIO startup application, owns the sole TCP writer
+to port 9070 in the selected design. The cRIO remains the physical source of
+truth through its existing network-published variables. Do not deploy a new
+cRIO sender or treat the historical cRIO-only 9070 firewall rule as proof of the
+adapter-to-gateway hop.
+
 The two arrows into Convene are intentionally independent:
 
 - The **desktop** uses a Convene pairing code to obtain its desktop machine
@@ -71,7 +82,7 @@ The two arrows into Convene are intentionally independent:
 | VM is the only `sim_` writer | VM state bridge and VM-specific binding scripts own derived stakeholder publication. |
 | Convene is visualization/consumer | Convene values never become cRIO, microwave, PLC, HMI, or actuator commands. |
 | Cloud-returned `/command` is advisory only | It may be observed locally but remains disconnected from all actuation. |
-| cRIO is the raw source of truth | The first real frame must be retained and compared with the expected contract before strict schema enforcement. |
+| cRIO is the raw source of truth | The first full-contract adapter frame must be retained and compared with the expected contract before strict schema enforcement. |
 | VM delivery is durable; desktop Convene audit is best effort | Convene cannot block or acknowledge the SQLite queue feeding the VM. |
 
 ## 3. Endpoint 1 — Windows 10 desktop edge gateway
@@ -96,7 +107,8 @@ The two arrows into Convene are intentionally independent:
 | Production config | Live HTTPS URL/token finalized; active file and one token-bearing backup verified as SYSTEM/Administrators only |
 | Synthetic fan-out | **PASS** at `2026-08-19T20:45:20Z`; desktop receive, VM ingest, and desktop Convene publish all advanced once |
 | VM predictive/`sim_` display | Operator-confirmed working after the five-minute sustained synthetic run |
-| Real cRIO frame | **Not yet observed** |
+| Live PSP engineering frame | **Transport observed through the input-only Windows adapter:** eight Mod2 TC scans plus three Mod3 analog scans. The evidence-gated source profile uses only `scan_Mod2_TCn_degC` and `scan_Mod3_AIn_raw`; revised-profile deployment is not claimed. |
+| Observed live POC cadence | One frame every 3 seconds sustained; nominal 1 Hz caused downstream `timestamp_stale` rejection and is not approved |
 | Tests | 27 gateway tests and 63 bridge/operator-workflow tests passed |
 
 ### 3.1.1 Retained commissioning evidence
@@ -161,7 +173,7 @@ live three-column agreement.
 
 ### 3.2 Desktop data handling order
 
-For each valid cRIO line:
+For each valid PSP-adapter line:
 
 1. Parse and construct the canonical frame.
 2. Persist the frame and sequence high-water mark in the SQLite VM queue.
@@ -198,7 +210,7 @@ Cleanup after stability is proven: remove unused/revoked desktop Convene records
 including credentialless test record `2rItUt06wMkwtuexiy89`. Do not delete the
 active desktop record while validating.
 
-### 3.4 Expected raw cRIO contract
+### 3.4 Expected raw cRIO-derived contract
 
 Required source metadata:
 
@@ -229,10 +241,45 @@ MW_flow_state              MW_RF
 MW_status
 ```
 
-The variable list is repository-derived, not live-observed. `strict_fields: false`
-preserves unexpected fields in the first real frame. Confirm names, types, units,
-and semantics before enabling a strict manifest. The predictive engine expects
-numeric values to be finite and the listed flags to be actual booleans.
+The complete variable list remains repository-derived and has not been confirmed
+by a full-contract live frame. `strict_fields: false` preserves unexpected
+fields. Confirm names, types, units, and semantics before enabling a strict
+manifest. The predictive engine expects numeric values to be finite and the
+listed flags to be actual booleans.
+
+The evidence-gated live PSP source profile covers only these eleven audit
+values:
+
+```text
+scan_Mod2_TC0_degC          scan_Mod2_TC1_degC
+scan_Mod2_TC2_degC          scan_Mod2_TC3_degC
+scan_Mod2_TC4_degC          scan_Mod2_TC5_degC
+scan_Mod2_TC6_degC          scan_Mod2_TC7_degC
+scan_Mod3_AI0_raw           scan_Mod3_AI1_raw
+scan_Mod3_AI2_raw
+```
+
+The Mod2 suffix records the known raw Celsius unit without claiming which panel
+or model signal a channel represents. The operator-panel screenshot at
+2026-08-19 22:37:54 EDT and sequence 1984 about 97 seconds later contradicted
+the former `TC2 -> MT_top` and `TC5..TC7 -> PL_bottom2..4` assignments.
+Repeated readings near 1379 were non-identifying, not evidence of invalid
+semantics. Offline replay also showed the old TC2/TC3 aliases could form a false
+complete MT measurement and drive `CRITICAL`/`SAFE_STATE`; consequently all
+eight Mod2 semantic aliases are quarantined until an approved, versioned
+mapping/quality profile exists. The NI-9205 values likewise retain scan-level
+names because their scaling to Torr or degrees Celsius is not approved. No
+canonical `PL_*`, `MT_*`, `MW_*`, process flag, or authoritative
+state/chamber/cycle source is present in this POC. It proves a live
+sensor/transport seam, not the complete naming or full-cycle contract. This
+describes the reviewed source shape and does not claim deployment.
+
+The observed sustainable POC cadence was one frame every three seconds. An
+attempt at nominal 1 Hz produced downstream `timestamp_stale` rejections; the
+cause and final cadence remain open. Missing fields are absent from the current
+frame. Any older Convene `gw_` value for an absent field—especially `gw_MW_*`
+or `gw_PL_purge_pump`—must be gated unavailable by current-frame presence,
+provenance, and freshness rather than displayed as live.
 
 ### 3.5 Desktop activation after VM handback
 
@@ -258,7 +305,7 @@ The finalizer prompts invisibly for the VM ingest token, protects backups and th
 active YAML with SYSTEM/Administrators-only ACLs, enables the direct desktop
 Convene publisher by credential reference, and validates the deployed loader.
 
-Do not use `transport: console` for live cRIO data; console transport acknowledges
+Do not use `transport: console` for live adapter data; console transport acknowledges
 frames without sending them to the VM.
 
 ### 3.6 Desktop verification
@@ -279,10 +326,10 @@ Invoke-RestMethod http://127.0.0.1:9080/latest |
 
 Expected binding:
 
-- `192.168.1.1:9070` for cRIO ingress.
+- `192.168.1.1:9070` for the local PSP-adapter ingress.
 - `127.0.0.1:9080` for local status only.
 
-`/health` must show cRIO receive count, VM delivered/queue/dead-letter counters,
+`/health` must show adapter receive count, VM delivered/queue/dead-letter counters,
 and the independent Convene `delivered`, `failed`, `coalesced`, and
 `last_success_age_s` counters.
 
@@ -384,7 +431,7 @@ vars
 ```
 
 The engine's `labview_map.py` converts the raw contract into chamber-tagged SI
-measurements, including °C→K, mbar→kPa, plastics bed-bank aggregation, and shared
+measurements, including °C→K, Torr→kPa, plastics bed-bank aggregation, and shared
 microwave-power attribution based on `active_chamber`. It then calculates the
 stakeholder-facing values: estimates, uncertainty/trust, margins, anomaly
 metrics, lifecycle state, forecasts, advisory severity/action, freshness, and
@@ -423,8 +470,11 @@ The desktop commissioning frame was accepted by VM ingress as run
 `sim_` update was observed in Convene. An accepted frame updates engine `/state`
 immediately; the estimator does not require a warm-up series. The remaining
 boundary is therefore `/state` -> `RECLAIMStateBridge` -> `sim_vars.json` -> the
-VM Convene agent/bindings. A single state also becomes stale after 15 seconds and
-can expire between downstream heartbeats.
+VM Convene agent/bindings. Engine freshness still fails closed at 15 seconds.
+Because the VM publisher reads on a 30-second heartbeat, a successful file uses
+a 45-second publication lease so a fresh payload is not expired before the next
+publisher read; that longer fallback lease does not relax the 15-second engine
+freshness predicate.
 
 After pulling branch `desktop/edge-gateway` on the VM, run from an elevated repository shell:
 
@@ -448,7 +498,8 @@ multiple VM bridge and Convene heartbeats, then proves stale expiry:
 ```
 
 The VM-only workflow validates predictive-state publication. A later sustained
-stream from the real cRIO must still prove the complete desktop-originated path.
+full-contract stream from the PSP adapter must still prove the complete
+desktop-originated path.
 
 ### 4.8 VM completion sequence
 
@@ -523,8 +574,9 @@ the relevant read-only output has been retained.
    approved named tunnel/DNS/Access policy or document and rehearse the exact
    endpoint re-finalization procedure after every Quick Tunnel restart.
 
-9. **Defer full restart acceptance until real cRIO data.** After a real cRIO
-   stream passes the three-endpoint correlation gate, restart Endpoint 1 and
+9. **Defer full restart acceptance until full-contract cRIO data.** After a
+   full-contract PSP-adapter stream passes the three-endpoint correlation gate,
+   restart Endpoint 1 and
    Endpoint 2 deliberately and prove task/service recovery, monotone identity,
    queue drainage, bridge lease behavior, and zero duplicate writers.
 
@@ -540,7 +592,7 @@ Convene receives two independently attributable views:
 
 - Writer: desktop machine credential created by the pairing-code workflow.
 - Prefix: `gw_`.
-- Content: raw cRIO values plus gateway provenance (`gw_run_id`, `gw_seq`,
+- Content: raw cRIO-derived adapter values plus gateway provenance (`gw_run_id`, `gw_seq`,
   source timestamp/state/chamber, etc.).
 - Purpose: prove exactly what left the hardware/gateway boundary.
 
@@ -567,10 +619,13 @@ gw_run_id / gw_seq / gw_ts / gw_source_op_state / gw_active_chamber
 sim_run_id / sim_seq / sim_ts_source / sim_source_op_state / sim_active_chamber
 ```
 
-Raw and derived values may use different units or aggregation. For example,
-`gw_PL_bottom1..4` are individual °C readings while `sim_PL_T_bed_meas` is a
-Kelvin bank aggregate. Apply the conversions in `CONVENE_GW_MAPPING.md` before
-declaring disagreement.
+Raw and derived values may use different units or aggregation. After an
+approved binding exists, for example, `gw_PL_bottom1..4` are individual °C
+readings while `sim_PL_T_bed_meas` is a Kelvin bank aggregate. The current
+evidence-gated POC publishes only `gw_scan_Mod2_TCn_degC` audit values and has no
+corresponding `sim_` measurement to compare. Apply the conversions in
+`CONVENE_GW_MAPPING.md` only to approved canonical bindings before declaring
+disagreement.
 
 Convene ONLINE status alone is not acceptance. Require changing values,
 freshness behavior, correct prefix ownership, and correlated source/sequence.
@@ -601,7 +656,9 @@ token to the other endpoint.
 - Desktop Convene pairing recovery/persistence tooling.
 - Direct nonblocking `gw_` `/machine/publish` implementation.
 - Live VM HTTPS configuration with exact secret ACL repair and verification.
-- SYSTEM boot task running with cRIO-only ingress and loopback-only status.
+- SYSTEM gateway boot task running with adapter-compatible ingress and
+  loopback-only status. The PSP adapter itself is not approved or installed as
+  a startup task.
 - One retained, explicitly synthetic dual-output commissioning pass.
 - Production loader rejects placeholder/non-TLS configuration.
 - Tests and GitHub branch publication.
@@ -616,11 +673,14 @@ token to the other endpoint.
 
 ### Remaining/blocking
 
-1. Configure the cRIO/LabVIEW sender for `192.168.1.1:9070` and emit one real
-   newline-delimited frame.
-2. Retain that first real frame and reconcile its names, types, units, chamber,
-   state, and cycle semantics before tightening schema enforcement.
-3. Sustain the real source long enough to correlate LabVIEW indicators, desktop
+1. Replace the partial engineering allowlist with the controls-approved PSP
+   channel, scaling, validity, and metadata allowlist; do not deploy a cRIO TCP
+   sender.
+2. Retain the first full-contract adapter frame and reconcile its names, types,
+   units, chamber, state, cycle, and time semantics before tightening schema
+   enforcement.
+3. Sustain the full source at an approved cadence without `timestamp_stale` long
+   enough to correlate LabVIEW indicators, desktop
    `gw_`, VM predictive state, and VM `sim_` through state transitions.
 4. Decide whether to replace the temporary Quick Tunnel with a durable named
    tunnel or document/rehearse re-finalization whenever its hostname changes.
@@ -631,8 +691,12 @@ token to the other endpoint.
 
 Do not call the three-endpoint path live until all boxes pass:
 
-- [ ] cRIO sends to `192.168.1.1:9070`; a real typed frame appears at `/latest`.
-- [ ] Gateway `/health` shows **real cRIO** frames and no unexplained local drops.
+- [x] The Windows input-only PSP adapter sends cRIO-derived engineering frames to
+      `192.168.1.1:9070`; a partial typed frame appears at `/latest`.
+- [ ] A full-contract typed adapter frame appears at `/latest` with approved
+      names, engineering units, validity semantics, and authoritative metadata.
+- [ ] Gateway `/health` shows the sustained full-contract adapter stream and no
+      unexplained local drops or `timestamp_stale` rejections.
 - [x] Desktop direct Convene counters show successful `gw_` publication for the
       labeled synthetic commissioning frame.
 - [x] Gateway queue drained over TLS through the current Cloudflare hostname for
@@ -645,6 +709,8 @@ Do not call the three-endpoint path live until all boxes pass:
       commissioning with no reported duplicate writer.
 - [ ] `gw_` raw values and `sim_` derived values agree after documented
       conversion/aggregation.
+- [ ] Fields absent from the current adapter frame are unavailable in Convene;
+      no retained `gw_MW_*`, `gw_PL_purge_pump`, or other old value appears live.
 - [ ] Source stop produces stale/not-live behavior; no stale value remains green.
 - [x] No command/advisory is connected to hardware actuation in the deployed
       desktop gateway path.

@@ -91,8 +91,9 @@ def test_gateway_raw_view_and_cloud_normalization_remain_distinct():
         "PL_bottom3": 99.0,
         "PL_bottom4": 100.0,
         "PL_surface_temp": 40.0,
-        "PL_chamber_pressure": 1000.0,
+        "PL_chamber_pressure": 760.0,
         "PL_process": True,
+        "PL_purge_pump": False,
         "MT_bottom": 0.0,
         "MT_top": 0.0,
         "MW_RF": True,
@@ -106,14 +107,33 @@ def test_gateway_raw_view_and_cloud_normalization_remain_distinct():
     # The gw_ machine reads this raw object and therefore retains LabVIEW units.
     assert frame == gateway_raw
     assert gateway_raw["vars"]["PL_bottom1"] == 100.0  # degC
-    assert gateway_raw["vars"]["PL_chamber_pressure"] == 1000.0  # mbar
+    assert gateway_raw["vars"]["PL_chamber_pressure"] == 760.0  # Torr
     assert gateway_raw["vars"]["MW_power"] == 3000.0  # shared W
 
     # The sim_ view receives normalized aggregate engine state in SI units, and
     # shared microwave power is attributed only to the declared active chamber.
     assert state["PL_T_bed_meas"] == 373.15
     assert state["PL_T_wall_meas"] == 313.15
-    assert state["PL_P_chamber"] == 100.0
+    assert state["PL_P_chamber"] == 101.325
     assert state["PL_P_fwd"] == 3000.0
     assert state["MT_P_fwd"] == 0.0
+    assert state["PL_process"] is True
+    assert state["PL_purge_pump"] is False
+    assert state["MW_RF"] is True
     assert "PL_T_bed_tc1" not in state
+
+
+def test_state_manifest_preserves_units_types_and_passthrough_names():
+    manifest = {
+        item["name"]: item
+        for item in DualPushEngine(production=True).svc.manifest()["variables"]
+    }
+
+    assert manifest["PL_T_bed_meas"]["unit"] == "K"
+    assert manifest["PL_T_bed_meas"]["dtype"] == "float"
+    assert manifest["PL_P_chamber"]["unit"] == "kPa"
+    assert manifest["PL_process"]["dtype"] == "bool"
+    assert manifest["MW_flow_state"]["dtype"] == "bool"
+    assert manifest["MW_flow_rate"]["unit"] == "provisional"
+    assert manifest["state_age_ms"]["unit"] == "ms"
+    assert manifest["seq"]["dtype"] == "int"

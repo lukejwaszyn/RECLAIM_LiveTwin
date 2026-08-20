@@ -4,7 +4,8 @@ engine_state_url: http://127.0.0.1:8078/state
 poll_interval_s: 1.0
 request_timeout_s: 3.0
 freshness_limit_ms: 15000
-lease_duration_ms: 5000
+publisher_heartbeat_ms: 30000
+lease_duration_ms: 45000
 output_path: C:\ConveneAgent\sim_vars.json
 prefix_mode: passthrough
 environment: earth_lab

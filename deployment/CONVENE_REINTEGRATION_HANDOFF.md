@@ -25,7 +25,7 @@ Automated coverage in `cloud_engine/tests/test_convene_binding_contract.py` and
   read, rather than frozen at ingest time;
 - the gateway frame preserves the raw LabVIEW values and never creates `sim_`
   keys;
-- cloud normalization converts °C→K and mbar→kPa; and
+- cloud normalization converts °C→K and Torr→kPa; and
 - shared SSMG forward/reflected power is attributed only to the declared active
   chamber.
 
