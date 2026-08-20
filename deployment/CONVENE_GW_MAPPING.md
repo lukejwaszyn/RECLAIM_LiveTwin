@@ -4,6 +4,12 @@
 > **Status:** LIVING reference. Confirm the 27 raw `vars` names against the first
 > real cRIO frame before trusting the mapping (GO_LIVE §9.5).
 
+> **Pressure-unit release blocker (2026-08-19):** the operator confirmed the
+> source pressure unit is Torr, not mbar. The tables below still describe the
+> currently deployed code's mbar assumption and must not be used for real-source
+> validation until `labview_map.py`, fixtures, tests, and this mapping are changed
+> together. Required conversion: `kPa = Torr * 0.1333224`.
+
 **Purpose.** Wire the laptop gateway into Convene as its **own machine**, publishing
 the `gw_` audit set defined in `convene/RECLAIM_Convene_Live_Binding.md`
 ("Gateway audit machine"). This is the §6 losslessness audit of the preflight:
