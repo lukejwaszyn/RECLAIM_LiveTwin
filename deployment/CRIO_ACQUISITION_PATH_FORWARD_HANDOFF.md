@@ -368,6 +368,7 @@ Any unchecked item keeps production declaration **NO-GO**.
 
 ## 8. Read next
 
+- `deployment/NewChat_cRIO_Source_Record_TCP_Implementation_Prompt.md`
 - `deployment/CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md`
 - `deployment/CRIO_PSP_LIVE_ADAPTER_HANDOFF.md`
 - `Past_Deprecated/deployment/CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`

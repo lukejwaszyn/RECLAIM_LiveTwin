@@ -42,6 +42,7 @@ Read roughly in this order.
 |---|---|
 | `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` | **Authoritative cRIO source decision** and full gate definitions (0–5): existing 34-field record → direct RT TCP, PSP fallback, staged gates, acceptance, rollback. |
 | `CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md` | Evidence-backed transport/authority trade study and controls discovery worksheet. |
+| `NewChat_cRIO_Source_Record_TCP_Implementation_Prompt.md` | Turnkey source-proof and controls-coordination prompt retained for implementation history and gate context. |
 | `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF.md` | The standing acceptance brief (role, boundary, endpoints, three-phase work). |
 | `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF_2.md` | **Current pickup.** Updates the brief's state (pre-flight green, Gate 3 checklist issued, cutover scripted, PL bed-bank finding) and folds in the next-session build scope (interfacing/deployment code + 1-command installer + scenarios). |
 | `CRIO_TELEMETRY_SOCKET_SETUP.md` | The single-socket contract, both ends (bind `192.168.1.1:9070`, framing, timeouts). |

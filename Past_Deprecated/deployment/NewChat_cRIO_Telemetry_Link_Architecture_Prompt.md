@@ -1,5 +1,9 @@
 # Prompt — cRIO/LabVIEW Telemetry Link Architecture and Integration
 
+> **Historical prompt:** the broad architecture phase is complete. For current
+> source-record implementation and controls coordination, use
+> `NewChat_cRIO_Source_Record_TCP_Implementation_Prompt.md`.
+
 You are continuing the RECLAIM Live Twin integration with a narrowly bounded
 task: architect and, only after explicit approval, implement the telemetry-only
 path from the cRIO/LabVIEW application to the dedicated Windows 10 edge gateway.
