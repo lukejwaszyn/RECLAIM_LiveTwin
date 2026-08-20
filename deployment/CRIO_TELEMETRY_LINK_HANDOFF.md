@@ -35,6 +35,7 @@ behavior. Returned gateway/cloud commands remain disconnected from hardware.
 | Firewall | Allows inbound TCP 9070 only from `192.168.1.2` on the Ethernet/Private seam |
 | Gateway status | Loopback only at `127.0.0.1:9080` |
 | Synthetic proof | One labeled frame traversed gateway -> VM and gateway -> desktop Convene |
+| Sustained downstream proof | 300/300 frames reached VM; predictive processing plus separate `gw_` and `sim_` Convene displays were operator-confirmed |
 | Real source proof | None; gateway receive count has not advanced from a cRIO frame |
 
 The actual cRIO model, operating system image, LabVIEW version, deployed startup

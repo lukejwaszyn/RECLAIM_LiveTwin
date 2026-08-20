@@ -24,11 +24,12 @@ infrastructure. There is no Linux host or Raspberry Pi in the live path. See
 | **BLOCKED** | Cannot be done yet. The blocker is named. |
 | **NOT DONE — DELIBERATE** | Achievable now, intentionally withheld. The reason is a safety constraint, not a scheduling one. Do not "helpfully" complete these. |
 
-**Current overall status: NO-GO for live data.** The physical cRIO link and
-gateway listener are proven, but no cRIO frame has arrived yet. The cloud endpoint
-and ingest token are still placeholders, the direct `gw_` publisher is staged
-but has no real frame to publish, and the boot task remains gated on manual
-end-to-end acceptance.
+**Current overall status: NO-GO only for real cRIO data.** The physical link,
+gateway listener/task, protected cloud configuration, sustained gateway-to-VM
+delivery, predictive processing, and independent Convene `gw_`/`sim_` displays
+are commissioned with synthetic input. No real cRIO frame has arrived; the
+remaining live gate is the LabVIEW telemetry producer plus real-source contract,
+three-column correlation, stale behavior, and restart evidence.
 
 ---
 
@@ -36,7 +37,7 @@ end-to-end acceptance.
 
 | # | Item | Evidence |
 |---|---|---|
-| 1.1 | Repo intact; gateway test suite green on this box | Refreshed suite: `25 passed in 1.39s` (`C:\RECLAIM\pi_gateway`, Python 3.13, pytest 9.1.1). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, H7 config gates, and the nonblocking direct Convene publisher. `cloud_engine` suite remains outside gateway staging. |
+| 1.1 | Repo intact; gateway test suite green on the gateway laptop | Current suite: `27 passed` (`C:\RECLAIM\pi_gateway` deployment venv). Covers the C1/H3 dead-letter contract, M7 seq high-water, M5 warn-once, §4.4 command relay, H7 config gates, the nonblocking direct Convene publisher, and guarded one-frame/five-minute Windows commissioning workflows. |
 | 1.2 | Gateway staged to its deployment location | `C:\RECLAIM\pi_gateway` — refreshed non-destructively from repository commit `a5908387451d38d5ef08d30bea66ec3aee2e2a17`; 14 files copied, 0 failed. The venv, production config, queue, and timestamped pre-refresh config backup were preserved. |
 | 1.3 | Deployment venv + runtime deps | `C:\RECLAIM\pi_gateway\.venv` (Python **3.13.0**). Installed: `pyyaml 6.0.3`, `requests 2.34.2`, `paho-mqtt 1.6.1` (correctly held `<2.0` by the M6 pin). |
 | 1.4 | Package imports from the staged tree | `import reclaim_edge, reclaim_edge.main` → OK, resolved from `C:\RECLAIM\pi_gateway\reclaim_edge\__init__.py`, version `0.1.0`. |
@@ -46,11 +47,11 @@ end-to-end acceptance.
 | 1.8 | Local console shakedown — process healthy without hardware or cloud | `config.console.yaml` (differs from `config.windows.yaml` on exactly two lines: `transport: console`, `listen_host: 127.0.0.1`). Ran 30 s. Clean start, no traceback. `/health`, `/latest`, `/command`, `/` all answered. `uptime_s` 5.0 → 15.2 → 26.9 with the supervisor loop polling worker liveness every 0.5 s throughout — no silent thread death (`main.py:56-66`). Health lines logged on the configured 10 s cadence. |
 | 1.9 | Loopback-only binding confirmed at the OS level | `netstat`: `127.0.0.1:9070` and `127.0.0.1:9080` LISTENING, same PID — never `0.0.0.0`. No inbound exposure created. Ports released on stop. |
 | 1.10 | Convene `gw_` audit mapping derived | `deployment/CONVENE_GW_MAPPING.md` — 36 variables (9 envelope + 27 raw channels), each with jsonPath into `http://127.0.0.1:9080/latest`, type, `sim_` counterpart, unit conversion, and code citation. Derived statically from `status.py`, `framer.py`, `receiver.py`, `labview_map.py`. |
-| 1.11 | Direct Convene `gw_` publisher implemented and staged | Convene-supplied `/api/machine/publish` contract integrated as `reclaim_edge.convene`: only scalar `gw_` names, one pending frame, nonblocking submit after durable VM enqueue, independent counters in `/health`, no `sim_` writes or VM acknowledgements. An empty-variable probe reached authenticated semantic validation (`HTTP 400 no variables to publish`, not 401) without creating a variable. Staged import/flatten gate passed. Real publish remains pending the first cRIO frame. |
+| 1.11 | Direct Convene `gw_` publisher implemented and commissioned | Convene-supplied `/api/machine/publish` contract integrated as `reclaim_edge.convene`: only scalar `gw_` names, one pending frame, nonblocking submit after durable VM enqueue, independent counters in `/health`, no `sim_` writes or VM acknowledgements. The five-minute proof delivered 296 audit updates and coalesced four while reporting zero failures. Real-source publication remains pending the first cRIO frame. |
 
 ---
 
-## 2. BLOCKED — §4.1 cRIO physical link and static IPs
+## 2. BLOCKED only on sender — §4.1 cRIO telemetry interface
 
 **Current blocker: the physical link, Private profile, scoped firewall rule, and
 gateway listener are proven, but the cRIO sender target, reverse-direction
@@ -100,49 +101,34 @@ console config — and why the boot task must not be installed yet (§6).
 
 ---
 
-## 3. BLOCKED — cloud ingress and tokens
+## 3. DONE for commissioning — cloud ingress and tokens
 
-**Blocker: the cloud engine endpoint is not provisioned and no tokens exist.**
+Endpoint 1 uses a protected live HTTPS configuration and the current Quick
+Tunnel. Endpoint 2 accepted all 300 frames in the sustained proof and reported
+the same active run. Tokens remain private and are not recorded in the repository.
 
-- [ ] Cloud dual engine deployed, bound **loopback only**, behind the
-      Cloudflare Tunnel (preflight §3)
-- [ ] Ingress hostname confirmed → set `cloud_url: https://<host>/ingest`
-- [ ] `RECLAIM_INGEST_TOKEN` generated (long, random) in the VM's
-      ACL-protected secret file → same value into gateway `auth_token`
-- [ ] `RECLAIM_READ_TOKEN` generated, distinct, for the GET routes
-      (`/state`, `/manifest`, `/history`, `/command`) used by the Convene
-      publisher and its native `.stp` visualization. `/health` stays open for probes
-- [ ] `RECLAIM_INGEST_STATE` configured (required under `--production`, so
-      run/seq identity survives a cloud restart — fix C4)
-- [ ] `curl https://<ingress>/health` reachable **from this laptop**, round-trip
-      times recorded
+- [x] Cloud dual engine deployed, bound **loopback only**, behind Cloudflare.
+- [x] Current Quick Tunnel `/ingest` hostname finalized in the gateway config.
+- [x] VM ingest credential stored in the VM secret file and protected gateway config.
+- [x] Distinct VM read credential supports the state bridge and `sim_` publication.
+- [x] Production ingest identity persistence is enabled.
+- [x] Public `/health` is reachable from the Windows 10 gateway laptop.
+- [x] Active config and token-bearing backup are restricted to SYSTEM and
+      Administrators by the corrected exact-ACL finalizer.
 
-### Current placeholder values — replace both
-
-```yaml
-cloud_url: PLACEHOLDER_CLOUD_INGRESS_NOT_PROVISIONED
-auth_token: PLACEHOLDER_RECLAIM_INGEST_TOKEN_NOT_PROVISIONED
-```
-
-**These placeholders will not stop the gateway from starting.** `config.py:131`
-checks only that `auth_token` is **non-empty**; any string passes. `cloud_url` is
-not validated at all. So a gateway started with these values loads cleanly and
-then fails every POST against a nonexistent host. **Replacing them is a human
-gate, not an enforced one** — treat it as a hard checklist item.
-
-- [ ] After entering real secrets, **restrict the ACL on
-      `C:\RECLAIM\pi_gateway\config.windows.yaml`** — it holds the ingest token
-      in cleartext; use an explicit restricted NTFS ACL.
-      Suggested: break inheritance, grant SYSTEM and Administrators only.
+Quick Tunnel hostnames remain ephemeral. Re-finalize Endpoint 1 whenever the
+hostname changes, or replace the Quick Tunnel with an approved named tunnel for
+unattended operation.
 
 ---
 
-## 4. NOT DONE — DELIBERATE — Windows Firewall inbound TCP 9070
+## 4. DONE — Windows Firewall inbound TCP 9070
 
-Withheld for this session by explicit guardrail. Required before the cRIO can
-connect, and **only** on the Private profile bound to the direct-link interface.
+The reviewed rule is active only on the Private direct-link Ethernet interface,
+with local `192.168.1.1`, remote `192.168.1.2`, and TCP 9070. Port 9080 remains
+loopback-only with no inbound allow rule.
 
-Command for the day it is authorized (do not run before §2 is complete):
+Applied rule shape (do not broaden):
 
 ```powershell
 New-NetFirewallRule -DisplayName "RECLAIM cRIO telemetry (9070)" `
@@ -162,7 +148,8 @@ loopback by design (`status.py:84`) and has no authentication (§9.4).
 
 **Rule evidence 2026-08-19:** enabled inbound TCP 9070, local
 `192.168.1.1`, remote `192.168.1.2`, Private profile, interface alias
-`Ethernet`; no explicit inbound 9080 rule and no 9070/9080 listener yet.
+`Ethernet`; no explicit inbound 9080 rule. The SYSTEM gateway now owns
+`192.168.1.1:9070` and loopback `127.0.0.1:9080`.
 Rollback is `configure-crio-network-firewall.ps1 -Mode Rollback` from an elevated
 PowerShell. Two pre-existing broad Private allow rules named `python.exe` target
 the user Python at
@@ -173,43 +160,36 @@ risk and must be dispositioned before a control-connected role.
 
 ---
 
-## 5. NOT DONE — DELIBERATE — `RECLAIM-EdgeGateway` boot task
+## 5. DONE for commissioning — `RECLAIM-EdgeGateway` boot task
 
-Withheld for this session by explicit guardrail.
+The guarded installer registered and started `RECLAIM-EdgeGateway` as SYSTEM
+after the network, firewall, config, and exact-ACL checks passed. The task was
+restarted once during commissioning to mint a fresh run ID after a VM-side
+acceptance run retired the prior identity; the VM then accepted all 300 frames.
 
-**Both installer preconditions are now satisfied** by this staging session:
-`install-gateway-task.ps1:18` checks for `.venv\Scripts\python.exe` (exists) and
-`:19` for `config.windows.yaml` (exists). The script does not merely register the
-task — line 40 **starts** it immediately.
-
-**If installed today it would repeatedly fail cloud delivery.** The staged bind
-address is now correct, but `cloud_url` and `auth_token` remain placeholders.
-The task's `-RestartCount 999 -RestartInterval 1 minute` also makes premature
-installation harder to diagnose. Keep the task absent until a manual run receives
-a real cRIO frame and the authenticated cloud path passes.
-
-**Ordering rule: install only after §2 (cRIO IPs) AND §3 (real cloud values) are
-both complete.** Not before, and not "just to test the registration."
-
-- [ ] §2 complete and verified
-- [ ] §3 complete and verified
-- [ ] Manual console run against the real `config.windows.yaml` succeeds first
-- [ ] `.\windows\install-gateway-task.ps1` run elevated
-- [ ] Task starts at boot with no login; survives a reboot
+- [x] §3 cloud configuration and connectivity verified
+- [x] Production config validated with protected ACL
+- [x] `install-gateway-task.ps1 -Start` run elevated
+- [x] Task runs as SYSTEM and owns the intended 9070/9080 listeners
+- [x] Controlled stop/start produced a new run and resumed successful delivery
+- [ ] Task starts at boot with no login; survives an intentional reboot
 - [ ] Failure restart verified (kill the process → returns within 1 min)
-- [ ] Clean stop verified (`Stop-ScheduledTask` → stays stopped, no resurrection)
+- [x] Clean stop/start verified with queue preservation
 
 Side effect to be aware of: the installer sets `RECLAIM_EDGE_CONFIG` as a
 **machine-level** environment variable (`:22`), which persists beyond the task.
 
 ---
 
-## 6. BLOCKED — §5 contract gates (all six)
+## 6. PARTIAL — §5 contract gates
 
-**Blocker: no cloud endpoint.** All six run from a trusted shell against the
-authenticated ingress. None can be exercised locally.
+Fresh sustained ingress, gateway-run supersession, VM predictive processing,
+and both Convene views are proven synthetically. Duplicate/cloud-restart and
+real-source freshness evidence remain open.
 
-- [ ] **Fresh frame** — one v1 frame → 1 accepted, 0 errors; `/state` shows
+- [x] **Synthetic fresh-stream gate** — 300 fresh frames accepted in the
+      sustained proof; Endpoint 2 processing and `sim_` display operator-confirmed.
+- [ ] **Real fresh frame** — one cRIO v1 frame accepted; `/state` shows
       `schema_version: reclaim.state.v1`, `mode: live`, `run_id`, `source_id`,
       `seq`, `ts_source`, `cycle_id`, `source_op_state`, singular `op_state`,
       `PL_op_state`, `MT_op_state`, `ingest_status: accepted`
@@ -220,7 +200,7 @@ authenticated ingress. None can be exercised locally.
       per-frame results: stale = `rejected/timestamp_stale/final`, fresh =
       `accepted`. On the laptop, confirm the stale frame lands in `/health`
       `dead_letter`, **not** back in the queue
-- [ ] **Gateway-restart gate** — restart the gateway task; new `run_id` →
+- [x] **Gateway-restart gate** — restart the gateway task; new `run_id` →
       cloud logs `RUN_SUPERSEDED`, keeps accepting, `active_run_id` updates,
       zero operator action
 - [ ] **Cloud-restart gate** — restart the ingest service, repost the last
@@ -231,20 +211,18 @@ authenticated ingress. None can be exercised locally.
 
 ---
 
-## 7. BLOCKED — §6 three-column V&V (the gateway audit machine)
+## 7. BLOCKED only on real-source V&V — §6 three-column audit
 
-**Blocker: needs both cRIO and cloud.** This is formal verification and
-validation of the data itself, and every later model discussion (ADR-001,
-ADR-002, estimator alternatives) inherits its basis.
+**Blocker: needs the real cRIO/LabVIEW producer.** Cloud, predictive processing,
+and both Convene mechanisms are commissioned synthetically; formal validation of
+names, units, state, chamber, cadence, and physical values needs the real source.
 
-- [ ] Gateway running against the real cloud endpoint, **no Convene binding
-      changed yet**
-- [ ] Laptop registered as its own Convene machine publishing the `gw_` set
+- [x] Gateway running against the current authenticated cloud endpoint
+- [x] Laptop registered as its own Convene machine publishing the `gw_` set
       per `deployment/CONVENE_GW_MAPPING.md` — separate namespace, read-only
       tap, never in the delivery path, **never writes `sim_*`**
-- [ ] Audit view built: three columns per signal (LabVIEW indicator, `gw_*`,
-      `sim_*`), with `gw_seq − sim_seq` and `sim_ingest_age_ms` as the live
-      lag readout
+- [x] Separate desktop `gw_` and VM `sim_` Convene displays confirmed for the
+      sustained synthetic stream
 - [ ] **Confirm the 27 raw `vars` names against the first real frame** and
       correct the mapping table if the stream differs (see §9.5)
 - [ ] Unit conversions applied in the view (°C→K, mbar→kPa) so unlike units do
@@ -256,8 +234,8 @@ ADR-002, estimator alternatives) inherits its basis.
 - [ ] §4.5 RF coexistence check: Wi-Fi pinned to 5 GHz, `last_ack_age_s` and
       `dead_letter` watched **during** `S_MicrowaveHeating`
 
-Only after this passes does §7 Convene cutover begin (one publisher, legacy
-writers disconnected).
+Both separate Convene writers are commissioned synthetically. Real-source
+three-column acceptance remains blocked on the cRIO/LabVIEW producer.
 
 ---
 
@@ -269,8 +247,8 @@ writers disconnected).
 §3 cloud+tokens ┘
 ```
 
-§2 and §3 are independent and can proceed in parallel. Everything downstream is
-strictly ordered. Nothing after §5 can start early.
+Sections 3–5 and the downstream synthetic path are complete. Section 2 now owns
+the critical path; real-source §6/§7 evidence follows the first cRIO frame.
 
 ---
 
@@ -456,7 +434,8 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
-| 2026-08-19 | Integrated Convene's supplied direct `/machine/publish` contract into the gateway. The new one-frame best-effort worker publishes only canonical `gw_` scalars after durable VM enqueue, exposes health counters, and cannot block/acknowledge the VM queue. Enabled the non-secret credential reference in staged config; production remains stopped and rejected until the real Cloudflare `/ingest` URL/token arrive. Fresh gateway suite: 25 passed. |
+| 2026-08-19 | Downstream synthetic commissioning PASS: after an intentional gateway restart generated fresh run `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2`, the guarded five-minute stream sent 300 frames in 300.019 s; gateway receive and VM ingest deltas were both 300, desktop Convene delivered 296 and coalesced four, with zero failures, zero new dead letters, and an empty final queue. The operator confirmed VM predictive processing and the separate `sim_` Convene display. Only the real cRIO/LabVIEW producer and real-source correlation/recovery gates remain NO-GO. |
+| 2026-08-19 | Integrated Convene's supplied direct `/machine/publish` contract into the gateway. The one-frame best-effort worker publishes only canonical `gw_` scalars after durable VM enqueue, exposes health counters, and cannot block/acknowledge the VM queue. The initial staging note was later superseded by the live protected configuration and sustained commissioning proof above. |
 | 2026-08-19 | Hardened the desktop production handoff: live HTTPS config now rejects placeholder/non-HTTPS/non-`/ingest` destinations and disabled TLS; added secret-prompting config finalization with protected backups; replaced the task installer with guarded network/firewall/ACL/config gates; and published `pi_gateway/windows/README.md`. Fresh verification: 20 gateway tests and 63 bridge/operator-workflow tests passed; all changed PowerShell parsed cleanly. |
 | 2026-08-19 | Reconciled the desktop Convene identity and found the backend's missing Firestore `machineCommands(machineId,status,createdAt)` index. Added secret-safe audit/repair tooling, then adopted Convene's documented direct `/machine/publish` contract for `gw_`: a bounded best-effort worker receives the same canonical frame only after durable VM enqueue and cannot block or acknowledge the VM path. Heartbeat/commands remain degraded by the backend index, while direct publish is independently testable. |
 | 2026-08-19 | Refreshed `C:\RECLAIM\pi_gateway` from commit `a590838`, corrected the active bind to `192.168.1.1:9070`, installed locked pytest 9.1.1 in the staging venv, and passed all 11 gateway tests plus config/import gates. Reapplied and independently verified the Private profile and cRIO-only firewall rule. A 50-second isolated manual run proved the real 9070 listener and loopback-only 9080 status endpoint without touching the production queue or cloud; no cRIO frame arrived, so sender targeting remains open. The local Convene SYSTEM agent is running with live backend TLS connections, but Enterprise sign-in and `gw_` collector configuration remain. |

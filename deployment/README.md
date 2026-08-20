@@ -23,15 +23,15 @@ full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
 | Stage | Scope | Status (2026-08-19) |
 |---|---|---|
 | **0** | Offline gateway staging + outbound access base | DONE |
-| **1** | Cloud predictive engine on the VM + Cloudflare route + tokens | Repository records prior proof; live VM inventory and current route handback pending |
+| **1** | Cloud predictive engine on the VM + Cloudflare route + tokens | Current route accepted 300/300 sustained frames; predictive processing and VM `sim_` display operator-confirmed |
 | **2** | cRIO ingress link + scoped firewall | Desktop IP/link/firewall DONE; cRIO sender target and first real frame pending |
-| **3** | Contract gates + three-column V&V (`gw_` audit) | Direct desktop publisher staged/tested; real cRIO-to-VM correlation pending |
-| **4** | Separate desktop `gw_` and VM `sim_` Convene views | Mechanisms are distinct and documented; visible live-value acceptance pending |
+| **3** | Contract gates + three-column V&V (`gw_` audit) | Synthetic downstream correlation PASS; real cRIO names/units/state correlation pending |
+| **4** | Separate desktop `gw_` and VM `sim_` Convene views | Both independent displays operator-confirmed for the sustained synthetic stream; real-source acceptance pending |
 
-Repository evidence records a proven VM ingestion-to-Convene sensing path,
-including fail-closed expiry, but this desktop session did not inventory the live
-VM. Overall hardware/live-cRIO status remains **NO-GO** until Stages 2–4 pass
-with one real correlated frame. See
+Repository and operator evidence now records a working sustained path from the
+Windows 10 gateway through VM ingestion/predictive processing to both independent
+Convene views. Overall hardware/live-cRIO status remains **NO-GO** until Stage 2
+and real-source three-column correlation pass with one retained real frame. See
 [`CONVENE_MISSION_OPERATIONS_RECAP.md`](CONVENE_MISSION_OPERATIONS_RECAP.md) for
 the evidence and display decision.
 
