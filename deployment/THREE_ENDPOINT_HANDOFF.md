@@ -16,6 +16,13 @@
 > remains **NO-GO** until an authoritative full-contract adapter stream traverses
 > all three endpoints and the evidence in §8 passes.
 
+> **Source-selection update (2026-08-20):** this document's PSP source diagrams
+> describe the completed engineering POC, not the selected production source.
+> Discovery has since proven an existing 34-field USB log record. The production
+> direction and controls gates are authoritative in
+> `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`; downstream endpoint boundaries in
+> this document remain applicable.
+
 ## 1. The three endpoints are distinct
 
 Do not merge their credentials, Convene machine identities, variable namespaces,

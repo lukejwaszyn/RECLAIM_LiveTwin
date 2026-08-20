@@ -2,14 +2,21 @@
 
 > **Stage:** 2-3 — real-source telemetry seam and contract validation
 >
-> **Status:** DEVELOPMENT APPROACH SELECTED; implementation and deployment require
-> separate explicit approvals. No real-source frame has yet reached the gateway.
+> **Status:** HISTORICAL DEVELOPMENT PLAN. The adapter was completed and exercised
+> as a partial engineering POC, but this is no longer the selected production
+> source. See `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
 >
 > **Branch:** `desktop/edge-gateway`
 >
-> **Selected architecture:** reuse the existing cRIO Scan Engine / NI-PSP
-> read interface from a new input-only Windows adapter. Do not modify or redeploy
-> the cRIO startup application.
+> **Historical architecture:** reuse the existing cRIO Scan Engine / NI-PSP read
+> interface from a new input-only Windows adapter. Retain this implementation for
+> audit-only diagnostics; do not use this document to authorize production or a
+> cRIO redeploy.
+
+The later evidence copy of `Data Stream.vi`, `Preheating Metals.vi`, and the
+project has different hashes from §2 and proves an existing repeating USB log
+record. The authoritative evidence revision and path forward are recorded in
+`CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
 
 ## 1. Outcome
 

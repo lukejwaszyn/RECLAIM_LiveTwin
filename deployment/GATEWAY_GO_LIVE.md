@@ -24,8 +24,8 @@ infrastructure. There is no Linux host or Raspberry Pi in the live path. See
 | **BLOCKED** | Cannot be done yet. The blocker is named. |
 | **NOT DONE — DELIBERATE** | Achievable now, intentionally withheld. The reason is a safety constraint, not a scheduling one. Do not "helpfully" complete these. |
 
-**Current overall status: partial live PSP engineering POC; full live remains
-NO-GO.** The physical link, gateway listener/task, protected cloud configuration,
+**Current overall status: partial live PSP engineering POC; a source-built USB
+record is proven; full live remains NO-GO.** The physical link, gateway listener/task, protected cloud configuration,
 sustained gateway-to-VM delivery, predictive processing, and independent Convene
 `gw_`/`sim_` displays are commissioned with synthetic input. An input-only
 Windows PSP adapter has also sent a partial live engineering stream: eight
@@ -35,6 +35,11 @@ canonical PL/MT model measurement. The
 remaining live gate is the authoritative mapping/scaling/metadata contract,
 three-column correlation, stale behavior, and restart evidence across a full
 physical cycle.
+
+The PSP adapter is now a diagnostic fallback rather than the selected production
+source. The selected direction is to preserve the existing USB logger and reuse
+its source-built record through a bounded, lower-priority direct TCP branch after
+the controls gates in `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` pass.
 
 ---
 
@@ -135,10 +140,11 @@ unattended operation.
 ## 4. DONE — narrow defensive Windows Firewall rule for TCP 9070
 
 The reviewed rule is active only on the Private direct-link Ethernet interface,
-with local `192.168.1.1`, remote `192.168.1.2`, and TCP 9070. It is preserved as
-narrow defensive configuration, but the selected Windows PSP adapter reaches
-the gateway locally and does not require the cRIO to initiate TCP 9070. Port 9080
-remains loopback-only with no inbound allow rule.
+with local `192.168.1.1`, remote `192.168.1.2`, and TCP 9070. It was not required
+by the diagnostic Windows PSP adapter, which reached the gateway locally. It is
+the correctly scoped rule for the selected direct cRIO-to-gateway TCP direction,
+subject to the controls deployment gates. Port 9080 remains loopback-only with no
+inbound allow rule.
 
 Applied rule shape (do not broaden):
 
@@ -239,10 +245,12 @@ source, and accepted-cadence freshness evidence remain open.
 
 ## 7. BLOCKED on full-contract real-source V&V — §6 three-column audit
 
-**Blocker:** the selected PSP subscriber is live only as a partial engineering
-POC. Formal validation still needs the approved channel/scaling/validity map and
-authoritative state, chamber, cycle, and time sources. Cloud, predictive
-processing, and both Convene mechanisms are commissioned synthetically.
+**Blocker:** the PSP subscriber proved only a partial engineering POC. The selected
+source-built-record path is not implemented or deployment-approved. Formal
+validation still needs deployed-source identity, snapshot coherence, the approved
+channel/scaling/validity map, and authoritative state, chamber, cycle, and time
+sources. Cloud, predictive processing, and both Convene mechanisms are
+commissioned synthetically.
 
 - [x] Gateway running against the current authenticated cloud endpoint
 - [x] Laptop registered as its own Convene machine publishing the `gw_` set
@@ -491,6 +499,7 @@ launcher `run-agent.cmd` carries a comment saying so.
 
 | Date | Change |
 |---|---|
+| 2026-08-20 | Source discovery proved that `Data Stream.vi` initializes timestamp-named files beneath `U:\Data Stream` and retained captures contain repeating 30-, 32-, and stable 34-field records. The files lack per-record time and authoritative state/chamber/cycle metadata; early generations contain delimiter defects. Per-item PSP is retained as a diagnostic engineering POC. The selected production direction is now the existing source-built record through a bounded lower-priority direct TCP branch to the existing gateway, with a one-string shared variable as the controls fallback. All RT changes and full-live declaration remain NO-GO pending deployed-source, coherence, authority, safety, rollback, and supervised acceptance gates in `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`. |
 | 2026-08-19 | Reconciled the selected live-source topology to the new input-only Windows NI-PSP subscriber: the cRIO remains unchanged and publishes existing Scan Engine variables; the desktop adapter is the sole TCP writer to the gateway. Recorded transport of eight Mod2 TCs plus three `scan_Mod3_AIn_raw` values at an observed sustainable three-second cadence. Later panel/sequence correlation contradicted several provisional process aliases, and offline replay exposed a false MT critical/safe-state path, so the evidence-gated source profile now quarantines all eleven as `scan_Mod2_TCn_degC`/`scan_Mod3_AIn_raw`; revised-profile deployment is not claimed. No `MW_*`, process fields, or authoritative cycle/state/chamber metadata were proven. Full-cycle acceptance and adapter deployment remain NO-GO, and retained Convene values for absent fields must be gated unavailable. |
 | 2026-08-19 | Downstream synthetic commissioning PASS: after an intentional gateway restart generated fresh run `df24bf58-b2e5-4d80-90c1-2b41e21ff7a2`, the guarded five-minute stream sent 300 frames in 300.019 s; gateway receive and VM ingest deltas were both 300, desktop Convene delivered 296 and coalesced four, with zero failures, zero new dead letters, and an empty final queue. The operator confirmed VM predictive processing and the separate `sim_` Convene display. Full-contract PSP-adapter input and real-source correlation/recovery gates remained NO-GO. |
 | 2026-08-19 | Integrated Convene's supplied direct `/machine/publish` contract into the gateway. The one-frame best-effort worker publishes only canonical `gw_` scalars after durable VM enqueue, exposes health counters, and cannot block/acknowledge the VM queue. The initial staging note was later superseded by the live protected configuration and sustained commissioning proof above. |

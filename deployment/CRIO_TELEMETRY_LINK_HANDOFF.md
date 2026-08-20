@@ -3,9 +3,11 @@
 > **Scope:** produce real, read-only telemetry from the cRIO/LabVIEW application
 > and deliver it over the isolated Ethernet seam to the Windows 10 edge gateway.
 >
-> **Status:** existing NI-PSP read seam discovered; the selected implementation
-> is a new input-only Windows adapter. Channel mapping, Torr conversion, source
-> metadata, implementation approval, and real-frame acceptance remain pending.
+> **Status:** superseded as the production-selection record by
+> `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`. The PSP adapter remains a diagnostic
+> engineering seam. Discovery has since proven an existing 34-field USB log record;
+> production direction is to reuse that source-built record through a bounded,
+> lower-priority RT telemetry branch after the controls gates pass.
 >
 > **Branch:** `desktop/edge-gateway`
 
@@ -48,10 +50,10 @@ controls source revision. Project metadata refers to `startup.rtexe`; deployment
 identity, source authority, time source, exact channel semantics, and deployment
 ownership remain unknown.
 
-## 3. Selected architecture
+## 3. Historical selected architecture — diagnostic fallback
 
-Use the existing network-published Scan Engine values through a new input-only
-subscriber on the Windows 10 edge gateway:
+This document originally selected the existing network-published Scan Engine
+values through a new input-only subscriber on the Windows 10 edge gateway:
 
 ```text
 cRIO Scan Engine / NI-PSP network-published values
@@ -63,11 +65,17 @@ cRIO Scan Engine / NI-PSP network-published values
   -> reconnect with bounded backoff after disconnect
 ```
 
-Do not modify or redeploy the cRIO startup application for this path. The adapter
-must use an explicit allowlist and input-only APIs. Discovery found analog/digital
-output references and RF/serial dependencies in the existing desktop VIs, so
-their `Read Only` folder name is not sufficient evidence of safety; treat them as
-mapping evidence, not trusted adapter code.
+Do not modify or redeploy the cRIO startup application for this diagnostic path.
+The adapter must use an explicit allowlist and input-only APIs. Discovery found
+analog/digital output references and RF/serial dependencies in the existing
+desktop VIs, so their `Read Only` folder name is not sufficient evidence of
+safety; treat them as mapping evidence, not trusted adapter code.
+
+Subsequent evidence showed that this path was not durable independently of the
+desktop LabVIEW/publisher state and that multi-item reads later failed. It remains
+useful for audit-only diagnostics but is no longer the selected production path.
+See `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` for the authoritative decision and
+gates.
 
 The edge receiver is single-client and supplies no application-level cRIO ACK.
 Use a single telemetry writer. Do not add an unbounded cRIO retry queue or replay
@@ -183,13 +191,13 @@ capturing secrets. Do not infer the deployed VI from a similarly named local fil
 
 ## 7. Architecture decision tree
 
-### Option A — cRIO TCP producer (not selected)
+### Option A — cRIO TCP producer (selected direction after later discovery)
 
 Use when the authoritative LabVIEW project is available and a supervised deploy
 is approved. Reuse a single existing telemetry snapshot if available, queue it to
 a lower-priority sender loop, and target `192.168.1.1:9070`.
 
-### Option B — read-only desktop adapter (selected)
+### Option B — read-only desktop adapter (diagnostic fallback)
 
 The cRIO already exposes network-published Scan Engine values over NI-PSP and the
 Windows 10 edge gateway already reads that seam. Build a new input-only Windows
@@ -202,8 +210,11 @@ are in `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`.
 Acceptable only for offline schema discovery. It is not a live-twin transport and
 cannot satisfy freshness, source-time, or loss accounting requirements.
 
-Option B is selected for development. It is not approved for deployment until
-the mapping, validity, coherence, unit-conversion, and no-write gates pass.
+Option B was selected for development at the time of this handoff. Later discovery
+proved that `Data Stream.vi` already assembles a repeating named record for USB
+logging. The path-forward handoff therefore selects reuse of that existing record
+through a bounded lower-priority direct TCP branch, with a one-string shared
+variable as the controls fallback. No RT change is approved until its gates pass.
 
 ## 8. Phased implementation and evidence
 
@@ -249,6 +260,8 @@ deployment revision, and failure evidence.
 
 ## 11. Read-next
 
+- `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`
+- `deployment/CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md`
 - `deployment/THREE_ENDPOINT_HANDOFF.md`
 - `deployment/GATEWAY_GO_LIVE.md`
 - `deployment/CONVENE_GW_MAPPING.md`
