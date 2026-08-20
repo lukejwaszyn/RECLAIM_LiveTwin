@@ -2,13 +2,21 @@
 
 **Date:** 2026-08-20  
 **Branch:** `desktop/edge-gateway`  
-**Status:** Source complete and offline-tested; live acceptance blocked at the cRIO NI-PSP publisher.
+**Status:** Source complete and offline-tested; retained as a diagnostic engineering
+fallback. It is not the selected production seam. See
+`CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
 
 ## Intended topology
 
 `cRIO 192.168.1.2` -> read-only Windows NI-PSP adapter on `192.168.1.1` -> local gateway TCP `192.168.1.1:9070` -> predictive-engine VM.
 
 No cRIO application, shared variable, output, setpoint, command, or target control is written by the adapter. No Convene endpoint was contacted during this work.
+
+Later discovery proved that `Data Stream.vi` already assembles a repeating named
+record for USB logging. The production direction is now to reuse that source-built
+record after controls proves its coherence and deployed-source identity. This PSP
+adapter remains useful for read-only scan-resource diagnostics and rollback-free
+engineering probes.
 
 ## Delivered implementation
 

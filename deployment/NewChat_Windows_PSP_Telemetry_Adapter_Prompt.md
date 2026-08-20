@@ -1,5 +1,9 @@
 # Prompt — Windows NI-PSP cRIO Telemetry Adapter Implementation
 
+> **Superseded for production source work.** Retain only for diagnostic PSP-adapter
+> maintenance. Start new cRIO acquisition work from
+> `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
+
 You are implementing the RECLAIM Live Twin's input-only Windows adapter for the
 existing cRIO Scan Engine / NI-PSP interface.
 

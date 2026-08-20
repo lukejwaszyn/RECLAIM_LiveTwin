@@ -4,7 +4,9 @@ This folder holds the deployment and handoff documentation for the RECLAIM Live
 Twin. Every doc carries a **stage/status banner** under its title so you can tell,
 at a glance, which phase of integration it belongs to. This index sorts them.
 
-**Where to start for endpoint execution:** read
+**Where to start for cRIO acquisition:** read
+`CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`, then
+`CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md`. For endpoint execution, read
 `THREE_ENDPOINT_HANDOFF.md`; it is the current strict Desktop / Windows Server
 2025 VM / Convene boundary and pickup point. For the immediate 72-hour demo and
 backend remediation, read
@@ -47,10 +49,12 @@ integration rather than production-grade CD.
 
 | Doc | Role |
 |---|---|
+| `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` | **Authoritative cRIO source decision:** proven 34-field USB log seam, selected existing-record-to-direct-TCP direction, controls fallback, staged gates, acceptance, and rollback. |
+| `CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md` | Evidence-backed transport/authority trade study and controls discovery worksheet. |
 | `THREE_ENDPOINT_HANDOFF.md` | **Current endpoint handoff:** strict Desktop / Windows Server 2025 VM / Convene ownership, separate `gw_` and `sim_` publishing mechanisms, present evidence, next commands, and acceptance gates. |
-| `CRIO_TELEMETRY_LINK_HANDOFF.md` | Endpoint-specific architecture, discovery, wire contract, safety, and acceptance plan for cRIO/LabVIEW telemetry into the Windows 10 edge gateway. |
-| `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md` | Selected input-only Windows NI-PSP adapter architecture, Celsius/Torr contract correction, owner work packages, test gates, supervised deployment, and rollback. |
-| `NewChat_Windows_PSP_Telemetry_Adapter_Prompt.md` | Turnkey prompt for the separately approved Windows NI-PSP adapter implementation session. |
+| `CRIO_TELEMETRY_LINK_HANDOFF.md` | Historical source-selection handoff, retained for endpoint contract and safety context; its PSP selection is superseded. |
+| `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md` | Historical PSP development plan, retained for the diagnostic adapter and its safety/test evidence; not the selected production seam. |
+| `NewChat_Windows_PSP_Telemetry_Adapter_Prompt.md` | Historical implementation prompt for the diagnostic PSP adapter; superseded for production source work. |
 | `NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md` | Self-contained prompt for the agent assigned to inspect and design the cRIO/LabVIEW telemetry producer seam. |
 | `DEPLOYMENT_TOPOLOGY.md` | Authoritative deployment topology, OS boundaries, live data path, and ownership rules. |
 | `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |

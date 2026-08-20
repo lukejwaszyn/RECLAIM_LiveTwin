@@ -1,5 +1,9 @@
 # Windows cRIO NI-PSP adapter proof of concept
 
+> **Current role:** diagnostic engineering fallback, not the selected production
+> source. See `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` for the proven
+> USB record seam and the authoritative path forward.
+
 This adapter uses the installed 32-bit NI DataSocket COM client to subscribe to
 an explicit input-module allowlist on `192.168.1.2`. It has no runtime resource
 browse option and contains no shared-variable write, target-control, deployment,
