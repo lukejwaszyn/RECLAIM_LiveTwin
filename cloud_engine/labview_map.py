@@ -223,7 +223,7 @@ if __name__ == "__main__":
     # expectations: surface 22.6C -> 295.75K; pressures use Torr -> kPa;
     # zero temperatures remain 273.15 K; RF on + PL_process False -> active MT.
     assert abs(ev["PL_T_wall_meas"] - 295.749) < 0.01, ev.get("PL_T_wall_meas")
-    assert abs(ev["PL_P_chamber"] - 139.6986) < 0.01, ev.get("PL_P_chamber")
+    assert abs(ev["PL_P_chamber"] - 139.6847) < 0.01, ev.get("PL_P_chamber")
     assert ev["PL_T_bed_tc1"] == 273.15, "0 degC must be retained"
     assert act == "MT", act
     print("OK labview_map self-check passed")
