@@ -1,0 +1,57 @@
+# RECLAIM Windows 10 Edge Gateway — cRIO LIVE LINK example.
+# Copy to C:/RECLAIM/pi_gateway/config.windows.yaml and edit for the site.
+# Secrets live here under a restricted NTFS ACL, never in code.
+#
+# This example pins the Seam A (cRIO -> gateway) socket to the values in
+# deployment/CRIO_TELEMETRY_SOCKET_SETUP.md. Seam B (gateway -> cloud) is
+# site-specific; configure it per deployment/GATEWAY_GO_LIVE.md before go-live.
+
+src: reclaim-crio-rt-01
+# Leave run_id blank to generate a new UUID at gateway start; a gateway restart
+# then starts a fresh seq space. Pin it only for a deliberately resumed run.
+run_id: ""
+mode: live
+schema_version: reclaim.telemetry.v1
+
+# --- Seam A: cRIO -> Windows 10 gateway (isolated OT LAN, plaintext TCP) ---
+# Bind to the OT NIC address specifically so 9070 is never offered on the WAN NIC.
+listen_host: 192.168.1.1
+listen_port: 9070
+# Half-open guard: drop a silent cRIO connection after this many seconds so a
+# reconnect is served. Keep it above several telemetry periods (~0.38 s each) but
+# low enough that an ungraceful cRIO drop recovers promptly. Tune together with the
+# producer's reconnect backoff. 0 disables (not recommended).
+conn_idle_timeout_s: 15.0
+# Maximum inbound UTF-8 JSON line bytes, including the terminating LF. Must equal
+# the producer's cap. Measured real frames run ~200-1319 B.
+max_line_bytes: 8192
+# Preserve the raw LabVIEW channel names for cloud-side labview_map.py. Do NOT set
+# true until `fields` here holds the complete raw cRIO schema.
+strict_fields: false
+
+# --- Seam B: gateway -> cloud (TLS on the WAN side; set per site) ---
+# transport: console | https | mqtts. Start with console to validate Seam A with no
+# cloud, then switch to https/mqtts with the VM URL + token for go-live.
+transport: console
+cloud_url: https://vm.example/ingest
+mqtt_host: vm.example
+mqtt_port: 8883
+mqtt_topic: reclaim/telemetry
+auth_token: ""                # bearer token (https) / password (mqtts)
+tls_ca: ""                    # path to CA bundle, or empty for system store
+verify_tls: true
+
+# Independent desktop audit tap (gw_ variables only); never blocks the VM queue.
+convene_enabled: false
+convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
+convene_credentials_path: C:/Windows/System32/config/systemprofile/.convene_agent.json
+convene_timeout_s: 10.0
+
+# buffer (store-and-forward)
+buffer_path: C:/ProgramData/RECLAIM/queue.db
+buffer_max_frames: 500000
+
+# runtime
+publish_batch: 50
+publish_interval_s: 0.5
+health_interval_s: 10.0
