@@ -47,7 +47,7 @@ def _jsonable(v):
         return [_jsonable(x) for x in v]
     return v
 
-from .config import EngineConfig, PhysicalParams, ENVIRONMENTS
+from .config import EngineConfig, ENVIRONMENTS, chamber_params
 from .engine import PredictiveEngine
 from .thread import StateStreamPublisher, default_manifest
 from .harness import (TruthPlant, runaway_scenario, nominal_scenario,
@@ -180,8 +180,15 @@ def _make_handler(svc: TwinStateService):
     return Handler
 
 
-def _build_engine(svc: TwinStateService, env_name: str):
-    cfg = EngineConfig(physical=PhysicalParams(), environment=env_name)
+CHAMBERS = ("PL", "MT")
+
+
+def _build_engine(svc: TwinStateService, env_name: str, chamber_id: str = "PL"):
+    # chamber_params(chamber_id) applies the CAD-derived geometry, material, and
+    # t_wall_limit for the named chamber; the bare PhysicalParams() default this
+    # replaced carries none of that (see ENGINE_SIDE_UPDATES_HANDOFF.md item 1).
+    cfg = EngineConfig(physical=chamber_params(chamber_id), environment=env_name,
+                       chamber_id=chamber_id)
     cfg.forecast.every = 1
     pub = StateStreamPublisher(default_manifest(),
                                sink=lambda msg: _route(svc, msg))
@@ -198,30 +205,85 @@ def _route(svc: TwinStateService, msg: str):
         svc.set_manifest(msg)
 
 
+def _dual_manifest_json() -> str:
+    """PL_/MT_-prefixed manifest for the dual-chamber rehearsal, mirroring the
+    production fan-out (push_ingest_dual.py) so /manifest matches what /state
+    actually publishes once both chambers are stepped. Rehearsal-identity
+    fields (mode/scenario/environment/speed) stay unprefixed -- they describe
+    the service run, not a chamber -- while op_state is republished per
+    chamber since PL and MT can be in different phases."""
+    base = default_manifest()
+    identity_names = {"mode", "scenario", "environment", "speed"}
+    variables = [v.to_dict() for v in base.variables if v.name in identity_names]
+    chamber_fields = [v for v in base.variables if v.name not in identity_names]
+    for prefix in ("PL_", "MT_"):
+        for v in chamber_fields:
+            d = v.to_dict()
+            d["name"] = prefix + d["name"]
+            variables.append(d)
+    return json.dumps({
+        "type": "manifest", "system": base.system, "model_ref": base.model_ref,
+        "schema_version": base.schema_version, "chambers": list(CHAMBERS),
+        "variables": variables, "states": base.states,
+    })
+
+
 def driver(svc: TwinStateService, scenario_name: str, env_name: str,
            speed: float, loop: bool, stop: threading.Event):
-    """Advance the engine over the harness, updating the service in ~real time.
+    """Advance PL and MT engines over the harness in lockstep, updating the
+    service in ~real time. Matches production's dual-chamber fan-out
+    (push_ingest_dual.py): two independent engine instances -- each bound to
+    its own chamber_params, including its own TruthPlant so the simulated
+    truth and the estimator's forward model agree -- stepping the same
+    simulated clock. Combined frame values publish PL_*/MT_*-prefixed.
 
     speed = simulated seconds per wall-clock second (e.g. 6 -> 6x faster).
     """
     env = ENVIRONMENTS[env_name]
     while not stop.is_set():
         svc.cycle += 1
-        eng, cfg = _build_engine(svc, env_name)
-        scenario: Scenario = SCENARIOS.get(scenario_name, runaway_scenario)(env)
-        truth = TruthPlant(PhysicalParams(), scenario, seed=svc.cycle)
-        dt = scenario.dt
-        for t, z, p_fwd, p_refl, _ in truth.stream():
+        engines = {}
+        streams = {}
+        for i, ch in enumerate(CHAMBERS):
+            eng, cfg = _build_engine(svc, env_name, ch)
+            scenario: Scenario = SCENARIOS.get(scenario_name, runaway_scenario)(env)
+            # distinct seed per chamber so PL/MT measurement noise is independent,
+            # not a mirrored copy of the same draw.
+            truth = TruthPlant(chamber_params(ch), scenario, seed=svc.cycle * 2 + i)
+            engines[ch] = (eng, cfg, scenario)
+            streams[ch] = truth.stream()
+        # engine construction re-emits each engine's own (unprefixed) manifest via
+        # _route; reassert the dual, prefixed manifest now that both are built.
+        svc.set_manifest(_dual_manifest_json())
+        dt = engines["PL"][2].dt
+        done = {ch: False for ch in CHAMBERS}
+        combined: dict = {}
+        for (t_pl, z_pl, pf_pl, pr_pl, _), (t_mt, z_mt, pf_mt, pr_mt, _) \
+                in zip(streams["PL"], streams["MT"]):
             if stop.is_set():
                 return
-            op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
-            extra = scenario.event_fn(t) if scenario.event_fn else None
-            pch = scenario.pressure_fn(t) if scenario.pressure_fn else None
-            out = eng.step(t, z, p_fwd, p_refl, op_state=op_state, extra_events=extra,
-                           p_chamber=pch)
-            svc.update(out.frame.values, t, out.frame.events, svc.cycle)
+            events: list = []
+            for ch, t, z, p_fwd, p_refl in (
+                ("PL", t_pl, z_pl, pf_pl, pr_pl), ("MT", t_mt, z_mt, pf_mt, pr_mt),
+            ):
+                if done[ch]:
+                    continue    # keep publishing this chamber's last frozen values
+                eng, cfg, scenario = engines[ch]
+                op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
+                extra = scenario.event_fn(t) if scenario.event_fn else None
+                pch = scenario.pressure_fn(t) if scenario.pressure_fn else None
+                out = eng.step(t, z, p_fwd, p_refl, op_state=op_state, extra_events=extra,
+                               p_chamber=pch)
+                combined.update({f"{ch}_{k}": v for k, v in out.frame.values.items()})
+                events += [f"{ch}:{e}" for e in out.frame.events]
+                if z[0] >= float(cfg.physical.t_limit):
+                    done[ch] = True
+            # PL and MT run the same scenario_name/env, so op_state_fn(t) agrees
+            # between them; expose it unprefixed too for identity consumers.
+            combined["op_state"] = combined.get("PL_op_state", combined.get("MT_op_state"))
+            svc.update(combined, t_pl, events, svc.cycle)
             time.sleep(max(0.0, dt / max(speed, 1e-6)))
-            if z[0] >= float(cfg.physical.t_limit):
+            if all(done.values()):
                 break
         if not loop:
             return
