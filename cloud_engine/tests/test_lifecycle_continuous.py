@@ -103,3 +103,102 @@ def test_q_scale_anti_windup_bounded():
     lo, hi = eng.ukf._q_bounds
     assert lo <= eng.ukf.q_scale <= hi
     assert eng.ukf.q_scale < hi          # not saturation-locked at the bound
+
+
+# ---------------------------------------------------------------------------
+# Identity-churn guard (lifecycle.py §2) — the transport-event cases.
+#
+# A gateway/cRIO reboot can renumber cycle_id in the middle of a live batch.
+# That is a TRANSPORT event, not a batch boundary: it must never reset per-cycle
+# analytics. These drive the FSM directly (pure bookkeeping, no engine needed)
+# so the guard's individual terms — hot, batch_present, and the category/power
+# qualifier — are each pinned independently.
+# ---------------------------------------------------------------------------
+from reclaim_predictive_engine.lifecycle import CycleLifecycle
+
+HOT = 600.0
+COLD = 300.0
+
+
+def _drive(fsm, steps):
+    """steps: (op_state, cycle_id, p_fwd, t_bed) at dt=1 s. Returns each result."""
+    return [fsm.update(op_state=op, cycle_id=cid, p_fwd=p, t_bed=tb, dt=1.0)
+            for op, cid, p, tb in steps]
+
+
+def _reset_indices(results):
+    return [i for i, r in enumerate(results) if r.new_cycle]
+
+
+def test_reboot_renumbering_cycle_id_mid_batch_does_not_reset():
+    """cRIO reboots mid-batch and renumbers cycle_id while still hot and powered."""
+    fsm = CycleLifecycle()
+    res = _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5
+                 + [("S_MicrowaveHeating", "A-renumbered", 2000.0, HOT)] * 5)
+    assert _reset_indices(res) == [0]          # only the genuine load
+    assert fsm.batch_present is True
+    assert fsm.phase == "ACTIVE"
+
+
+def test_reboot_renumbering_across_power_interruption_does_not_reset():
+    """The renumbering lands on the resume frame, right after an outage."""
+    fsm = CycleLifecycle()
+    res = _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5
+                 + [("S_PowerInterrupted", "A", 0.0, HOT)] * 3
+                 + [("S_MicrowaveHeating", "B", 2000.0, HOT)] * 3)
+    assert _reset_indices(res) == [0]
+    assert fsm.batch_present is True
+
+
+def test_restart_and_safe_state_hold_the_batch_without_resetting():
+    """S_Restart / S_SafeState are suspend states: hold, never reset, resume in place."""
+    for held in ("S_Restart", "S_SafeState"):
+        fsm = CycleLifecycle()
+        _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+               + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5)
+        heating_before = fsm.active_heating_s
+        res = _drive(fsm, [(held, "A", 0.0, HOT)] * 4)
+        assert all(r.suspended for r in res), held
+        assert all(not r.new_cycle for r in res), held
+        assert fsm.phase == "SUSPENDED", held
+        assert fsm.batch_present is True, held           # latch survives the hold
+        # resume the same batch: still no reset, accumulation continues
+        res2 = _drive(fsm, [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 3)
+        assert not any(r.new_cycle for r in res2), held
+        assert fsm.active_heating_s > heating_before, held
+
+
+def test_batch_identity_turnover_after_completion_resets():
+    """Once COMPLETE clears the latch, a new cycle_id is a real batch boundary."""
+    fsm = CycleLifecycle()
+    res = _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5
+                 + [("S_Complete", "A", 0.0, HOT)]
+                 + [("S_BatchLoad", "B", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "B", 2000.0, HOT)] * 2)
+    assert _reset_indices(res) == [0, 7]
+    assert fsm.batch_present is True
+
+
+def test_new_cycle_id_on_cold_chamber_resets():
+    """The `hot` term: a cold chamber cannot be a resuming in-progress batch."""
+    fsm = CycleLifecycle()
+    res = _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 3
+                 + [("S_MicrowaveHeating", "B", 2000.0, COLD)] * 2)
+    assert _reset_indices(res) == [0, 4]
+
+
+def test_new_cycle_id_while_hot_without_a_load_is_suppressed_by_design():
+    """Documented guard behavior, pinned deliberately: with no LOAD/COMPLETE to
+    bracket it, a cycle_id turnover on a hot in-progress batch reads as identity
+    churn, NOT a new batch. This depends on the sequencer always emitting
+    S_BatchLoad at a real boundary — if that ever stops being true, this test is
+    the one that should fail and force the guard to be revisited."""
+    fsm = CycleLifecycle()
+    res = _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+                 + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5
+                 + [("S_MicrowaveHeating", "B", 2000.0, HOT)] * 5)
+    assert _reset_indices(res) == [0]

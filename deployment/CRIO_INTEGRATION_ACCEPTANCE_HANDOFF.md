@@ -118,7 +118,7 @@ authoritative until §6-A confirms the signatures.
    `InterfaceAlias` matches the actual OT adapter.
 4. **Pre-flight the software.** From `pi_gateway`, `cloud_engine`, and
    `crio_source_record`, run `PYTHONPATH="$PWD" python3 -m pytest tests -q` (expect
-   55 / 67 / 70) and run the bench replay harness. Green is the go-signal to point the
+   55 / 73 / 70) and run the bench replay harness. Green is the go-signal to point the
    real cRIO in.
 5. **Bring the gateway up and watch it.** Confirm frames are received, validated, and
    buffered; confirm forwarding to the predictive-engine VM and the Convene tap; watch

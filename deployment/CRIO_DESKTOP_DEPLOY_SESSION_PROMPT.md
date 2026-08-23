@@ -35,6 +35,9 @@ yours to sign.
 3. `deployment/CRIO_TELEMETRY_SOCKET_SETUP.md` — the socket contract (both ends).
 4. `pi_gateway/windows/README.md` — the guarded desktop workflow and its scripts.
 5. `deployment/GATEWAY_GO_LIVE.md` — the authoritative go/no-go punch list.
+6. `deployment/CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` — where your Step 5
+   conformance evidence lands (item 6.3, the bed-bank policy trap). Read it
+   before the capture so you record the right evidence; controls signs it, not you.
 
 Before acting, acknowledge and list exactly what you reviewed and the current
 gate status you infer.
@@ -88,7 +91,7 @@ file-hash inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config +
 
 **Step 1 — Pre-flight (green is the go-signal).** From the checkout:
 `py -3.13 -m uv sync --locked --all-extras --dev --python 3.13`, then run the three
-suites and the bench replay. Expect **55 / 67 / 70** and bench replay
+suites and the bench replay. Expect **55 / 73 / 70** and bench replay
 `accepted 3 / rejected 0`. Any red: **stop**, do not deploy onto a failing build.
 
 **Step 2 — Configure to current spec.**
@@ -122,10 +125,17 @@ quarantined without a complete-or-drop bank policy, frames pass the gateway but 
 cloud rejects each one whole (`telemetry_invalid`; MT/MW lost). Record it as Gate 3
 checklist item 6.3 evidence — **do not "fix" it downstream.**
 
-**Step 6 — Scenarios (optional, advisory-only).** If asked to rehearse:
+**Step 6 — Scenarios (optional, advisory-only).** If asked to rehearse, there are
+exactly three one-command targets:
 `.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal` (8177),
-`power-outage` (8178), `lunar` (8179), plus a loss-of-data check. Ports 8177–8179
-must never be routed to production and never touch `8078`.
+`power-outage` (8178), `lunar` (8179) — the script's `ValidateSet` accepts nothing
+else, so do not invent a fourth profile name. The rehearsal plan's fourth item, the
+**loss-of-data/freshness check, has no scenario target yet** (it is installer build
+scope, handoff §E.3). Run that one by hand: stop the producer feed and confirm on
+loopback `/health` that the rx counter stops advancing and `last_ack_age_s` /
+`last_success_age_s` climb — the stack must report staleness, not hold or fabricate
+a last-good value. Ports 8177–8179 must never be routed to production and never
+touch `8078`.
 
 ## 6. Do NOT (guardrails — verbatim)
 
@@ -155,7 +165,7 @@ would affect control, interlocks, outputs, watchdogs, or the USB logger.
 
 ## 8. Handback report (produce at the end)
 
-Report: SHA deployed; pre-flight results (55/67/70 + bench replay); listener/port
+Report: SHA deployed; pre-flight results (55/73/70 + bench replay); listener/port
 ownership before and after; a redacted `/health` and `/latest` sample; the
 conformance result; any config/mapping deviations; explicit confirmation that no
 command/actuation path was connected; and the standing status — **labeled
