@@ -186,3 +186,13 @@ gateway or cloud installation in place.**
 See `docs/RECLAIM_Remote_Gateway_Preflight.md` for the remote deployment sequence,
 and `deployment/LIFECYCLE_RESTART_AUDIT_RECORD.md` for the current
 graceful-closure/restart audit state and open items.
+
+## Bringing the cRIO online
+
+When the cRIO is connected and something is not arriving, validating, or reaching
+the VM or Convene, start at
+**`deployment/CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md`**. It carries the
+known-good baseline (what has already been proven end to end, so you do not
+re-debug it), the first-frame checklist, and a fault ladder that isolates which
+side of the seam a problem is on — plus the failures that look like bugs and are
+not.

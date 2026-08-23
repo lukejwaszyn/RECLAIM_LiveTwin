@@ -248,6 +248,34 @@ root README now uses that form for the scenarios.
 
 ---
 
+## 3e. Sustained stream — PASSED (450 frames, both seams, 2026-08-23)
+
+One frame proved the path existed; this proves it **sustains**.
+`send-commissioning-stream.ps1`, 180 s at 400 ms (approximating the real ~0.38 s
+source cadence), through the real ingress with nothing stubbed:
+
+```
+FramesSent            450        GatewayReceivedDelta  450
+VmIngestedDelta       450        DeadLetterDelta         0
+ConveneDeliveredDelta 270        ConveneFailedDelta      0
+ConveneCoalescedDelta 180        QueueDepth              0
+LatestSequence        451        Passed               true
+VmActiveRunId == LatestRunId  (e61a982f-…)
+```
+
+**Zero loss on the durable path:** every one of 450 frames was received, queued,
+delivered and ingested by the VM, the queue fully drained, and the retained
+dead-letter count did not move. Run identity matched end to end.
+
+**The 270/180 Convene split is correct, not loss.** The `gw_` tap is deliberately a
+nonblocking one-frame queue that *replaces* an older pending frame rather than
+blocking the receiver — 270 delivered + 180 coalesced = 450 accounted for. Coalescing
+is the audit tap protecting the durable path, exactly as designed; it never
+participates in VM acking. This is the first exercise of that behavior
+(`coalesced` had been 0 since deployment).
+
+---
+
 ## 4. Running the scenarios
 
 **Three one-command targets, advisory-only, loopback-bound:**
@@ -319,6 +347,58 @@ concept that exists under any naming.
   channel, so no physical batch signature. Note also that a derived counter is an
   ordinal local to an engine run — unlike a real ID it does not survive a restart,
   so it would need persisting.
+
+---
+
+## 4c. Accepted scope decisions (2026-08-23, owner)
+
+**`cycle_id` may never exist — accepted, no code required.** The FSM does not need
+an identifier, it needs a reset *edge*, and the planned operating mode supplies one
+for free: each demo run is a single batch, and the rehearsal harness rebuilds the
+engine on **every loop iteration** (`_build_engine` sits inside the driver's `while`
+loop), so charge mass re-seeds, energy zeroes and `q_scale` resets automatically
+with no ID involved.
+
+Measured consequence **if** an engine ever persists across batches with no reset
+edge (four consecutive batches, `cycle_id=None`, no reset firing):
+
+| batch | charge_mass | energy_wh | active_heat_s |
+|---|---:|---:|---:|
+| 1 | 0.9958 | 32.8 | 60 |
+| 2 | 0.9915 | 66.1 | 120 |
+| 3 | 0.9871 | 99.4 | 180 |
+| 4 | 0.9827 | 132.8 | 240 |
+
+Charge mass decays monotonically and never recharges (`reset_cycle()` is what calls
+`model.recharge()`), so the mass-flow model eventually believes there is no
+feedstock; energy and heating time become lifetime totals and
+`energy_efficiency_g_per_wh` trends to zero. **This bites only on live continuous
+operation across multiple batches in one persistent engine** — not on any run
+described above.
+
+If that becomes the operating mode, the fix is a derived boundary — **cold dwell
+then reheat**, which is robust against the case the design warns about (a power cut
+does not cool the bed to ambient, an unloaded chamber does and stays there). It
+belongs in the **engine**, never the gateway, whose stated invariant is that it
+fabricates no values.
+
+**Live → scenario switching does not require dropping the live feed.** The
+rehearsal profiles are standalone engines on `8177`–`8181` with `--feed harness`;
+they never touch the gateway, `9070`, or the live path, and bind separate labeled
+Convene rehearsal identities. Run them alongside live data.
+
+**Unplugging the Ethernet is safe, and is the right tool for demonstrating
+loss-of-data on the live path.** Verified: with the adapter reading `Disconnected`,
+`192.168.1.1:9070` stayed bound and `/health` kept serving — because the NIC address
+is **static** (`PrefixOrigin: Manual`). It is an *ungraceful* drop (no FIN), caught
+by half-open detection plus the 15 s idle timeout; queued frames stay durable and
+the cRIO reconnects on its own. **If that interface is ever moved to DHCP this stops
+being true** — the address would vanish on link-down and the bind would break.
+
+Rejected alternatives: stopping the gateway task is the genuinely graceful shutdown
+but makes `/health` vanish (connection refused rather than stale), which is the
+opposite of the loss-of-data signature; a firewall block will not reliably tear down
+an already-established connection and muddies the guarded firewall audit.
 
 ---
 
