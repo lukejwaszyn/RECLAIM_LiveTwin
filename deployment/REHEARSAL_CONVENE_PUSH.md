@@ -34,7 +34,7 @@ own non-live identity and prefix:
 | `lunar` | `reclaim-rehearsal-lunar` | `rehearsal_lunar_` | `127.0.0.1:8179` |
 
 Enforced in code, as hard failures rather than warnings
-(`cloud_engine/rehearsal_convene.py`):
+(`tools/rehearsal_convene.py`):
 
 - a prefix outside the `rehearsal_` namespace is rejected;
 - any emitted name starting `sim_` or `gw_` raises, as defense in depth;
@@ -52,7 +52,7 @@ Start a scenario, then publish alongside it:
 
 ```powershell
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
-.\cloud_engine\windows\start-rehearsal-convene-publisher.ps1 nominal -DryRun
+.\tools\windows\start-rehearsal-convene-publisher.ps1 nominal -DryRun
 ```
 
 `-DryRun` exercises the whole fetch → flatten → prefix path and prints the
@@ -62,7 +62,7 @@ Use it to prove the mapping before any external Convene change.
 To publish for real:
 
 ```powershell
-.\cloud_engine\windows\start-rehearsal-convene-publisher.ps1 nominal `
+.\tools\windows\start-rehearsal-convene-publisher.ps1 nominal `
     -Api https://<backend>/api `
     -Credential C:\ProgramData\RECLAIM\rehearsal\nominal.convene_agent.json
 ```
@@ -153,6 +153,11 @@ exercises the real end-to-end pipeline instead of short-cutting it.
 
 | Path | Role |
 |---|---|
-| `cloud_engine/rehearsal_convene.py` | publisher, profile table, namespace guards |
-| `cloud_engine/tests/test_rehearsal_convene_publisher.py` | 9 tests, all guards covered |
-| `cloud_engine/windows/start-rehearsal-convene-publisher.ps1` | launcher |
+| `tools/rehearsal_convene.py` | scenario /state publisher, profile table, namespace guards |
+| `tools/tests/test_rehearsal_convene_publisher.py` | 9 tests, all guards covered |
+| `tools/windows/start-rehearsal-convene-publisher.ps1` | publisher launcher |
+| `tools/synthetic_crio.py` | synthetic cRIO: raw frames into the real pipeline |
+| `tools/tests/test_synthetic_crio.py` | 8 tests, incl. real-socket and mode-gate proofs |
+
+Everything lives in `tools/` and imports `cloud_engine` read-only. `cloud_engine`
+is the VM's software and is not modified from the gateway desktop.

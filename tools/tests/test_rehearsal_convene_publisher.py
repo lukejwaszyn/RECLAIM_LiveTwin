@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import sys
 
 import pytest
 
-from rehearsal_convene import (
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT / "tools"))
+
+from rehearsal_convene import (  # noqa: E402
     PRODUCTION_CREDENTIAL,
     PROFILES,
     RESERVED_PREFIXES,

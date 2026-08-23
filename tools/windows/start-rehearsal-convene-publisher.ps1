@@ -38,14 +38,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$CloudEngineDir = Split-Path -Parent $ScriptDir
-$RepositoryRoot = Split-Path -Parent $CloudEngineDir
+$ToolsDir = Split-Path -Parent $ScriptDir
+$RepositoryRoot = Split-Path -Parent $ToolsDir
 
 if (-not $PythonExe) {
     $PythonExe = Join-Path $RepositoryRoot ".venv\Scripts\python.exe"
 }
 if (-not (Test-Path $PythonExe)) {
-    throw "Locked environment not found at $PythonExe. Run start-rehearsal-scenario.ps1 once to bootstrap it, or pass -PythonExe."
+    throw "Locked environment not found at $PythonExe. Run cloud_engine\windows\start-rehearsal-scenario.ps1 once to bootstrap it, or pass -PythonExe."
 }
 
 # The scenario must already be serving; publishing an empty namespace would
@@ -54,7 +54,7 @@ if (-not (Test-Path $PythonExe)) {
 $Ports = @{ "nominal" = 8177; "power-outage" = 8178; "lunar" = 8179 }
 $Port = $Ports[$Scenario]
 if (-not (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)) {
-    throw "No scenario is listening on 127.0.0.1:$Port. Start it first: .\start-rehearsal-scenario.ps1 $Scenario"
+    throw "No scenario is listening on 127.0.0.1:$Port. Start it first: .\cloud_engine\windows\start-rehearsal-scenario.ps1 $Scenario"
 }
 
 Write-Host "RECLAIM rehearsal Convene publisher - synthetic data, non-live identity"
@@ -69,8 +69,8 @@ if ($Credential) { $PublisherArgs += @("--credential", $Credential) }
 if ($Once)       { $PublisherArgs += "--once" }
 if ($DryRun)     { $PublisherArgs += "--dry-run" }
 
-$env:PYTHONPATH = $CloudEngineDir
-Push-Location $CloudEngineDir
+$env:PYTHONPATH = $ToolsDir
+Push-Location $ToolsDir
 $ProcessExitCode = 1
 try {
     & $PythonExe @PublisherArgs
