@@ -18,7 +18,7 @@ touches the cRIO, a VI, the gateway host, or any live endpoint.
 
 ```bash
 cd crio_source_record
-PYTHONPATH="$PWD" python3 -m pytest tests -q          # expect 61 passing
+PYTHONPATH="$PWD" python3 -m pytest tests -q          # expect 70 passing (61 Gate 2 + 9 conformance)
 ```
 
 Baselines (must stay green — proof of no regression):

@@ -62,6 +62,19 @@ requires controls/onsite evidence not available offline.
 | The record's fields are latched in one Scan Engine iteration | unknown | One serialized line does not prove single-iteration coherence | controls/NI | Gate 1 |
 | Authoritative `cycle_id`/`source_op_state`/`active_chamber`/per-frame time exist at source | unknown | Record carries one start timestamp only; no physical cycle/state/chamber channel identified | controls/NI | Gate 1 |
 
+### 3.1 Addendum — integration pre-flight session, 2026-08-23 (commit `3608872`)
+
+| Claim | Status | Evidence | Owner | Gate impact |
+|---|---|---|---|---|
+| All three suites pass unchanged at `3608872`: pi_gateway 55, cloud_engine 67, crio_source_record 70 | proven | pytest runs 2026-08-23 (integration workstation, Python 3.11) | RECLAIM dev | §B.4 pre-flight |
+| Bench replay green end-to-end: sent 3 / received 3 / accepted 3 / rejected 0, max frame 902 B | proven | `python -m crio_source_record.bench_replay` 2026-08-23 | RECLAIM dev | §B.4 pre-flight |
+| Conformance checker binds the REAL gateway framer and REAL cloud engine (not reimplementations) | proven | `conformance.py` imports `reclaim_edge.framer`/`push_ingest_dual`; exercised 2026-08-23 | RECLAIM dev | Gate 3 §6 |
+| Quarantining `PL_bottom2` with NO bank policy yields gateway-PASS but whole-frame cloud rejection (`telemetry_invalid`) on every frame; `SUPPRESS_INCOMPLETE` on the same records yields cloud-accepted | proven | conformance runs 2026-08-23 on fixture-built frames (871 B rejected / 806 B accepted) | RECLAIM dev | Gate 3 checklist 6.3 |
+| `config.crio-live.example.yaml` Seam A values match the socket contract (bind 192.168.1.1:9070, idle 15 s, 8192 B, strict_fields false) | proven | line-by-line review vs `CRIO_TELEMETRY_SOCKET_SETUP.md` §3, 2026-08-23 | gateway | §B.2 |
+| Firewall helper is audit-default, apply-guarded (asserts OT addressing, NO default route, cRIO ping, no 9080 allow rule), scoped 9070 `192.168.1.2→192.168.1.1` Private/interface-bound, with JSON-backed rollback | proven | read-only review of `configure-crio-network-firewall.ps1`, 2026-08-23 | gateway | §B.3 |
+| Gate 3 producer review remains OPEN — VI source unavailable this session; evidence questionnaire issued | unknown | `deployment/CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` | controls/NI + integration | Gate 3 |
+| Gates 0 and 1 remain OPEN — no deployed-source hash, rollback exercise, coherence proof, or signed maps received | unknown | signed-maps worksheet still UNSIGNED | controls/NI | Gate 0/1 |
+
 ## 4. What Gate 2 deliberately does not establish
 
 Snapshot coherence/skew, deployed-source identity, rollback, and every physical

@@ -744,5 +744,5 @@ Do not call the three-endpoint path live until all boxes pass:
 - VM Windows scripts: `deployment/windows-vm/README.md`
 - VM state bridge: `deployment/WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md`
 - Convene binding contract: `convene/RECLAIM_Convene_Live_Binding.md`
-- cRIO telemetry architecture: `deployment/CRIO_TELEMETRY_LINK_HANDOFF.md`
-- cRIO architecture agent prompt: `deployment/NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md`
+- cRIO telemetry architecture: `Past_Deprecated/deployment/CRIO_TELEMETRY_LINK_HANDOFF.md`
+- cRIO architecture agent prompt: `Past_Deprecated/deployment/NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md`

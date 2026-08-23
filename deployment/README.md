@@ -1,116 +1,132 @@
 # RECLAIM Deployment — Document Index (by integration stage)
 
 This folder holds the deployment and handoff documentation for the RECLAIM Live
-Twin. Every doc carries a **stage/status banner** under its title so you can tell,
-at a glance, which phase of integration it belongs to. This index sorts them.
+Twin. Historical, superseded, and spent one-time material has been moved to
+[`../Past_Deprecated/`](../Past_Deprecated/README.md) (with a manifest) so this
+folder stays current. Most docs carry a **stage/status banner** under their title.
 
-**Where to start for cRIO acquisition:** read
-`CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`, then
-`CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md`. For endpoint execution, read
-`THREE_ENDPOINT_HANDOFF.md`; it is the current strict Desktop / Windows Server
-2025 VM / Convene boundary and pickup point. For the immediate 72-hour demo and
-backend remediation, read
-`RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md`, then
-`RECLAIM_BACKEND_REMEDIATION_HANDOFF.md`. The implementation-session prompt is
-`NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md`, which includes the backend,
-cloud-pipeline, and Convene sequence. `ClaudeCode_Backend_Remediation_Prompt.md`
-remains the narrower backend-only prompt. For the **current VM engine session**,
-read `VM_ENGINE_HANDOFF.md` first. For project-wide context, `HANDOFF.md` is the
-full project story and `GATEWAY_GO_LIVE.md` is the authoritative go/no-go list.
-`DEPLOYMENT_TOPOLOGY.md` is the authoritative platform record: Windows Server
-2025 cloud VM plus Windows 10 gateway laptop.
+**Where to start**
 
-## Integration stages
+- **cRIO acquisition → acceptance (the live thread):** read
+  `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` (authoritative decision + gate
+  definitions 0–5), then the current acceptance brief
+  `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF_2.md` (supersedes `_HANDOFF.md`'s state).
+- **Endpoint boundary:** `THREE_ENDPOINT_HANDOFF.md` — strict Desktop / Windows
+  Server 2025 VM / Convene ownership.
+- **Project-wide context:** `HANDOFF.md` (full story) and `GATEWAY_GO_LIVE.md`
+  (authoritative go/no-go). `DEPLOYMENT_TOPOLOGY.md` is the platform record.
+- **Demo / rehearsal:** `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` and
+  `NEXT_SESSION_CD_REHEARSAL_PLAN.md` (nominal / power-outage / lunar scenarios).
 
-| Stage | Scope | Status (2026-08-19) |
+## Integration stages (status 2026-08-23)
+
+| Stage | Scope | Status |
 |---|---|---|
-| **0** | Offline gateway staging + outbound access base | DONE |
-| **1** | Cloud predictive engine on the VM + Cloudflare route + tokens | Current route accepted 300/300 sustained frames; predictive processing and VM `sim_` display operator-confirmed |
-| **2** | cRIO ingress link + scoped firewall | Desktop IP/link/firewall DONE; cRIO sender target and first real frame pending |
-| **3** | Contract gates + three-column V&V (`gw_` audit) | Synthetic downstream correlation PASS; real cRIO names/units/state correlation pending |
-| **4** | Separate desktop `gw_` and VM `sim_` Convene views | Both independent displays operator-confirmed for the sustained synthetic stream; real-source acceptance pending |
+| **0** | Offline gateway staging + outbound access base | DONE (records archived) |
+| **1** | Cloud predictive engine on the VM + Cloudflare route + tokens | Sustained synthetic path proven; VM `sim_` display operator-confirmed |
+| **2** | cRIO ingress link + scoped firewall + offline contract | Link + firewall DONE; offline contract DONE (55/67/70 + bench replay green at `3608872`); real first-frame acceptance pending |
+| **3** | RT producer review + signed maps | OPEN — producer evidence questionnaire issued; maps UNSIGNED |
+| **4/5** | Supervised one-frame + sustained + fault/restart acceptance | Pending Phase B cutover + named-owner go |
 
-Repository and operator evidence now records a working sustained path from the
-Windows 10 gateway through VM ingestion/predictive processing to both independent
-Convene views. Overall hardware/live-cRIO status remains **NO-GO** until Stage 2
-and real-source three-column correlation pass with one retained real frame. See
-[`CONVENE_MISSION_OPERATIONS_RECAP.md`](CONVENE_MISSION_OPERATIONS_RECAP.md) for
-the evidence and display decision.
-
-The executable plan for the next endpoint session is
-[`NEXT_SESSION_CD_REHEARSAL_PLAN.md`](NEXT_SESSION_CD_REHEARSAL_PLAN.md). It
-splits work between the MacBook/VM lane and Adam's direct lab/gateway lane,
-preserves the gateway's existing staged code, and targets a fast advisory-only
-integration rather than production-grade CD.
+Overall live-cRIO status remains **NO-GO**; the stream is an explicitly labeled
+engineering shadow until the gates close. See
+`CRIO_INTEGRATION_ACCEPTANCE_HANDOFF_2.md` §7.
 
 ## Documents
+
+### cRIO acquisition & acceptance — the current thread (LIVING)
+
+Read roughly in this order.
+
+| Doc | Role |
+|---|---|
+| `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` | **Authoritative cRIO source decision** and full gate definitions (0–5): existing 34-field record → direct RT TCP, PSP fallback, staged gates, acceptance, rollback. |
+| `CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md` | Evidence-backed transport/authority trade study and controls discovery worksheet. |
+| `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF.md` | The standing acceptance brief (role, boundary, endpoints, three-phase work). |
+| `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF_2.md` | **Current pickup.** Updates the brief's state (pre-flight green, Gate 3 checklist issued, cutover scripted, PL bed-bank finding) and folds in the next-session build scope (interfacing/deployment code + 1-command installer + scenarios). |
+| `CRIO_TELEMETRY_SOCKET_SETUP.md` | The single-socket contract, both ends (bind `192.168.1.1:9070`, framing, timeouts). |
+| `CRIO_LABVIEW_PRODUCER_HANDOFF.md` | Exactly what the RT producer must emit (build spec). |
+| `CRIO_TELEMETRY_WRITE_PATH_AUDIT.md` | Receiver/cloud behavior relied on (input-only receiver, bed-bank rule, command relay display-only). |
+| `CRIO_SOURCE_RECORD_SIGNED_MAPS.md` | **UNSIGNED** worksheet controls must sign (channel/quality/state/chamber/cycle/time maps). |
+| `CRIO_SOURCE_RECORD_DECISION_RECORD.md` | Gate 2 decision + the running evidence table (`Claim | status | evidence | owner | gate`). |
+| `CRIO_SOURCE_RECORD_RUNBOOK.md` | Offline contract/parser/conformance/bench-replay runbook. |
+| `CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` | Gate 3 evidence questionnaire the LabVIEW/controls team answers and countersigns. |
+| `CRIO_GATEWAY_CUTOVER_RUNSHEET.md` | Ordered bench-VI → production-listener cutover (desktop/gateway side). |
+| `CRIO_PSP_LIVE_ADAPTER_HANDOFF.md` | NI-PSP live adapter — retained as the diagnostic/**fallback** source, not the primary seam. |
 
 ### Cross-cutting (read first — LIVING)
 
 | Doc | Role |
 |---|---|
-| `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` | **Authoritative cRIO source decision:** proven 34-field USB log seam, selected existing-record-to-direct-TCP direction, controls fallback, staged gates, acceptance, and rollback. |
-| `CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md` | Evidence-backed transport/authority trade study and controls discovery worksheet. |
-| `THREE_ENDPOINT_HANDOFF.md` | **Current endpoint handoff:** strict Desktop / Windows Server 2025 VM / Convene ownership, separate `gw_` and `sim_` publishing mechanisms, present evidence, next commands, and acceptance gates. |
-| `CRIO_TELEMETRY_LINK_HANDOFF.md` | Historical source-selection handoff, retained for endpoint contract and safety context; its PSP selection is superseded. |
-| `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md` | Historical PSP development plan, retained for the diagnostic adapter and its safety/test evidence; not the selected production seam. |
-| `NewChat_Windows_PSP_Telemetry_Adapter_Prompt.md` | Historical implementation prompt for the diagnostic PSP adapter; superseded for production source work. |
-| `NewChat_cRIO_Telemetry_Link_Architecture_Prompt.md` | Self-contained prompt for the agent assigned to inspect and design the cRIO/LabVIEW telemetry producer seam. |
-| `DEPLOYMENT_TOPOLOGY.md` | Authoritative deployment topology, OS boundaries, live data path, and ownership rules. |
-| `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Critical path for a guaranteed synthetic nominal demo, two practice scenarios, and a separately gated live stretch path. |
-| `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for RT-03/RT-05 backend fixes. |
-| `NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md` | **Primary fresh-chat prompt:** implement backend fixes, prove the cloud pipeline, and prepare isolated Convene reintegration. |
-| `ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the focused backend implementation session. |
-| `HANDOFF.md` | Full project story and current pickup point. Authoritative narrative. |
+| `THREE_ENDPOINT_HANDOFF.md` | Current endpoint handoff: strict Desktop / VM / Convene ownership, separate `gw_`/`sim_` publishing, evidence, acceptance gates. |
+| `DEPLOYMENT_TOPOLOGY.md` | Authoritative topology, OS boundaries, live data path, ownership rules. |
+| `HANDOFF.md` | Full project story and pickup point. Authoritative narrative. |
 | `GATEWAY_GO_LIVE.md` | Living go/no-go punch list across all stages. Authoritative status. |
-| `CONVENE_MISSION_OPERATIONS_RECAP.md` | 2026-08-18/19 VM integration evidence, root causes, stakeholder display taxonomy, variable types, and binding-ID worksheet. |
+| `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Guaranteed synthetic nominal demo, two practice scenarios, gated live stretch. |
+| `NEXT_SESSION_CD_REHEARSAL_PLAN.md` | Fast advisory-only integration plan; MacBook/VM vs lab/gateway lanes; nominal/outage/lunar scenarios. |
+| `RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | Implementation boundary and acceptance contract for the RT-03/RT-05 backend fixes (implemented). |
+| `CONVENE_MISSION_OPERATIONS_RECAP.md` | VM integration evidence, root causes, display taxonomy, binding-ID worksheet. |
 
-### Stage 1 — Cloud engine + egress (CURRENT)
+### Stage 1 — Cloud engine + egress (VM) (LIVING)
 
 | Doc | Role |
 |---|---|
-| `LUKE_VM_LOCAL_HANDOFF.md` | **Luke's active owner lane:** local source gate, VM deployment, endpoint acceptance, Adam rendezvous, and Convene cutover. |
-| `VM_ENGINE_HANDOFF.md` | **Read first.** Full story of the endpoint (prior reboot/discrepancy + fix), the DO-NOT-DEBUG-IT-BACK guardrails, and the acceptance gates. |
-| `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session (objective + step outline). |
-| `NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` | Turnkey prompt for a Codex session running on the Windows VM: exact ingress-to-Convene boundary, Tuesday PASS evidence, and isolated rehearsal profiles. |
-| `VM_ENGINE_RUNBOOK.md` | Executable Windows Server 2025 steps: deploy, ACL-protected secrets/state, WinSW service, cloudflared, verify, hand back. |
-| `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Authoritative fault/fix analysis (why the reboot was needed; §4.1 design of record). |
-| `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), the command-authority mode (advisory default), and the deploy-blocking disposition. |
-| `../cloud_engine/tools/redteam_ingest.py` | Live acceptance harness (LabVIEW-terminology emitter + pipeline/lifecycle assertions). Gate 2 in the handoff. |
-| `../cloud_engine/tests/test_lifecycle_continuous.py` | Continuous-run regression test (Gate 1). |
+| `LUKE_VM_LOCAL_HANDOFF.md` | Luke's owner lane: local source gate, VM deployment, endpoint acceptance, Convene cutover. |
+| `VM_ENGINE_HANDOFF.md` | Read first for a VM session: endpoint story, guardrails, acceptance gates. |
+| `VM_ENGINE_SESSION_BRIEF.md` | Turnkey brief for the VM engine session. |
+| `VM_ENGINE_RUNBOOK.md` | Executable Windows Server 2025 steps: deploy, secrets/state ACLs, WinSW, cloudflared, verify. |
+| `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Fault/fix analysis (§4.1 design of record). |
+| `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), advisory-default command authority. |
+| `../cloud_engine/tools/redteam_ingest.py` | Live acceptance harness. |
+| `../cloud_engine/windows/start-rehearsal-scenario.ps1` | Scenario launcher: `nominal` (8177) / `power-outage` (8178) / `lunar` (8179), advisory-only, never production port 8078. |
 
 ### Stage 3 — Contract gates + V&V (reference, LIVING)
 
 | Doc | Role |
 |---|---|
-| `CONVENE_GW_MAPPING.md` | `gw_` audit variables → gateway `/latest` jsonPaths (36 vars). Feeds the three-column V&V. |
-| `CONVENE_REINTEGRATION_HANDOFF.md` | Repository-proven cloud/gateway binding contract, isolated rehearsal identities, field gaps, and the explicit external operator checkpoint. |
-| `WINDOWS_VM_CONVENE_STATE_BRIDGE_HANDOFF.md` | Approved architecture and implementation contract for the independent Windows VM `/state` → `sim_vars.json` bridge. |
-| `NewChat_Windows_VM_Convene_State_Bridge_Prompt.md` | Turnkey fresh-agent prompt to implement and test the Windows VM state bridge without mutating the VM. |
-| `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md` | Lease-aware Windows service configuration, guarded installation, verification, logging, acceptance, and rollback procedure. |
-| `windows-vm/README.md` | Index and security contract for the proven Windows VM deployment, recovery, diagnostics, and acceptance scripts. |
+| `CONVENE_GW_MAPPING.md` | `gw_` audit variables → gateway `/latest` jsonPaths. Feeds three-column V&V. |
+| `CONVENE_REINTEGRATION_HANDOFF.md` | Cloud/gateway binding contract, isolated rehearsal identities, operator checkpoint. |
+| `WINDOWS_VM_CONVENE_STATE_BRIDGE_HANDOFF.md` | Architecture + implementation contract for the VM `/state` → `sim_vars.json` bridge. |
+| `WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md` | Lease-aware Windows service config, guarded install, verification, rollback. |
+| `windows-vm/README.md` | Index + security contract for the proven Windows VM deployment/recovery/acceptance scripts. |
+
+### CI/CD (reference)
+
+| Doc | Role |
+|---|---|
+| `CI_CD_ARCHITECTURE.md` | CI/CD architecture for the live-data path. |
+| `CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md` | Red-team integration handoff for the CI/CD lane. |
+| `../docs/RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md` | Promotion baseline; read before promotion. |
 
 ### Stage 0 — Base tooling / installers (reference)
 
 | Doc | Role |
 |---|---|
-| `convene-setup-2.ps1` | Headless-by-default Windows VM Convene agent bootstrap: Python dependency setup, pairing, startup task, and `sim_vars.json` heartbeat transport. |
+| `convene-setup-2.ps1` | Headless-by-default Windows VM Convene agent bootstrap. |
+| `CONVENE_VARIABLE_BINDINGS.example.json` | Example Convene variable-binding manifest (no live IDs/values). |
 
-### Historical / superseded (kept for context — NOT current work plans)
+> **One-command installer (planned):** the next session builds a single idempotent
+> full-stack installer/updater that pulls the current SHA and deploys gateway + VM
+> engine + state bridge and can stand up the scenarios, wrapping the existing
+> guarded per-component scripts in `pi_gateway/windows/`, `cloud_engine/windows/`,
+> `convene_bridge/windows/`, and `deployment/windows-vm/`. Scope + acceptance are
+> specified in `CRIO_INTEGRATION_ACCEPTANCE_HANDOFF_2.md` §6-E.
 
-| Doc | Stage | Why kept |
-|---|---|---|
-| `START_HERE.md` | 0 | Kickoff pointer for the staging session. Complete; superseded by `HANDOFF.md`. |
-| `ClaudeCode_Staging_Prompts.md` | 0 | The staging session's prompt pack. Record of how the gateway was staged. |
-| `ClaudeCode_Gateway_Reconciliation_Prompts.md` | 0.5 | Historical Pi→Windows-laptop naming reconciliation (GO_LIVE §9.6). Executed; not a live deployment plan. |
-| `SSH_Tailscale_ClaudeCode_Setup.md` | 0 | Access setup. **SSH parts superseded** by the outbound-only model (§9.1); Tailscale/Claude Code steps still valid. |
+## Archived material
+
+Historical, superseded, and spent one-time session prompts now live in
+[`../Past_Deprecated/`](../Past_Deprecated/README.md). That folder's README lists
+every moved file, its origin, and why. Notably archived: the Stage-0 staging
+records (`START_HERE.md`, the `ClaudeCode_*_Prompts.md` pack), the spent
+`NewChat_*` session prompts, and the superseded PSP-selection cRIO docs
+(`CRIO_TELEMETRY_LINK_HANDOFF.md`, `CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`).
 
 ## Conventions
 
-- **Visualization:** the Unreal/Twinmotion path is retired. Live 3D is the
-  **Convene-native `.stp` visualization** — it binds the published `sim_`
-  variables to elements of a STEP model. Spec lives in
+- **Visualization:** the live 3D path is the **Convene-native `.stp` visualization**
+  binding published `sim_` variables to STEP-model elements. Spec:
   `../convene/RECLAIM_Convene_Live_Binding.md`.
-- **Guardrails (all stages):** `--production` accepts `mode: "live"` only;
-  deploy **side-by-side**, never overwrite a running stack in place; the engine
-  binds **loopback** and cloudflared is the only path in.
+- **Guardrails (all stages):** `--production` accepts `mode: "live"` only; deploy
+  **side-by-side**, never overwrite a running stack in place; the engine binds
+  **loopback** and cloudflared is the only ingress; all predictive output stays
+  **advisory** with no actuator authority.

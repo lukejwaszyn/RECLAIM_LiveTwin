@@ -66,7 +66,7 @@ engine, stopped bridge, and expired `bridge_valid_until`. Ingress or local
 `/state` without Convene evidence is `PARTIAL`; a value merely appearing and then
 freezing in Convene is not acceptance.
 
-Use `NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` as the turnkey
+Use `Past_Deprecated/deployment/NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` as the turnkey
 prompt for the Codex session running on the VM.
 
 ## Wednesday dependency

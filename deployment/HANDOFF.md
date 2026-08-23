@@ -217,18 +217,18 @@ become runnable.
 | `deployment/DEPLOYMENT_TOPOLOGY.md` | Authoritative Windows VM/gateway topology and responsibility boundary |
 | `deployment/RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` | Immediate demo critical path, scenario run sheet, endpoint gates, and fallback |
 | `deployment/RECLAIM_BACKEND_REMEDIATION_HANDOFF.md` | RT-03/RT-05 implementation contract and acceptance gates |
-| `deployment/NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md` | Primary fresh-chat prompt for backend fixes, cloud proof, and Convene reintegration |
-| `deployment/ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the backend implementation session |
+| `Past_Deprecated/deployment/NewChat_Cloud_Pipeline_Convene_Fix_Prompt.md` | Primary fresh-chat prompt for backend fixes, cloud proof, and Convene reintegration |
+| `Past_Deprecated/deployment/ClaudeCode_Backend_Remediation_Prompt.md` | Turnkey prompt for the backend implementation session |
 | `deployment/GATEWAY_GO_LIVE.md` | Living go/no-go punch list (authoritative status) |
 | `deployment/VM_ENGINE_HANDOFF.md` | **Stage 1 — read-first** full story + guardrails + acceptance gates for the VM session |
 | `deployment/VM_ENGINE_SESSION_BRIEF.md` | Stage 1 — turnkey brief for the cloud VM engine session |
-| `deployment/NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` | Fresh VM Codex prompt for Tuesday ingress-to-Convene integration and rehearsal profiles |
+| `Past_Deprecated/deployment/NewChat_Windows_VM_Predictive_Engine_Integration_Prompt.md` | Fresh VM Codex prompt for Tuesday ingress-to-Convene integration and rehearsal profiles |
 | `deployment/VM_ENGINE_RUNBOOK.md` | Stage 1 — executable step-by-step VM deployment (quick tunnel) |
 | `docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Engine fault/fix analysis + autonomous-lifecycle design of record |
 | `deployment/CONVENE_GW_MAPPING.md` | `gw_` audit variables → `/latest` jsonPaths (36 vars) |
-| `deployment/SSH_Tailscale_ClaudeCode_Setup.md` | Access setup as run (SSH parts now superseded — see §9.1) |
+| `Past_Deprecated/deployment/SSH_Tailscale_ClaudeCode_Setup.md` | Access setup as run (SSH parts now superseded — see §9.1) |
 | `deployment/convene-setup-2.ps1` | Headless-by-default Windows VM Convene agent bootstrap; pairs, registers the startup task, and carries `sim_vars.json` as heartbeat `simVars` |
-| `deployment/START_HERE.md`, `ClaudeCode_*_Prompts.md` | Historical Stage-0 session records (see `deployment/README.md`) |
+| `Past_Deprecated/deployment/START_HERE.md`, `ClaudeCode_*_Prompts.md` | Historical Stage-0 session records (see `deployment/README.md`) |
 | `docs/RECLAIM_Remote_Gateway_Preflight.md` | The canonical deployment preflight |
 | `docs/RECLAIM_Live_Telemetry_Architecture.md` | Schemas, validation, single-writer contract |
 | `convene/RECLAIM_Convene_Live_Binding.md` | `sim_` binding set + Convene-native `.stp` visualization spec |
