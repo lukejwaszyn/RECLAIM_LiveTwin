@@ -52,6 +52,8 @@ Read roughly in this order.
 | `CRIO_SOURCE_RECORD_RUNBOOK.md` | Offline contract/parser/conformance/bench-replay runbook. |
 | `CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` | Gate 3 evidence questionnaire the LabVIEW/controls team answers and countersigns. |
 | `CRIO_GATEWAY_CUTOVER_RUNSHEET.md` | Ordered bench-VI → production-listener cutover (desktop/gateway side). |
+| `ENGINE_SIDE_UPDATES_HANDOFF.md` | Proposals for the `cloud_engine` owner (not applied): chamber params for rehearsal, `/state` freshness field, and the deferred batch-boundary edge. |
+| `CONVENE_FIRESTORE_INDEX_HANDOVER.md` | Ready-to-apply fix for the Convene backend owner: the missing `machineCommands` composite index that blocks rehearsal scenarios from reaching Convene. |
 | `CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md` | **Start here when the cRIO is connected and frames are not flowing.** Known-good baseline, first-frame checklist, fault ladder, and known non-bugs. |
 | `LIFECYCLE_RESTART_AUDIT_RECORD.md` | Audit record of graceful-closure/restart handling, scenario targets, and the open `active_heating_s`/`S_Restart` semantics question. |
 | `CRIO_PSP_LIVE_ADAPTER_HANDOFF.md` | NI-PSP live adapter — retained as the diagnostic/**fallback** source, not the primary seam. |
