@@ -91,7 +91,7 @@ file-hash inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config +
 
 **Step 1 — Pre-flight (green is the go-signal).** From the checkout:
 `py -3.13 -m uv sync --locked --all-extras --dev --python 3.13`, then run the three
-suites and the bench replay. Expect **55 / 73 / 70** and bench replay
+suites and the bench replay. Expect **55 / 74 / 70** and bench replay
 `accepted 3 / rejected 0`. Any red: **stop**, do not deploy onto a failing build.
 
 **Step 2 — Configure to current spec.**
@@ -130,8 +130,9 @@ four one-command targets, and the script's `ValidateSet` accepts nothing else:
 `.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal` (8177),
 `power-outage` (8178), `lunar` (8179), `loss-of-data` (8181). The first three loop
 until stopped; `loss-of-data` runs one cycle and then stops updating while still
-serving, so `/health` keeps returning 200 with `status: running` while `t_sim`
-freezes — the stack must report staleness, not hold or fabricate a last-good value.
+serving, so `/health` and `/state` keep answering with the last values readable
+but flip to `status: stopped` while `t_sim` freezes — the stack must report
+staleness, not hold or fabricate a last-good value.
 The runner builds the locked environment on first use if it is missing. Ports
 8177–8181 must never be routed to production and never touch `8078`.
 
@@ -167,7 +168,7 @@ would affect control, interlocks, outputs, watchdogs, or the USB logger.
 
 ## 8. Handback report (produce at the end)
 
-Report: SHA deployed; pre-flight results (55/73/70 + bench replay); listener/port
+Report: SHA deployed; pre-flight results (55/74/70 + bench replay); listener/port
 ownership before and after; a redacted `/health` and `/latest` sample; the
 conformance result; any config/mapping deviations; explicit confirmation that no
 command/actuation path was connected; and the standing status — **labeled

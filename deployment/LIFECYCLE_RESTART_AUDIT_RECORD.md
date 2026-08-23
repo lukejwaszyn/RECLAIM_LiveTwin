@@ -18,7 +18,7 @@ and are controls/onsite-owned.** Nothing here signs any of them.
 | Suite | Count | Result |
 |---|---|---|
 | `pi_gateway` | 55 | pass |
-| `cloud_engine` | 73 | pass (was 67; +6 added this session, §3) |
+| `cloud_engine` | 74 | pass (was 67; +6 churn-guard tests, +1 stalled-status regression, §3) |
 | `crio_source_record` | 70 | pass |
 
 **Gateway graceful closure.** `pi_gateway/reclaim_edge/main.py:49-50` traps
@@ -137,6 +137,72 @@ read-first list never had them open that checklist.
 
 ---
 
+## 3b. Bug found and FIXED — stalled stream kept reporting `status: running`
+
+**Found by** building the `loss-of-data` rehearsal. **Fixed** in
+`cloud_engine/reclaim_predictive_engine/service.py`.
+
+`TwinStateService.update()` set `status = "running"` on every frame and nothing
+ever cleared it. When the driver finished — a `--no-loop` run, or an exhausted
+replay — the daemon driver thread simply returned while `serve_forever()` kept
+the HTTP surface up. `/health` and `/state` then advertised **`status: running`
+over a record that could no longer change**, alongside a reassuring
+`advisory_message: "All residuals within bounds"`. A consumer could not tell a
+live stream from a dead one, which is precisely the failure the loss-of-data
+check exists to expose.
+
+**Fix.** Added `TwinStateService.mark_stopped()` and wrapped both drivers so that
+whichever one runs flags the stream on return:
+
+- `status` flips `running` → `stopped`; the frozen values stay readable.
+- The latest view is **copied before mutation**, so the history entry keeps the
+  status it actually had while live — history is not retroactively rewritten.
+- Idempotent, and a later `update()` revives it to `running` (so a looping
+  scenario is unaffected).
+
+**Verified** end to end: a `--no-loop` cycle reported `status: running, t_sim:
+304.0` mid-run and `status: stopped, t_sim: 400.0` after completion, on both
+`/health` and `/state`. Regression test:
+`test_stopped_stream_does_not_keep_reporting_running` (cloud_engine 73 → 74).
+
+**Still true, and not a bug:** `/state` carries no wall-clock timestamp and no age
+field, so the engine can answer "not advancing" but never "how stale." Real
+freshness gating lives in the bridge (`convene_bridge/contract.py`), which
+requires `state_age_ms` and `mode: live` and therefore only accepts the
+production dual-ingest path. Rehearsal exercises the engine, not that gating.
+
+---
+
+## 3c. Convene `gw_` audit tap — PROVEN on the live gateway
+
+The `gw_` tap was never broken. It had never been **exercised**: the gateway had
+`received: 0`, and the publisher loads its credential lazily on first delivery,
+so `machine_id` was null and nothing had ever been attempted. Convene showed the
+machine as connected because the *agent* heartbeat updates presence before it
+500s — presence is not telemetry.
+
+One labeled synthetic frame (`COMMISSIONING-NOT-CRIO-20260823T203214Z`) sent into
+`192.168.1.1:9070` settled it. Both seams delivered:
+
+```
+received: 0 -> 1        delivered: 1        queue_depth: 0
+last_ack_age_s: 18.23   dead_lettered_session: 0
+convene: machine_id BcryPSMP2iLbSRns5uhm, delivered 1, failed 0, last_success_age_s 18.48
+```
+
+So Seam A (cRIO-style TCP -> framer -> durable queue), Seam B (Cloudflare -> VM
+`/ingest`, **acked**), and the independent Convene `gw_` tap all work on the
+current build. The remaining Convene defect is unrelated and backend-owned: the
+agent's heartbeat/command plane still returns HTTP 500 for want of the Firestore
+composite `machineCommands` index (2622 occurrences in `agent.log`).
+
+**Doc correction:** the live desktop identity is `BcryPSMP2iLbSRns5uhm`, and the
+SYSTEM profile and user profile now hold the *same* credential. The three machine
+IDs named in `GATEWAY_GO_LIVE.md` §9.8 (`6xai…` revoked, `NziS…`, `2rIt…`) are all
+historical; the 2026-08-19 SYSTEM/user divergence is resolved.
+
+---
+
 ## 4. Running the scenarios
 
 **Three one-command targets, advisory-only, loopback-bound:**
@@ -177,10 +243,11 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 | # | Item | Owner | Blocking |
 |---|---|---|---|
 | 1 | `active_heating_s` / `S_Restart` semantics (§2) | engine + controls | Gate 1 signature |
-| 2 | **Convene `gw_` binding not live** — code path exists (`ConvenePublisher`, mapping, tests) but `convene_enabled: false` in both configs; needs https endpoint + credentials on the gateway | gateway | Convene backend |
+| 2 | ~~Convene `gw_` binding not live~~ — **PROVEN 2026-08-23** on the live gateway (§3c); runtime config already had `convene_enabled: true` (repo templates ship `false` by design) | — | closed |
 | 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
 | 5 | **Signed maps UNSIGNED** — `cycle_id`, `source_op_state`, `active_chamber` and every raw channel are placeholder/unratified | controls | Gate 1 |
+| 5b | 159 dead-lettered frames persisted in the runtime queue from earlier sessions (`dead_lettered_session: 0`) — review before go-live | gateway | — |
 | 6 | ~~Loss-of-data one-command target~~ — **done**, `loss-of-data` profile on 8181 | — | closed |
 | 7 | `deploy\Install-ReclaimLiveTwin.ps1` does not exist; the runsheet path is what executes today | installer scope §E.3 | — |
 

@@ -101,6 +101,20 @@ class TwinStateService:
             self._latest = rec
             self._history.append(rec)
 
+    def mark_stopped(self) -> None:
+        """The driver has finished producing frames — stop reporting `running`.
+
+        Without this, /state and /health keep advertising `status: running` over
+        a record that can no longer change, which is exactly the misleading
+        display the loss-of-data rehearsal exists to catch. The latest view is
+        copied before mutation so the history entry keeps the status it actually
+        had while the stream was live.
+        """
+        with self._lock:
+            if self._latest.get("status") == "running":
+                self._latest = dict(self._latest)
+                self._latest["status"] = "stopped"
+
     def manifest(self) -> dict:
         with self._lock:
             return dict(self._manifest)
@@ -262,14 +276,25 @@ def main():
         port=args.port,
     )
     stop = threading.Event()
+
+    def _drive_then_mark(fn, *fn_args):
+        """Run a driver and flag the stream stopped when it returns, so a
+        finished (--no-loop) or exhausted run stops reading as live."""
+        try:
+            fn(*fn_args)
+        finally:
+            svc.mark_stopped()
+
     if args.feed == "replay":
         if not args.file:
             ap.error("--feed replay requires --file <path.tdms|.csv>")
-        th = threading.Thread(target=replay_driver, args=(svc, args.file, args.env,
-                              args.speed, not args.no_loop, stop), daemon=True)
+        th = threading.Thread(target=_drive_then_mark,
+                              args=(replay_driver, svc, args.file, args.env,
+                                    args.speed, not args.no_loop, stop), daemon=True)
     else:
-        th = threading.Thread(target=driver, args=(svc, args.scenario, args.env,
-                              args.speed, not args.no_loop, stop), daemon=True)
+        th = threading.Thread(target=_drive_then_mark,
+                              args=(driver, svc, args.scenario, args.env,
+                                    args.speed, not args.no_loop, stop), daemon=True)
     th.start()
 
     server = ThreadingHTTPServer((args.host, args.port), _make_handler(svc))

@@ -27,20 +27,20 @@ py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
 python scripts\check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **55 / 73 / 70**
+### 2. Tests — expect **55 / 74 / 70**
 
 Each suite needs its own package root on `PYTHONPATH`. Green across all three is
 the pre-flight go-signal; **any red means stop, do not deploy.**
 
 ```powershell
 $env:PYTHONPATH="pi_gateway";         python -m pytest pi_gateway -q          # 55
-$env:PYTHONPATH="cloud_engine";       python -m pytest cloud_engine -q        # 73
+$env:PYTHONPATH="cloud_engine";       python -m pytest cloud_engine -q        # 74
 $env:PYTHONPATH="crio_source_record"; python -m pytest crio_source_record -q  # 70
 ```
 
 ```bash
 PYTHONPATH=pi_gateway         python -m pytest pi_gateway -q          # 55
-PYTHONPATH=cloud_engine       python -m pytest cloud_engine -q        # 73
+PYTHONPATH=cloud_engine       python -m pytest cloud_engine -q        # 74
 PYTHONPATH=crio_source_record python -m pytest crio_source_record -q  # 70
 ```
 
@@ -83,14 +83,17 @@ Invoke-RestMethod http://127.0.0.1:8177/history
 ```
 
 **`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
-keep answering while the data stops advancing: `/health` still returns 200 with
-`status: running`, but `t_sim` freezes. That is the condition the check exists to
-rehearse — a consumer must detect staleness rather than trust a last-good value.
-Note the engine's own `/state` carries **no wall-clock timestamp or age field**;
-freshness gating lives downstream in the bridge, which requires `state_age_ms`
-and `mode: live` and therefore only accepts the production dual-ingest path.
-Rehearsal on 8177–8181 exercises the engine and its HTTP surface, **not** the
-bridge's freshness/identity gating.
+keep answering and the last values stay readable, but the data stops advancing:
+`/health` and `/state` report `status: stopped` and `t_sim` freezes. That is the
+condition the check exists to rehearse — a consumer must detect staleness rather
+than trust a last-good value.
+
+Note what the engine does **not** give you: `/state` carries no wall-clock
+timestamp and no age field, so "how stale" cannot be answered from the engine
+alone — only "not advancing". Real freshness gating lives downstream in the
+bridge, which requires `state_age_ms` and `mode: live` and therefore only accepts
+the production dual-ingest path. Rehearsal on 8177–8181 exercises the engine and
+its HTTP surface, **not** the bridge's freshness/identity gating.
 
 **Where to run them.** The scenarios are self-contained — they need only this
 checkout, never the cRIO, the gateway, or a network feed. Run them on any machine

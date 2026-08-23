@@ -66,7 +66,7 @@ $Profiles = @{
         Port = 8181
         Speed = 2
         NoLoop = $true
-        Expected = "Freshness/staleness rehearsal. Runs ONE cycle (about 3 min 20 s wall time) and then STOPS UPDATING while the endpoints stay served. After that point /state must stop advancing and its age must climb — the stack must report staleness, not hold or fabricate a last-good value."
+        Expected = "Freshness/staleness rehearsal. Runs ONE cycle (about 3 min 20 s wall time) then STOPS UPDATING while the endpoints stay served: /health and /state keep answering with the last values readable, but status flips to stopped and t_sim freezes. The stack must report staleness, not hold or fabricate a last-good value."
     }
 }
 

@@ -170,7 +170,7 @@ Expected repeatable results:
 | `nominal` | 8177 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=2` | stable `P_fwd=2200`; one 400-s simulated cycle in about 3 min 20 s wall time, repeating |
 | `power-outage` | 8178 | `mode=harness`, `scenario=power_outage`, `environment=earth_lab`, `speed=4` | history shows `S_PowerInterrupted` and `P_fwd=0` near 1 min 53 s, then `S_Restart` near 3 min 8 s; cycle about 3 min 45 s, repeating |
 | `lunar` | 8179 | `mode=harness`, `scenario=nominal`, `environment=lunar_surface`, `speed=2` | stable `P_fwd=2200` under lunar-surface physics; one cycle in about 3 min 20 s, repeating |
-| `loss-of-data` | 8181 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=2` | runs ONE cycle then stops updating while still serving: `/health` stays 200 with `status: running` while `t_sim` freezes |
+| `loss-of-data` | 8181 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=2` | runs ONE cycle then stops updating while still serving: `/health` stays 200, `status` flips to `stopped`, and `t_sim` freezes |
 
 Repeat the smoke checks for ports `8178`, `8179`, and `8181`. The service retains up to
 600 history frames; use `/history` during or immediately after the outage cycle
