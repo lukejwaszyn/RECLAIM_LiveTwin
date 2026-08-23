@@ -370,6 +370,6 @@ Any unchecked item keeps production declaration **NO-GO**.
 
 - `deployment/CRIO_ACQUISITION_OPTIONS_TRADE_STUDY.md`
 - `deployment/CRIO_PSP_LIVE_ADAPTER_HANDOFF.md`
-- `deployment/CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`
-- `deployment/CRIO_TELEMETRY_LINK_HANDOFF.md`
+- `Past_Deprecated/deployment/CRIO_PSP_ADAPTER_DEVELOPMENT_PLAN.md`
+- `Past_Deprecated/deployment/CRIO_TELEMETRY_LINK_HANDOFF.md`
 - `docs/RECLAIM_Live_Telemetry_Architecture.md`
