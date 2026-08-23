@@ -45,6 +45,11 @@ gate status you infer.
 - The clean checkout is under `C:\RECLAIM\src\RECLAIM_LiveTwin` on branch
   `desktop/edge-gateway`. The **existing runtime baseline `C:\RECLAIM\pi_gateway`
   must be preserved** — do not delete, rename, overwrite, or `git pull` inside it.
+- **One clean checkout only.** The working tree must be a real git clone of
+  `desktop/edge-gateway` — never a GitHub ZIP download (a `*-main`/`*-master`
+  folder with no `.git`). Stray/stale source copies (ZIP extracts, old or partial
+  clones, prior `-old` renames) get cleared in Step 0 so no one deploys from a
+  stale tree.
 - Listeners: gateway owns `192.168.1.1:9070` and loopback `127.0.0.1:9080` via the
   `RECLAIM-EdgeGateway` SYSTEM scheduled task. Only one process may listen on 9070.
 - The VM ingest endpoint (current Cloudflare quick-tunnel hostname) and the ingest
@@ -65,11 +70,21 @@ not improvise a third path.
 
 ## 5. Gated procedure — one unit at a time (show plan → STOP for "go" → run)
 
-**Step 0 — Sync and preserve the baseline.** Fetch and checkout the reviewed SHA
-in `C:\RECLAIM\src`. Capture (read-only) the existing baseline: file-hash
-inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config + `queue.db`
-metadata (no secrets, no data copy), listeners on 9070/9080, and the
-`RECLAIM-EdgeGateway` task definition. Report the SHA.
+**Step 0 — Establish one clean checkout, clear stale copies, preserve the baseline.**
+First make the working tree a verified git clone of `desktop/edge-gateway` (e.g.
+`C:\RECLAIM\src\RECLAIM_LiveTwin`): if the current folder has no `.git` or is a
+ZIP download (`*-main`), clone fresh rather than working in it; then `git fetch` +
+`git switch desktop/edge-gateway` + `git pull --ff-only`, and confirm HEAD is the
+reviewed SHA. **Clear the stale SOURCE copies** — GitHub ZIP extracts (`*-main`),
+old/partial clones, and prior `-old` renames of the repo — so the next operator
+cannot deploy from the wrong tree. **Scope strictly to stray source checkouts:**
+never delete or move the runtime baseline `C:\RECLAIM\pi_gateway`, its
+`config.windows.yaml`, `queue.db`, ingest state, or any secret/token file. When
+unsure whether a folder is runtime or a stray source copy, **rename it aside and
+report — do not delete.** Then capture (read-only) the baseline for the record:
+file-hash inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config +
+`queue.db` metadata (no secrets, no data copy), listeners on 9070/9080, and the
+`RECLAIM-EdgeGateway` task definition. Report the SHA and exactly what was cleared.
 
 **Step 1 — Pre-flight (green is the go-signal).** From the checkout:
 `py -3.13 -m uv sync --locked --all-extras --dev --python 3.13`, then run the three
@@ -120,6 +135,9 @@ must never be routed to production and never touch `8078`.
   unsafe network/firewall state, exposed 9080 rules, and conflicting listeners —
   do not defeat those refusals.
 - Do not overwrite `C:\RECLAIM\pi_gateway`; deploy the new checkout side-by-side.
+  Stale-copy cleanup (Step 0) is limited to stray SOURCE checkouts (ZIP downloads,
+  old clones); never delete runtime config, `queue.db`, state, secrets, or the
+  baseline — rename-aside and report when unsure.
 - Do not expose `9080` through any tunnel; do not add a default route on the
   OT-facing (cRIO) NIC.
 - No secret on any command line, in any commit, log, or screenshot.
