@@ -258,7 +258,7 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 | 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
 | 5 | **Signed maps UNSIGNED** — `cycle_id`, `source_op_state`, `active_chamber` and every raw channel are placeholder/unratified | controls | Gate 1 |
-| 5b | 159 dead-lettered frames persisted in the runtime queue from earlier sessions (`dead_lettered_session: 0`) — review before go-live | gateway | — |
+| 5b | ~~159 persisted dead-lettered frames~~ — **accepted 2026-08-23**: old frames are not of interest provided new ones publish, and the live probe delivered clean (`delivered 1, failed 0, dead_lettered_session 0`). Data left in place rather than purged; purge is a separate explicit action | — | closed |
 | 6 | ~~Loss-of-data one-command target~~ — **done**, `loss-of-data` profile on 8181 | — | closed |
 | 7 | `deploy\Install-ReclaimLiveTwin.ps1` does not exist; the runsheet path is what executes today | installer scope §E.3 | — |
 
