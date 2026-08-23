@@ -52,6 +52,7 @@ Read roughly in this order.
 | `CRIO_SOURCE_RECORD_RUNBOOK.md` | Offline contract/parser/conformance/bench-replay runbook. |
 | `CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` | Gate 3 evidence questionnaire the LabVIEW/controls team answers and countersigns. |
 | `CRIO_GATEWAY_CUTOVER_RUNSHEET.md` | Ordered bench-VI → production-listener cutover (desktop/gateway side). |
+| `LIFECYCLE_RESTART_AUDIT_RECORD.md` | Audit record of graceful-closure/restart handling, scenario targets, and the open `active_heating_s`/`S_Restart` semantics question. |
 | `CRIO_PSP_LIVE_ADAPTER_HANDOFF.md` | NI-PSP live adapter — retained as the diagnostic/**fallback** source, not the primary seam. |
 
 ### Cross-cutting (read first — LIVING)

@@ -25,22 +25,22 @@ $Profiles = @{
         EngineScenario = "nominal"
         Environment = "earth_lab"
         Port = 8177
-        Speed = 6
-        Expected = "Stable 2200 W Earth-lab heat-and-hold; one cycle is about 67 seconds wall time."
+        Speed = 2
+        Expected = "Stable 2200 W Earth-lab heat-and-hold; one cycle is about 3 min 20 s wall time (400 s simulated at 2x)."
     }
     "power-outage" = @{
         EngineScenario = "power_outage"
         Environment = "earth_lab"
         Port = 8178
-        Speed = 12
-        Expected = "3500 W heating; S_PowerInterrupted/P_fwd=0 near 38 seconds, S_Restart near 63 seconds, cycle about 75 seconds."
+        Speed = 4
+        Expected = "3500 W heating; S_PowerInterrupted/P_fwd=0 near 1 min 53 s, S_Restart near 3 min 8 s, cycle about 3 min 45 s wall time (900 s simulated at 4x)."
     }
     "lunar" = @{
         EngineScenario = "nominal"
         Environment = "lunar_surface"
         Port = 8179
-        Speed = 6
-        Expected = "Stable 2200 W heat-and-hold using lunar_surface physics; one cycle is about 67 seconds wall time."
+        Speed = 2
+        Expected = "Stable 2200 W heat-and-hold using lunar_surface physics; one cycle is about 3 min 20 s wall time (400 s simulated at 2x)."
     }
 }
 

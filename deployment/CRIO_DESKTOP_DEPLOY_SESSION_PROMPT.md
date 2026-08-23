@@ -35,6 +35,9 @@ yours to sign.
 3. `deployment/CRIO_TELEMETRY_SOCKET_SETUP.md` — the socket contract (both ends).
 4. `pi_gateway/windows/README.md` — the guarded desktop workflow and its scripts.
 5. `deployment/GATEWAY_GO_LIVE.md` — the authoritative go/no-go punch list.
+6. `deployment/CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` — where your Step 5
+   conformance evidence lands (item 6.3, the bed-bank policy trap). Read it
+   before the capture so you record the right evidence; controls signs it, not you.
 
 Before acting, acknowledge and list exactly what you reviewed and the current
 gate status you infer.
@@ -45,6 +48,11 @@ gate status you infer.
 - The clean checkout is under `C:\RECLAIM\src\RECLAIM_LiveTwin` on branch
   `desktop/edge-gateway`. The **existing runtime baseline `C:\RECLAIM\pi_gateway`
   must be preserved** — do not delete, rename, overwrite, or `git pull` inside it.
+- **One clean checkout only.** The working tree must be a real git clone of
+  `desktop/edge-gateway` — never a GitHub ZIP download (a `*-main`/`*-master`
+  folder with no `.git`). Stray/stale source copies (ZIP extracts, old or partial
+  clones, prior `-old` renames) get cleared in Step 0 so no one deploys from a
+  stale tree.
 - Listeners: gateway owns `192.168.1.1:9070` and loopback `127.0.0.1:9080` via the
   `RECLAIM-EdgeGateway` SYSTEM scheduled task. Only one process may listen on 9070.
 - The VM ingest endpoint (current Cloudflare quick-tunnel hostname) and the ingest
@@ -65,15 +73,25 @@ not improvise a third path.
 
 ## 5. Gated procedure — one unit at a time (show plan → STOP for "go" → run)
 
-**Step 0 — Sync and preserve the baseline.** Fetch and checkout the reviewed SHA
-in `C:\RECLAIM\src`. Capture (read-only) the existing baseline: file-hash
-inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config + `queue.db`
-metadata (no secrets, no data copy), listeners on 9070/9080, and the
-`RECLAIM-EdgeGateway` task definition. Report the SHA.
+**Step 0 — Establish one clean checkout, clear stale copies, preserve the baseline.**
+First make the working tree a verified git clone of `desktop/edge-gateway` (e.g.
+`C:\RECLAIM\src\RECLAIM_LiveTwin`): if the current folder has no `.git` or is a
+ZIP download (`*-main`), clone fresh rather than working in it; then `git fetch` +
+`git switch desktop/edge-gateway` + `git pull --ff-only`, and confirm HEAD is the
+reviewed SHA. **Clear the stale SOURCE copies** — GitHub ZIP extracts (`*-main`),
+old/partial clones, and prior `-old` renames of the repo — so the next operator
+cannot deploy from the wrong tree. **Scope strictly to stray source checkouts:**
+never delete or move the runtime baseline `C:\RECLAIM\pi_gateway`, its
+`config.windows.yaml`, `queue.db`, ingest state, or any secret/token file. When
+unsure whether a folder is runtime or a stray source copy, **rename it aside and
+report — do not delete.** Then capture (read-only) the baseline for the record:
+file-hash inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config +
+`queue.db` metadata (no secrets, no data copy), listeners on 9070/9080, and the
+`RECLAIM-EdgeGateway` task definition. Report the SHA and exactly what was cleared.
 
 **Step 1 — Pre-flight (green is the go-signal).** From the checkout:
 `py -3.13 -m uv sync --locked --all-extras --dev --python 3.13`, then run the three
-suites and the bench replay. Expect **55 / 67 / 70** and bench replay
+suites and the bench replay. Expect **55 / 73 / 70** and bench replay
 `accepted 3 / rejected 0`. Any red: **stop**, do not deploy onto a failing build.
 
 **Step 2 — Configure to current spec.**
@@ -107,10 +125,17 @@ quarantined without a complete-or-drop bank policy, frames pass the gateway but 
 cloud rejects each one whole (`telemetry_invalid`; MT/MW lost). Record it as Gate 3
 checklist item 6.3 evidence — **do not "fix" it downstream.**
 
-**Step 6 — Scenarios (optional, advisory-only).** If asked to rehearse:
+**Step 6 — Scenarios (optional, advisory-only).** If asked to rehearse, there are
+exactly three one-command targets:
 `.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal` (8177),
-`power-outage` (8178), `lunar` (8179), plus a loss-of-data check. Ports 8177–8179
-must never be routed to production and never touch `8078`.
+`power-outage` (8178), `lunar` (8179) — the script's `ValidateSet` accepts nothing
+else, so do not invent a fourth profile name. The rehearsal plan's fourth item, the
+**loss-of-data/freshness check, has no scenario target yet** (it is installer build
+scope, handoff §E.3). Run that one by hand: stop the producer feed and confirm on
+loopback `/health` that the rx counter stops advancing and `last_ack_age_s` /
+`last_success_age_s` climb — the stack must report staleness, not hold or fabricate
+a last-good value. Ports 8177–8179 must never be routed to production and never
+touch `8078`.
 
 ## 6. Do NOT (guardrails — verbatim)
 
@@ -120,6 +145,9 @@ must never be routed to production and never touch `8078`.
   unsafe network/firewall state, exposed 9080 rules, and conflicting listeners —
   do not defeat those refusals.
 - Do not overwrite `C:\RECLAIM\pi_gateway`; deploy the new checkout side-by-side.
+  Stale-copy cleanup (Step 0) is limited to stray SOURCE checkouts (ZIP downloads,
+  old clones); never delete runtime config, `queue.db`, state, secrets, or the
+  baseline — rename-aside and report when unsure.
 - Do not expose `9080` through any tunnel; do not add a default route on the
   OT-facing (cRIO) NIC.
 - No secret on any command line, in any commit, log, or screenshot.
@@ -137,7 +165,7 @@ would affect control, interlocks, outputs, watchdogs, or the USB logger.
 
 ## 8. Handback report (produce at the end)
 
-Report: SHA deployed; pre-flight results (55/67/70 + bench replay); listener/port
+Report: SHA deployed; pre-flight results (55/73/70 + bench replay); listener/port
 ownership before and after; a redacted `/health` and `/latest` sample; the
 conformance result; any config/mapping deviations; explicit confirmation that no
 command/actuation path was connected; and the standing status — **labeled
