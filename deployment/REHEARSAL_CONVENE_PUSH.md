@@ -1,8 +1,8 @@
 # Rehearsal Scenarios → Convene (push path)
 
-> **Status:** gateway leg implemented and proven locally 2026-08-23. Cloud/VM leg
-> **not built yet, but not blocked** — the pipeline already supports it by design;
-> it needs a synthetic frame source (§4).
+> **Status:** gateway leg and the synthetic cRIO both implemented and proven
+> locally 2026-08-23. What remains for the cloud leg is **VM-side configuration,
+> not code** (§4).
 > **Standing status unchanged: labeled engineering shadow — NO-GO for any
 > production claim.**
 
@@ -104,15 +104,43 @@ the intended route:
   `mode_rejected`). A synthetic `harness` frame therefore *cannot* enter the
   production engine or reach `sim_`, even by misconfiguration.
 
-What remains to build:
+### The synthetic cRIO — built
 
-1. **The synthetic cRIO.** Drive `TruthPlant`, serialize each step into a
-   canonical `reclaim.telemetry.v1` frame (`vars` carrying `PL_*`/`MT_*`
-   channels, `mode: "harness"`, monotone `seq` per `(run_id, source_id)`, fresh
-   `ts`), and write it line-delimited to the gateway's TCP port.
-2. **A non-production engine instance** on the VM to receive it — its own port
-   and state file, started without `--production`. Production `8078` is not a
-   valid target and the mode gate above enforces that independently.
+`tools/synthetic_crio.py` drives `TruthPlant` and writes raw LabVIEW frames to
+the gateway's TCP receiver, in the cRIO's own schema and units (degC/Torr, which
+`labview_map` converts back to K/kPa). It sets **no** identity of its own: the
+gateway assigns `run_id`, `seq` and `mode`, exactly as it does for real hardware.
+
+```powershell
+# Print frames without opening a socket:
+.venv\Scripts\python.exe tools\synthetic_crio.py --dry-run --max-frames 5
+
+# Drive a gateway configured mode: harness
+.venv\Scripts\python.exe tools\synthetic_crio.py --scenario nominal --port 9070 --speed 2
+```
+
+Proven by `tools/tests/test_synthetic_crio.py` (8 tests) against the real
+components, not restated copies of them:
+
+- units round-trip through the actual `labview_map.normalize()`, with the
+  four-TC mean recovering the true bed temperature;
+- frames traverse a real `Receiver` over a real socket, and come out canonical
+  with the gateway's own `mode: harness` stamp;
+- a **non-production** `DualPushEngine` accepts a harness frame;
+- a **`--production`** `DualPushEngine` refuses it — synthetic data provably
+  cannot reach the live `sim_` namespace.
+
+### What remains — VM-side configuration, owned by the engine owner
+
+No further code is required. `cloud_engine` is the VM's software and is
+**read-only from the gateway desktop**, so these are the owner's actions:
+
+1. **A non-production engine instance** — its own port and `--state-file`,
+   started *without* `--production`. Production `8078` is not a valid target,
+   and the mode gate above enforces that independently of configuration.
+2. **A second gateway instance configured `mode: harness`**, pointed at that
+   engine's `/ingest`. The mode value already exists in `config.py:44`; nothing
+   needs adding.
 3. **A rehearsal bridge instance** reading that engine and publishing under the
    same `rehearsal_*` identities, so the cloud leg and the gateway leg agree.
 
