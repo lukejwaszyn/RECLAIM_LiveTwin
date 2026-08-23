@@ -34,9 +34,9 @@ experiences and show `/health`, `/manifest`, `/state`, and `/history`:
 
 | Demo | Engine selection | Purpose | Approximate wall time |
 |---|---|---|---:|
-| Nominal, primary | `nominal` + `earth_lab`, 6x | Full nominal narrative and stable advisory display | ~67 s/cycle |
-| Power outage, practice | `power_outage` + `earth_lab`, 12x | Outage, thermal coast, and recovery behavior | ~75 s/cycle |
-| Lunar operation, practice | `nominal` + `lunar_surface`, 6x | Synthetic environment contrast without live data | ~67 s/cycle |
+| Nominal, primary | `nominal` + `earth_lab`, 2x | Full nominal narrative and stable advisory display | ~3 min 20 s/cycle |
+| Power outage, practice | `power_outage` + `earth_lab`, 4x | Outage, thermal coast, and recovery behavior | ~3 min 45 s/cycle |
+| Lunar operation, practice | `nominal` + `lunar_surface`, 2x | Synthetic environment contrast without live data | ~3 min 20 s/cycle |
 
 The lunar practice is the existing synthetic environment model. It is **not**
 the unimplemented live-anchored dual Earth/lunar counterfactual proposed by

@@ -142,9 +142,9 @@ read-first list never had them open that checklist.
 **Three one-command targets, advisory-only, loopback-bound:**
 
 ```powershell
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal        # 8177, earth_lab,     6x
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage   # 8178, earth_lab,    12x
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar          # 8179, lunar_surface, 6x
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal        # 8177, earth_lab,     2x -> ~3m20s
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage   # 8178, earth_lab,     4x -> ~3m45s
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar          # 8179, lunar_surface, 2x -> ~3m20s
 ```
 
 Each refuses to start if its port already has a listener, prints its expected
