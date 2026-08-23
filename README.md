@@ -52,21 +52,43 @@ $env:PYTHONPATH="pi_gateway;cloud_engine;$PWD"; python -m crio_source_record.ben
 
 ### 3. Rehearsal scenarios — one command each, any time
 
-Every scenario is a single command. Nothing else is required: if the locked
-environment does not exist yet, the runner builds it once on first use, so these
-work from a fresh checkout without running step 1 first.
+**Pick ONE line and run it.** Each line below is a complete, self-contained
+command — there is no setup step, and nothing above it needs to be run first. If
+the locked environment does not exist yet, the runner builds it once on first use,
+so these work from a fresh checkout.
+
+Run the nominal scenario:
 
 ```powershell
-$s = '.\cloud_engine\windows\start-rehearsal-scenario.ps1'
-powershell -NoProfile -ExecutionPolicy Bypass -File $s nominal
-powershell -NoProfile -ExecutionPolicy Bypass -File $s power-outage
-powershell -NoProfile -ExecutionPolicy Bypass -File $s lunar
-powershell -NoProfile -ExecutionPolicy Bypass -File $s loss-of-data
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
 ```
 
-`-ExecutionPolicy Bypass` is required: a default Windows install blocks unsigned
-local scripts, and this is the invocation form used elsewhere in the repo. If your
-session already permits scripts, you can call the `.ps1` directly.
+...or the power-outage scenario:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
+```
+
+...or the lunar scenario:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
+```
+
+...or the loss-of-data / freshness rehearsal:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data
+```
+
+Each runs in the foreground and prints what to expect; stop it with `Ctrl+C`. They
+use different ports, so you may run several at once in separate windows if you
+want to compare them side by side.
+
+`-ExecutionPolicy Bypass` is required because a default Windows install blocks
+unsigned local scripts; this is the invocation form already used elsewhere in the
+repo. If your session already permits scripts, you can call the `.ps1` directly:
+`.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal`
 
 | Profile | Port | Physics | Cycle | Behavior |
 |---|---:|---|---:|---|
@@ -186,3 +208,13 @@ gateway or cloud installation in place.**
 See `docs/RECLAIM_Remote_Gateway_Preflight.md` for the remote deployment sequence,
 and `deployment/LIFECYCLE_RESTART_AUDIT_RECORD.md` for the current
 graceful-closure/restart audit state and open items.
+
+## Bringing the cRIO online
+
+When the cRIO is connected and something is not arriving, validating, or reaching
+the VM or Convene, start at
+**`deployment/CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md`**. It carries the
+known-good baseline (what has already been proven end to end, so you do not
+re-debug it), the first-frame checklist, and a fault ladder that isolates which
+side of the seam a problem is on — plus the failures that look like bugs and are
+not.
