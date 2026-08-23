@@ -20,7 +20,7 @@ if (-not $PythonExe) {
     $PythonExe = Join-Path $RepositoryRoot ".venv\Scripts\python.exe"
 }
 if (-not (Test-Path $PythonExe)) {
-    Write-Host "Locked environment not found — bootstrapping it once (this takes a minute)..."
+    Write-Host "Locked environment not found - bootstrapping it once (this takes a minute)..."
     Push-Location $RepositoryRoot
     try {
         & py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
@@ -77,7 +77,7 @@ if ($ExistingListener) {
     throw "Port $($Selected.Port) already has a listener; stop it or verify ownership before continuing."
 }
 
-Write-Host "RECLAIM synthetic rehearsal — advisory-only, no actuator authority"
+Write-Host "RECLAIM synthetic rehearsal - advisory-only, no actuator authority"
 Write-Host "Profile: $Scenario | scenario=$($Selected.EngineScenario) | environment=$($Selected.Environment) | port=$($Selected.Port) | speed=$($Selected.Speed)x"
 Write-Host "Expected: $($Selected.Expected)"
 Write-Host "Verify: Invoke-RestMethod http://127.0.0.1:$($Selected.Port)/health"

@@ -214,6 +214,40 @@ historical; the 2026-08-19 SYSTEM/user divergence is resolved.
 
 ---
 
+## 3d. Bug found and FIXED (pre-existing) — runner unparseable in Windows PowerShell 5.1
+
+`start-rehearsal-scenario.ps1` was saved as UTF-8 **without a BOM** while containing
+non-ASCII em dashes. Windows PowerShell 5.1 decodes a BOM-less `.ps1` as ANSI, so
+`—` (`E2 80 94`) became `a-euro-"` in CP1252 — and that trailing `0x94` is a
+smart closing quote, which terminated the string early and cascaded into
+`The string is missing the terminator: "`. The script would not run **at all** under
+the very shell the deploy prompt mandates ("run elevated Windows PowerShell 5.1").
+
+**Pre-existing, not introduced by this session's rewrite:** the same failure
+reproduces on the original at `9e8e898^`. It went unnoticed because a syntax check
+run under **pwsh 7** parses the file fine — pwsh assumes UTF-8. Anything validating
+these scripts must do so under 5.1, or the check is worthless.
+
+**Fix.** The runner is now pure ASCII (`assert` on write). Verified: parses OK under
+5.1, and a full one-command run bootstrapped the locked environment and served
+`/health` on 8177.
+
+**Blast radius checked:** only two `.ps1` files in the repo contain non-ASCII. The
+other, `deployment/convene-setup-2.ps1`, parses fine under 5.1 (its degree sign and
+box-drawing characters do not mojibake into a quote). **Every cutover script**
+(`configure-crio-network-firewall`, `finalize-gateway-config`, `install-gateway-task`,
+`send-commissioning-*`, `repair-convene-desktop-agent`) is ASCII-clean and unaffected.
+
+**Convention going forward:** keep `.ps1` files ASCII-only. It removes the encoding
+dependency entirely rather than relying on a BOM surviving future edits.
+
+**Second, separate gotcha (documented, not a code bug):** execution policy blocks
+these scripts on a default Windows install. The repo convention already used
+elsewhere is `powershell -NoProfile -ExecutionPolicy Bypass -File <script>`; the
+root README now uses that form for the scenarios.
+
+---
+
 ## 4. Running the scenarios
 
 **Three one-command targets, advisory-only, loopback-bound:**

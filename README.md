@@ -57,11 +57,16 @@ environment does not exist yet, the runner builds it once on first use, so these
 work from a fresh checkout without running step 1 first.
 
 ```powershell
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data
+$s = '.\cloud_engine\windows\start-rehearsal-scenario.ps1'
+powershell -NoProfile -ExecutionPolicy Bypass -File $s nominal
+powershell -NoProfile -ExecutionPolicy Bypass -File $s power-outage
+powershell -NoProfile -ExecutionPolicy Bypass -File $s lunar
+powershell -NoProfile -ExecutionPolicy Bypass -File $s loss-of-data
 ```
+
+`-ExecutionPolicy Bypass` is required: a default Windows install blocks unsigned
+local scripts, and this is the invocation form used elsewhere in the repo. If your
+session already permits scripts, you can call the `.ps1` directly.
 
 | Profile | Port | Physics | Cycle | Behavior |
 |---|---:|---|---:|---|
