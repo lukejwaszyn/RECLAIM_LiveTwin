@@ -249,6 +249,45 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 
 ---
 
+## 4b. DEFERRED until the cRIO link is live — physics-derived identity
+
+**Decision (2026-08-23, owner):** do not design against the current channel list.
+The VI will supply different semantics; `cycle_id`, `source_op_state`, and
+`active_chamber` get resolved once the cRIO link is established and working.
+Recorded here only so the reasoning is not re-derived later.
+
+**The method transfers even though the names will not.** `lifecycle.py` and
+`engine.py` contain **zero** raw channel references — they consume normalized
+values (`p_fwd`, `z`, `op_state`). Raw names live only at the translation
+boundary (`labview_map.py`, `push_ingest_dual.py`, `crio_source_record/*`). A VI
+semantics change therefore lands in the mapping layer, not the physics, and the
+`active_heating_s` fix in §2 survives any renaming because "forward power" is a
+concept that exists under any naming.
+
+**What was established before deferring** (re-check against the real VI):
+
+- *`active_chamber`* — derive from **per-chamber forward power**, not hot/cold.
+  Thermal lag means a chamber that finished minutes ago is still the hottest, so
+  "hottest = active" points at the wrong chamber through every cooldown. Rule:
+  active = chamber with `P_fwd` over threshold; if neither is powered, **latch the
+  last powered one** rather than falling back to hottest.
+- *`op_state`* — asymmetric between chambers on the current list. PL carries
+  boolean phase flags (`PL_preprocess` / `PL_process` / `PL_postprocess`) plus
+  pumps and pressure, so evacuate / seal-check / heat / cooldown are all
+  observable without the state string. MT has two thermocouples and power only —
+  heating / cooling / idle are inferable, evacuation and product handling are not.
+- *`cycle_id`* — the weakest to derive, and the one to keep as a supplied ID if
+  controls can produce any stable one. A batch boundary needs a **load/unload
+  bracket**, not a power or thermal edge (a power edge cannot distinguish "batch
+  finished" from "power cut mid-run" — the governing principle in `lifecycle.py`).
+  PL has a real bracket: chamber pressure returning to atmosphere with pumps off
+  means the chamber was opened and the charge changed. MT has no pressure or pump
+  channel, so no physical batch signature. Note also that a derived counter is an
+  ordinal local to an engine run — unlike a real ID it does not survive a restart,
+  so it would need persisting.
+
+---
+
 ## 5. Still open
 
 | # | Item | Owner | Blocking |
