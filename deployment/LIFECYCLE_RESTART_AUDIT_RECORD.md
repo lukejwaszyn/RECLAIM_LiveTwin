@@ -145,16 +145,18 @@ read-first list never had them open that checklist.
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal        # 8177, earth_lab,     2x -> ~3m20s
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage   # 8178, earth_lab,     4x -> ~3m45s
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar          # 8179, lunar_surface, 2x -> ~3m20s
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data   # 8181, earth_lab,     2x -> one cycle, then stale
 ```
 
 Each refuses to start if its port already has a listener, prints its expected
 behavior, and exposes `/health`, `/state`, `/history` on `127.0.0.1`. **Ports
-8177–8179 must never be routed to production; `8078` is never touched.**
+8177–8181 must never be routed to production; `8078` is never touched.**
 
 **The rehearsal plan wants four runs** (`NEXT_SESSION_CD_REHEARSAL_PLAN.md:164-168`)
-— nominal ×2, power-outage ×1, lunar ×1, **loss-of-data ×1**. The fourth has **no
-scenario target**; handoff §E.3 lists it as installer build scope. Until that
-exists, run it by hand:
+— nominal ×2, power-outage ×1, lunar ×1, **loss-of-data ×1**. All four are now
+one-command targets (`loss-of-data` added on 8181, running one cycle with
+`--no-loop` so the endpoints keep serving while the data stops advancing). The
+equivalent check on the gateway is still manual:
 
 > Bring up any profile, confirm `/health` is advancing, then **stop the producer
 > feed**. Confirm the rx counter stops advancing and `last_ack_age_s` /
@@ -179,7 +181,7 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 | 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
 | 5 | **Signed maps UNSIGNED** — `cycle_id`, `source_op_state`, `active_chamber` and every raw channel are placeholder/unratified | controls | Gate 1 |
-| 6 | Loss-of-data one-command target (§4) | installer scope §E.3 | — |
+| 6 | ~~Loss-of-data one-command target~~ — **done**, `loss-of-data` profile on 8181 | — | closed |
 | 7 | `deploy\Install-ReclaimLiveTwin.ps1` does not exist; the runsheet path is what executes today | installer scope §E.3 | — |
 
 **Gate status unchanged by this session:** 0 open · 1 open (worksheet unsigned) ·

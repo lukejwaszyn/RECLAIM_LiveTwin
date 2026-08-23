@@ -50,29 +50,31 @@ Bench replay must end `{'accepted': 3, ..., 'rejected': 0, 'sent': 3}`:
 $env:PYTHONPATH="pi_gateway;cloud_engine;$PWD"; python -m crio_source_record.bench_replay
 ```
 
-### 3. Rehearsal scenarios — 3 to 5 minutes each
+### 3. Rehearsal scenarios — one command each, any time
 
-Three one-command targets. Each is **fully synthetic** (`--feed harness`), binds
-loopback-only, refuses to start if its port is already taken, and prints its
-expected behavior before running. Stop any of them with `Ctrl+C`.
+Every scenario is a single command. Nothing else is required: if the locked
+environment does not exist yet, the runner builds it once on first use, so these
+work from a fresh checkout without running step 1 first.
 
 ```powershell
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal        # 8177  ~3 min 20 s
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage   # 8178  ~3 min 45 s
-.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar          # 8179  ~3 min 20 s
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data
 ```
 
-| Profile | Port | Physics | Wall time | What it shows |
+| Profile | Port | Physics | Cycle | Behavior |
 |---|---:|---|---:|---|
-| `nominal` | 8177 | `earth_lab`, 2x | ~3 min 20 s | Stable 2200 W heat-and-hold, steady advisory display |
-| `power-outage` | 8178 | `earth_lab`, 4x | ~3 min 45 s | Outage at ~1 min 53 s, thermal coast, `S_Restart` at ~3 min 8 s, recovery |
-| `lunar` | 8179 | `lunar_surface`, 2x | ~3 min 20 s | Same cycle under lunar physics, for environment contrast |
+| `nominal` | 8177 | `earth_lab`, 2x | ~3 min 20 s | Stable 2200 W heat-and-hold; **repeats until Ctrl+C** |
+| `power-outage` | 8178 | `earth_lab`, 4x | ~3 min 45 s | Outage at ~1 min 53 s, coast, `S_Restart` at ~3 min 8 s; **repeats until Ctrl+C** |
+| `lunar` | 8179 | `lunar_surface`, 2x | ~3 min 20 s | Same cycle under lunar physics; **repeats until Ctrl+C** |
+| `loss-of-data` | 8181 | `earth_lab`, 2x | ~3 min 20 s | Runs **one** cycle, then stops updating while still serving — the freshness rehearsal |
 
-The runner uses the locked `.venv\Scripts\python.exe` created by step 1 and
-refuses to start without it; pass `-PythonExe <path>` to point at a different
-interpreter.
+Each is fully synthetic (`--feed harness`), binds loopback-only, refuses to start
+if its port is already taken, and prints its expected behavior first. Pass
+`-PythonExe <path>` to use a different interpreter.
 
-Inspect a running scenario on loopback:
+Inspect any running scenario on loopback (substitute the port):
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8177/health
@@ -80,20 +82,24 @@ Invoke-RestMethod http://127.0.0.1:8177/state
 Invoke-RestMethod http://127.0.0.1:8177/history
 ```
 
-**Where to run them.** The scenarios are self-contained — they need only this
-checkout and the locked `.venv`, never the cRIO, the gateway, or a network feed.
-Run them on any machine that is **not** currently serving production `8078`. In
-practice that means the Windows 10 desktop/gateway during a deploy or demo
-session, which keeps machine-level separation from the VM's production port. Do
-not run them on the predictive-engine VM while it serves production: the script's
-port guard is only port-level protection, and `8177`–`8179` must never be routed
-to production or bound as live mission state.
+**`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
+keep answering while the data stops advancing: `/health` still returns 200 with
+`status: running`, but `t_sim` freezes. That is the condition the check exists to
+rehearse — a consumer must detect staleness rather than trust a last-good value.
+Note the engine's own `/state` carries **no wall-clock timestamp or age field**;
+freshness gating lives downstream in the bridge, which requires `state_age_ms`
+and `mode: live` and therefore only accepts the production dual-ingest path.
+Rehearsal on 8177–8181 exercises the engine and its HTTP surface, **not** the
+bridge's freshness/identity gating.
 
-**Loss-of-data / freshness check.** The rehearsal plan calls for a fourth run,
-but it has **no scenario target** (it is installer build scope). Run it by hand:
-start any profile, confirm `/health` is advancing, then stop the producer feed and
-confirm the rx counter stops advancing and `last_ack_age_s` / `last_success_age_s`
-climb. The stack must *report staleness*, not hold or fabricate a last-good value.
+**Where to run them.** The scenarios are self-contained — they need only this
+checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
+that is **not** currently serving production `8078`. In practice that means the
+Windows 10 desktop/gateway during a deploy or demo session, which keeps
+machine-level separation from the VM's production port. Do not run them on the
+predictive-engine VM while it serves production: the script's port guard is only
+port-level protection, and `8177`–`8181` must never be routed to production or
+bound as live mission state.
 
 For every run retain: commit SHA, run ID, timestamps, expected vs observed,
 screenshots, and deviations. Keep synthetic services clearly labeled as rehearsal

@@ -77,6 +77,6 @@ confirming the registered executable path is repository-owned.
   deliberately not in this repository.
 - Production port `8078` remains loopback-only; cloudflared is the only external
   route.
-- Rehearsal ports `8177`–`8179` must never be routed into production or bound as
+- Rehearsal ports `8177`–`8181` must never be routed into production or bound as
   live mission state.
 - All predictive commands remain advisory and must not acquire hardware authority.

@@ -277,7 +277,7 @@ running after cutover — it is a permanent V&V fixture, not scaffolding.
 The rehearsal scenarios run as **separate GET-only engine instances**, never by
 switching the live one. On the Windows VM, start them with
 `cloud_engine\windows\start-rehearsal-scenario.ps1` using `nominal`,
-`power-outage`, or `lunar`. They use loopback ports 8177–8179, publish explicit
+`power-outage`, `lunar`, or `loss-of-data`. They use loopback ports 8177–8181, publish explicit
 `mode=harness` plus scenario/environment metadata, and bind only to separate
 rehearsal Convene namespaces. Start and stop them without touching the live
 stack; the live engine rejects rehearsal-labeled frames by design (§5 proved

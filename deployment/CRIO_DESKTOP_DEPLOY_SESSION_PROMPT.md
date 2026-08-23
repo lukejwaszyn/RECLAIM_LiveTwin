@@ -126,16 +126,18 @@ cloud rejects each one whole (`telemetry_invalid`; MT/MW lost). Record it as Gat
 checklist item 6.3 evidence — **do not "fix" it downstream.**
 
 **Step 6 — Scenarios (optional, advisory-only).** If asked to rehearse, there are
-exactly three one-command targets:
+four one-command targets, and the script's `ValidateSet` accepts nothing else:
 `.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal` (8177),
-`power-outage` (8178), `lunar` (8179) — the script's `ValidateSet` accepts nothing
-else, so do not invent a fourth profile name. The rehearsal plan's fourth item, the
-**loss-of-data/freshness check, has no scenario target yet** (it is installer build
-scope, handoff §E.3). Run that one by hand: stop the producer feed and confirm on
-loopback `/health` that the rx counter stops advancing and `last_ack_age_s` /
-`last_success_age_s` climb — the stack must report staleness, not hold or fabricate
-a last-good value. Ports 8177–8179 must never be routed to production and never
-touch `8078`.
+`power-outage` (8178), `lunar` (8179), `loss-of-data` (8181). The first three loop
+until stopped; `loss-of-data` runs one cycle and then stops updating while still
+serving, so `/health` keeps returning 200 with `status: running` while `t_sim`
+freezes — the stack must report staleness, not hold or fabricate a last-good value.
+The runner builds the locked environment on first use if it is missing. Ports
+8177–8181 must never be routed to production and never touch `8078`.
+
+Note the boundary: rehearsal exercises the engine and its HTTP surface, **not** the
+bridge's freshness/identity gating, which requires `state_age_ms` and `mode: live`
+and so only accepts the production dual-ingest path.
 
 ## 6. Do NOT (guardrails — verbatim)
 

@@ -58,7 +58,7 @@ Success also requires:
 | cRIO | Real LabVIEW source | Not used | Static IP/link, approved source contract, safe operating window |
 | Gateway ingress `:9070` | Receive cRIO telemetry | Not used | Bound only to approved interface; firewall and single-source behavior verified |
 | Gateway status `127.0.0.1:9080` | Local health/latest visibility | Optional display only | `/health` and `/latest` green; raw `/command` is not consumed or surfaced as actionable |
-| Synthetic services `127.0.0.1:8177-8179` | Isolated scenario engines | Required | Never tunnel or route to production |
+| Synthetic services `127.0.0.1:8177-8181` | Isolated scenario engines | Required | Never tunnel or route to production |
 | Windows Server 2025 VM ingest `127.0.0.1:8078` | Production dual push engine | Not used | RT-03/RT-05 green, locked artifact, persistent Windows state path writable, advisory mode, maintenance gate |
 | Cloudflare public route | Authenticated VM egress edge | Not used | Stable hostname, TLS, tokens, route-to-loopback, health and auth checks |
 | Convene rehearsal namespace | Demo visualization | Preferred; local HTTP viewer is fallback | Distinct fields such as `rehearsal_nominal_*`, `rehearsal_outage_*`, and `rehearsal_lunar_*` |
@@ -167,11 +167,12 @@ Expected repeatable results:
 
 | Profile | Port | `/health` identity | Key `/state` or `/history` result |
 |---|---:|---|---|
-| `nominal` | 8177 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=6` | stable `P_fwd=2200`; one 400-s simulated cycle in about 67 wall-clock seconds |
-| `power-outage` | 8178 | `mode=harness`, `scenario=power_outage`, `environment=earth_lab`, `speed=12` | history shows `S_PowerInterrupted` and `P_fwd=0` near 38 wall-clock seconds, then `S_Restart` near 63 seconds; cycle about 75 seconds |
-| `lunar` | 8179 | `mode=harness`, `scenario=nominal`, `environment=lunar_surface`, `speed=6` | stable `P_fwd=2200` under lunar-surface physics; one cycle in about 67 seconds |
+| `nominal` | 8177 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=2` | stable `P_fwd=2200`; one 400-s simulated cycle in about 3 min 20 s wall time, repeating |
+| `power-outage` | 8178 | `mode=harness`, `scenario=power_outage`, `environment=earth_lab`, `speed=4` | history shows `S_PowerInterrupted` and `P_fwd=0` near 1 min 53 s, then `S_Restart` near 3 min 8 s; cycle about 3 min 45 s, repeating |
+| `lunar` | 8179 | `mode=harness`, `scenario=nominal`, `environment=lunar_surface`, `speed=2` | stable `P_fwd=2200` under lunar-surface physics; one cycle in about 3 min 20 s, repeating |
+| `loss-of-data` | 8181 | `mode=harness`, `scenario=nominal`, `environment=earth_lab`, `speed=2` | runs ONE cycle then stops updating while still serving: `/health` stays 200 with `status: running` while `t_sim` freezes |
 
-Repeat the smoke checks for ports `8178` and `8179`. The service retains up to
+Repeat the smoke checks for ports `8178`, `8179`, and `8181`. The service retains up to
 600 history frames; use `/history` during or immediately after the outage cycle
 for the brief interruption and restart transitions so a polling interval cannot
 miss them.
