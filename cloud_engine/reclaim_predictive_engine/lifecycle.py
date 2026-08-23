@@ -73,7 +73,7 @@ class CycleLifecycle:
         self._suspended = False
         # published durations
         self.cycle_elapsed_s = 0.0    # wall-clock since batch load (counts through suspends)
-        self.active_heating_s = 0.0   # accumulated powered time only (pauses on suspend)
+        self.active_heating_s = 0.0   # measured powered time (p_fwd > power_on_w), any phase
 
     def _category(self, op: str) -> str:
         c = self.cfg
@@ -98,6 +98,20 @@ class CycleLifecycle:
         powered = (p_fwd is not None) and (float(p_fwd) > cfg.power_on_w)
         hot = (t_bed is not None) and (float(t_bed) > cfg.ambient_k + cfg.hot_margin_k)
         cid = str(cycle_id) if cycle_id not in (None, "") else None
+
+        # 0) POWERED TIME IS PHYSICAL, NOT VOCABULARY-BASED. active_heating_s keys
+        #    off measured forward power alone, never op_state. The sequencer's
+        #    state names are unratified (Gate 1) and, worse, some of them lie about
+        #    power: S_Restart is classified SUSPEND yet the coupler is delivering
+        #    full power during it. Measuring the physical input instead makes this
+        #    field mean exactly what it says, keeps it consistent with
+        #    consumed_energy_wh (which already integrates power regardless of
+        #    phase), and removes the dependency on the signed-map worksheet.
+        #    Temperature is deliberately NOT used here: the bed stays hot through a
+        #    cooldown or an outage, so it measures "a batch is present" (which is
+        #    what the churn guard below uses `hot` for), not "we are heating".
+        if powered:
+            self.active_heating_s += dt
 
         # 1) SUSPEND has highest precedence. Hold everything; never reset. The batch
         #    is still physically present, so the latch stays set and we resume in place.
@@ -141,8 +155,7 @@ class CycleLifecycle:
         # 4) Phase resolution + duration accounting.
         if self.batch_present:
             self.cycle_elapsed_s += dt
-            if powered:
-                self.active_heating_s += dt
+            if powered:                      # accumulation happens in step 0
                 self.phase = "ACTIVE"
             elif cat == "LOAD":
                 self.phase = "LOADING"

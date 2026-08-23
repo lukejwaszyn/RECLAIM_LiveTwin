@@ -237,7 +237,7 @@ tunnel is an acceptable temporary route:
 
 Its hostname is ephemeral and bearer credentials are the only application-layer
 protection. A named tunnel with an approved DNS name and Access policy is preferred
-for durable interoperability. Never route synthetic ports 8177–8179.
+for durable interoperability. Never route synthetic ports 8177–8181.
 The launcher refuses a competing cloudflared service/process or existing
 configuration, saves the generated base URL to
 `C:\ProgramData\RECLAIM\cloudflared-quick\public-url.txt`, and prints the exact
@@ -320,7 +320,7 @@ PowerShell terminal from the release root:
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
 ```
 
-The profiles use ports 8177, 8178, and 8179 respectively. Verify their explicit
+The profiles use ports 8177, 8178, 8179, and 8181 (`loss-of-data`) respectively. Verify their explicit
 `mode`, `scenario`, `environment`, and `speed` through `/health`; use `/history`
 to capture brief outage/restart transitions. Bind only to the isolated rehearsal
 identities in `CONVENE_REINTEGRATION_HANDOFF.md`.

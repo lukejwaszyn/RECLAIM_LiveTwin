@@ -37,7 +37,7 @@ pass, the stream stays a labeled engineering shadow, NO-GO for any production cl
 - **Windows 10 edge gateway:** `192.168.1.1/24`, TCP receiver `9070` — the Python
   gateway (TCP server). Read-only health/latest on loopback `127.0.0.1:9080`.
 - **Windows Server 2025 predictive-engine VM:** downstream of the gateway; ingest
-  on loopback `8078`; rehearsal scenarios on `8177`–`8179`.
+  on loopback `8078`; rehearsal scenarios on `8177`–`8181`.
 - **Convene:** downstream visualization only.
 
 ## 3. Current state — what changed since the last handoff
@@ -98,7 +98,7 @@ The signed maps are still not signed. Treat `cycle_id`, `source_op_state`,
 
 Run `CRIO_GATEWAY_CUTOVER_RUNSHEET.md` on the Windows 10 edge gateway
 (`192.168.1.1`), stopping at any check that fails: pre-checks + firewall audit;
-config + current tunnel hostname/token; on-gateway pre-flight (55/73/70 + bench
+config + current tunnel hostname/token; on-gateway pre-flight (55/76/70 + bench
 replay); hand the port from the LabVIEW bench reader to the `RECLAIM-EdgeGateway`
 SYSTEM task; watch loopback `9080` (never tunnel it).
 
@@ -166,7 +166,7 @@ path.**
   Require an explicit role (no accidental `all`).
 - **"Update to current specifications":** checkout/verify the pinned SHA, run
   `uv sync --locked --all-extras --dev`, run the component suites (**expect
-  55 / 73 / 70**) and the bench replay, and **refuse to deploy on any red**. Record
+  55 / 76 / 70**) and the bench replay, and **refuse to deploy on any red**. Record
   the deployed SHA.
 - **Wrap, don't replace, the existing guarded scripts:**
   - *gateway:* `configure-crio-network-firewall.ps1` (Audit→Apply),
@@ -196,8 +196,8 @@ path.**
 **E.3 Scenarios.**
 - `-Role scenarios` (or a `Start-Scenario` verb) stands up the rehearsal profiles
   via `cloud_engine/windows/start-rehearsal-scenario.ps1`: **`nominal` (8177)**,
-  **`power-outage` (8178)**, **`lunar` (8179)**, plus the loss-of-data/freshness
-  behavior. Advisory-only; ports `8177`–`8179` must **never** be routed to
+  **`power-outage` (8178)**, **`lunar` (8179)**, and **`loss-of-data` (8181)** —
+  all four are one-command targets. Advisory-only; ports `8177`–`8181` must **never** be routed to
   production or bound as live mission state; the production port `8078` is never
   touched.
 - Expose each scenario's `/health`, `/state`, `/history`; optionally bind the
@@ -209,10 +209,10 @@ path.**
 
 **E.4 Testing/acceptance for the installer itself.**
 - *MacBook side:* `-WhatIf` plan review; `install.py` unit tests;
-  `scripts/check_repository_hygiene.py`; full 55/73/70 + bench replay pre-flight.
+  `scripts/check_repository_hygiene.py`; full 55/76/70 + bench replay pre-flight.
 - *Windows/gateway side:* idempotent re-run yields no changes; rollback path
   exercised; commissioning frame/stream evidence retained; scenario bring-up on
-  `8177`–`8179` with `8078` untouched.
+  `8177`–`8181` with `8078` untouched.
 - *Definition of done:* one command updates+deploys the gateway to the current
   SHA; one command per scenario; a re-run is a no-op; the existing gateway baseline
   stays recoverable; all output advisory.

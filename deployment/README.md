@@ -79,7 +79,7 @@ Read roughly in this order.
 | `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Fault/fix analysis (§4.1 design of record). |
 | `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), advisory-default command authority. |
 | `../cloud_engine/tools/redteam_ingest.py` | Live acceptance harness. |
-| `../cloud_engine/windows/start-rehearsal-scenario.ps1` | Scenario launcher: `nominal` (8177) / `power-outage` (8178) / `lunar` (8179), advisory-only, never production port 8078. |
+| `../cloud_engine/windows/start-rehearsal-scenario.ps1` | Scenario launcher: `nominal` (8177) / `power-outage` (8178) / `lunar` (8179) / `loss-of-data` (8181), advisory-only, never production port 8078. |
 
 ### Stage 3 — Contract gates + V&V (reference, LIVING)
 

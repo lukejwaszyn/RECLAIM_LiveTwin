@@ -202,3 +202,43 @@ def test_new_cycle_id_while_hot_without_a_load_is_suppressed_by_design():
                  + [("S_MicrowaveHeating", "A", 2000.0, HOT)] * 5
                  + [("S_MicrowaveHeating", "B", 2000.0, HOT)] * 5)
     assert _reset_indices(res) == [0]
+
+
+# ---------------------------------------------------------------------------
+# active_heating_s is measured from FORWARD POWER, never from op_state and never
+# from temperature (lifecycle.py step 0). These pin both halves of that rule.
+# ---------------------------------------------------------------------------
+
+def test_active_heating_counts_powered_time_even_in_a_suspend_state():
+    """S_Restart is classified SUSPEND but the coupler is delivering full power.
+
+    Regression: SUSPEND used to return before the powered check, so the restart
+    window was counted by consumed_energy_wh but not by active_heating_s -- two
+    published fields disagreeing about the same seconds. Powered time is powered
+    time regardless of what the sequencer calls the phase.
+    """
+    fsm = CycleLifecycle()
+    _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+           + [("S_MicrowaveHeating", "A", 3500.0, HOT)] * 10)
+    assert fsm.active_heating_s == pytest.approx(10.0)
+
+    # 20 s of S_Restart WITH power on -> must be counted
+    _drive(fsm, [("S_Restart", "A", 3500.0, HOT)] * 20)
+    assert fsm.active_heating_s == pytest.approx(30.0)
+    assert fsm.phase == "SUSPENDED"          # phase label is still the sequencer's
+
+
+def test_active_heating_ignores_a_hot_but_unpowered_chamber():
+    """Temperature must NOT drive this field: the bed stays hot through an outage
+    and a cooldown, so gating on `hot` would book phantom heating (it would count
+    the power-outage scenario's entire 300 s outage)."""
+    fsm = CycleLifecycle()
+    _drive(fsm, [("S_BatchLoad", "A", 0.0, COLD)]
+           + [("S_MicrowaveHeating", "A", 3500.0, HOT)] * 10)
+    baseline = fsm.active_heating_s
+
+    # hot the whole time, zero power, across outage + cooldown + idle
+    _drive(fsm, [("S_PowerInterrupted", "A", 0.0, HOT)] * 30
+           + [("S_CoolDown", "A", 0.0, HOT)] * 30
+           + [("S_Idle", "A", 0.0, HOT)] * 30)
+    assert fsm.active_heating_s == pytest.approx(baseline)

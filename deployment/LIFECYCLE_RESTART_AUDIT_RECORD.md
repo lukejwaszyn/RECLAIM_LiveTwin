@@ -18,7 +18,7 @@ and are controls/onsite-owned.** Nothing here signs any of them.
 | Suite | Count | Result |
 |---|---|---|
 | `pi_gateway` | 55 | pass |
-| `cloud_engine` | 73 | pass (was 67; +6 added this session, §3) |
+| `cloud_engine` | 74 | pass (was 67; +6 churn-guard tests, +1 stalled-status regression, §3) |
 | `crio_source_record` | 70 | pass |
 
 **Gateway graceful closure.** `pi_gateway/reclaim_edge/main.py:49-50` traps
@@ -51,44 +51,55 @@ across five permutations and behaved correctly in all of them:
 
 ---
 
-## 2. Finding still OPEN — `active_heating_s` vs `consumed_energy_wh`
+## 2. RESOLVED — `active_heating_s` now measured from forward power
 
-**Not fixed. Requires a semantics decision, and is coupled to Gate 1.**
+**Was:** `active_heating_s` excluded 20 s / 19.4 Wh of genuinely powered time in
+`power_outage_scenario`, because `S_Restart` is a member of `suspend_states` and
+the SUSPEND branch returned before the powered check — while `consumed_energy_wh`
+counted those same seconds. Two published fields disagreeing about the same 20 s,
+with any derived average power reading ~3.4% high.
 
-In `power_outage_scenario` (`harness.py:146`) forward power returns to 3500 W at
-t=750 s while `op_state` remains `S_Restart` until t=770 s. `S_Restart` is a member
-of `suspend_states` (`lifecycle.py:51`), and the SUSPEND branch returns at
-`lifecycle.py:108` *before* the powered check. Measured over the full 900 s
+**Resolved by changing the signal, not the state table.** Powered time is now
+measured physically, from forward power alone (`lifecycle.py` step 0):
+
+```python
+if powered:                      # p_fwd > cfg.power_on_w
+    self.active_heating_s += dt
+```
+
+This runs before the SUSPEND early-return, so it is independent of what the
+sequencer calls the phase. Phase labelling (IDLE / ACTIVE / SUSPENDED) still uses
+`op_state` — that is what a sequencer is for — but *duration accounting* no longer
+does.
+
+**Why this beats waiting for Gate 1.** The state vocabulary is unratified and, in
+at least one case, actively misleading: `S_Restart` is classified as a suspend
+state while the coupler delivers full power. Keying the field to the measured
+input makes it mean what its name says, puts it in agreement with
+`consumed_energy_wh` (which already integrated power regardless of phase), and
+**removes the dependency on the signed-map worksheet entirely.** The open Gate 1
+question is no longer blocking this metric.
+
+**Why NOT thermocouple temperature.** Temperature is a lagging, integrating
+signal — the bed stays hot through an outage and a cooldown, which is exactly the
+"thermal coast" the power-outage scenario exists to show. Measured over that
 scenario:
 
-```
-true powered time     : 600 s
-FSM active_heating_s  : 580 s
-uncounted             :  20 s  =  19.4 Wh of 583.3 Wh  (3.3% of cycle energy)
-```
+| Gating signal | Counted | vs true 600 s |
+|---|---:|---|
+| **Forward power (implemented)** | **600 s** | exact |
+| Temperature (`hot`) | 900 s | **+300 s phantom, 50% overcount** |
 
-Both fields are published (`engine.py:261,267`) and are already read together
-downstream (`tools/redteam_ingest.py:169`). Any average power derived as
-`consumed_energy_wh / active_heating_s` reads ~3.4% high for a cycle containing a
-restart.
+Temperature would have booked the entire 300 s outage as heating. It remains the
+right signal for a different question — "is a batch physically present" — which is
+what the churn guard uses `hot` for. Power for *is it heating*, temperature for
+*is something in there*.
 
-The field's own comment is internally contradictory exactly here — "accumulated
-powered time only (**pauses on suspend**)" — so this is a definition question, not
-an obvious coding error:
-
-- **Option A** — `active_heating_s` means *powered seconds*: accumulate it inside
-  the SUSPEND branch when `p_fwd` is above threshold. Preserves hold/no-reset.
-- **Option B** — it means *seconds in a non-suspended phase*: current behavior is
-  correct; document the divergence so nobody derives average power from the pair.
-- **Option C** — `S_Restart` is recovery-with-power and does not belong in
-  `suspend_states` at all.
-
-**Blocked on Gate 1.** `LifecycleConfig`'s docstring already says to "confirm the
-sets and thresholds against the real sequencer," and the acceptance handoff states
-the signed maps are **unsigned** — `source_op_state` is unratified. The open
-question for controls is concrete: **does the real sequencer's `S_Restart` carry
-forward power?** If it does, this gap reaches live data, not just the rehearsal.
-No code was changed pending that answer.
+**Verified:** the scenario that exposed the gap now reports 600 s counted of 600 s
+true, 0 uncounted. Regression tests
+`test_active_heating_counts_powered_time_even_in_a_suspend_state` and
+`test_active_heating_ignores_a_hot_but_unpowered_chamber` pin both halves
+(cloud_engine 74 → 76). All pre-existing tests passed unchanged.
 
 ---
 
@@ -137,6 +148,106 @@ read-first list never had them open that checklist.
 
 ---
 
+## 3b. Bug found and FIXED — stalled stream kept reporting `status: running`
+
+**Found by** building the `loss-of-data` rehearsal. **Fixed** in
+`cloud_engine/reclaim_predictive_engine/service.py`.
+
+`TwinStateService.update()` set `status = "running"` on every frame and nothing
+ever cleared it. When the driver finished — a `--no-loop` run, or an exhausted
+replay — the daemon driver thread simply returned while `serve_forever()` kept
+the HTTP surface up. `/health` and `/state` then advertised **`status: running`
+over a record that could no longer change**, alongside a reassuring
+`advisory_message: "All residuals within bounds"`. A consumer could not tell a
+live stream from a dead one, which is precisely the failure the loss-of-data
+check exists to expose.
+
+**Fix.** Added `TwinStateService.mark_stopped()` and wrapped both drivers so that
+whichever one runs flags the stream on return:
+
+- `status` flips `running` → `stopped`; the frozen values stay readable.
+- The latest view is **copied before mutation**, so the history entry keeps the
+  status it actually had while live — history is not retroactively rewritten.
+- Idempotent, and a later `update()` revives it to `running` (so a looping
+  scenario is unaffected).
+
+**Verified** end to end: a `--no-loop` cycle reported `status: running, t_sim:
+304.0` mid-run and `status: stopped, t_sim: 400.0` after completion, on both
+`/health` and `/state`. Regression test:
+`test_stopped_stream_does_not_keep_reporting_running` (cloud_engine 73 → 74).
+
+**Still true, and not a bug:** `/state` carries no wall-clock timestamp and no age
+field, so the engine can answer "not advancing" but never "how stale." Real
+freshness gating lives in the bridge (`convene_bridge/contract.py`), which
+requires `state_age_ms` and `mode: live` and therefore only accepts the
+production dual-ingest path. Rehearsal exercises the engine, not that gating.
+
+---
+
+## 3c. Convene `gw_` audit tap — PROVEN on the live gateway
+
+The `gw_` tap was never broken. It had never been **exercised**: the gateway had
+`received: 0`, and the publisher loads its credential lazily on first delivery,
+so `machine_id` was null and nothing had ever been attempted. Convene showed the
+machine as connected because the *agent* heartbeat updates presence before it
+500s — presence is not telemetry.
+
+One labeled synthetic frame (`COMMISSIONING-NOT-CRIO-20260823T203214Z`) sent into
+`192.168.1.1:9070` settled it. Both seams delivered:
+
+```
+received: 0 -> 1        delivered: 1        queue_depth: 0
+last_ack_age_s: 18.23   dead_lettered_session: 0
+convene: machine_id BcryPSMP2iLbSRns5uhm, delivered 1, failed 0, last_success_age_s 18.48
+```
+
+So Seam A (cRIO-style TCP -> framer -> durable queue), Seam B (Cloudflare -> VM
+`/ingest`, **acked**), and the independent Convene `gw_` tap all work on the
+current build. The remaining Convene defect is unrelated and backend-owned: the
+agent's heartbeat/command plane still returns HTTP 500 for want of the Firestore
+composite `machineCommands` index (2622 occurrences in `agent.log`).
+
+**Doc correction:** the live desktop identity is `BcryPSMP2iLbSRns5uhm`, and the
+SYSTEM profile and user profile now hold the *same* credential. The three machine
+IDs named in `GATEWAY_GO_LIVE.md` §9.8 (`6xai…` revoked, `NziS…`, `2rIt…`) are all
+historical; the 2026-08-19 SYSTEM/user divergence is resolved.
+
+---
+
+## 3d. Bug found and FIXED (pre-existing) — runner unparseable in Windows PowerShell 5.1
+
+`start-rehearsal-scenario.ps1` was saved as UTF-8 **without a BOM** while containing
+non-ASCII em dashes. Windows PowerShell 5.1 decodes a BOM-less `.ps1` as ANSI, so
+`—` (`E2 80 94`) became `a-euro-"` in CP1252 — and that trailing `0x94` is a
+smart closing quote, which terminated the string early and cascaded into
+`The string is missing the terminator: "`. The script would not run **at all** under
+the very shell the deploy prompt mandates ("run elevated Windows PowerShell 5.1").
+
+**Pre-existing, not introduced by this session's rewrite:** the same failure
+reproduces on the original at `9e8e898^`. It went unnoticed because a syntax check
+run under **pwsh 7** parses the file fine — pwsh assumes UTF-8. Anything validating
+these scripts must do so under 5.1, or the check is worthless.
+
+**Fix.** The runner is now pure ASCII (`assert` on write). Verified: parses OK under
+5.1, and a full one-command run bootstrapped the locked environment and served
+`/health` on 8177.
+
+**Blast radius checked:** only two `.ps1` files in the repo contain non-ASCII. The
+other, `deployment/convene-setup-2.ps1`, parses fine under 5.1 (its degree sign and
+box-drawing characters do not mojibake into a quote). **Every cutover script**
+(`configure-crio-network-firewall`, `finalize-gateway-config`, `install-gateway-task`,
+`send-commissioning-*`, `repair-convene-desktop-agent`) is ASCII-clean and unaffected.
+
+**Convention going forward:** keep `.ps1` files ASCII-only. It removes the encoding
+dependency entirely rather than relying on a BOM surviving future edits.
+
+**Second, separate gotcha (documented, not a code bug):** execution policy blocks
+these scripts on a default Windows install. The repo convention already used
+elsewhere is `powershell -NoProfile -ExecutionPolicy Bypass -File <script>`; the
+root README now uses that form for the scenarios.
+
+---
+
 ## 4. Running the scenarios
 
 **Three one-command targets, advisory-only, loopback-bound:**
@@ -145,16 +256,18 @@ read-first list never had them open that checklist.
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal        # 8177, earth_lab,     2x -> ~3m20s
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage   # 8178, earth_lab,     4x -> ~3m45s
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar          # 8179, lunar_surface, 2x -> ~3m20s
+.\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data   # 8181, earth_lab,     2x -> one cycle, then stale
 ```
 
 Each refuses to start if its port already has a listener, prints its expected
 behavior, and exposes `/health`, `/state`, `/history` on `127.0.0.1`. **Ports
-8177–8179 must never be routed to production; `8078` is never touched.**
+8177–8181 must never be routed to production; `8078` is never touched.**
 
 **The rehearsal plan wants four runs** (`NEXT_SESSION_CD_REHEARSAL_PLAN.md:164-168`)
-— nominal ×2, power-outage ×1, lunar ×1, **loss-of-data ×1**. The fourth has **no
-scenario target**; handoff §E.3 lists it as installer build scope. Until that
-exists, run it by hand:
+— nominal ×2, power-outage ×1, lunar ×1, **loss-of-data ×1**. All four are now
+one-command targets (`loss-of-data` added on 8181, running one cycle with
+`--no-loop` so the endpoints keep serving while the data stops advancing). The
+equivalent check on the gateway is still manual:
 
 > Bring up any profile, confirm `/health` is advancing, then **stop the producer
 > feed**. Confirm the rx counter stops advancing and `last_ack_age_s` /
@@ -170,16 +283,56 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 
 ---
 
+## 4b. DEFERRED until the cRIO link is live — physics-derived identity
+
+**Decision (2026-08-23, owner):** do not design against the current channel list.
+The VI will supply different semantics; `cycle_id`, `source_op_state`, and
+`active_chamber` get resolved once the cRIO link is established and working.
+Recorded here only so the reasoning is not re-derived later.
+
+**The method transfers even though the names will not.** `lifecycle.py` and
+`engine.py` contain **zero** raw channel references — they consume normalized
+values (`p_fwd`, `z`, `op_state`). Raw names live only at the translation
+boundary (`labview_map.py`, `push_ingest_dual.py`, `crio_source_record/*`). A VI
+semantics change therefore lands in the mapping layer, not the physics, and the
+`active_heating_s` fix in §2 survives any renaming because "forward power" is a
+concept that exists under any naming.
+
+**What was established before deferring** (re-check against the real VI):
+
+- *`active_chamber`* — derive from **per-chamber forward power**, not hot/cold.
+  Thermal lag means a chamber that finished minutes ago is still the hottest, so
+  "hottest = active" points at the wrong chamber through every cooldown. Rule:
+  active = chamber with `P_fwd` over threshold; if neither is powered, **latch the
+  last powered one** rather than falling back to hottest.
+- *`op_state`* — asymmetric between chambers on the current list. PL carries
+  boolean phase flags (`PL_preprocess` / `PL_process` / `PL_postprocess`) plus
+  pumps and pressure, so evacuate / seal-check / heat / cooldown are all
+  observable without the state string. MT has two thermocouples and power only —
+  heating / cooling / idle are inferable, evacuation and product handling are not.
+- *`cycle_id`* — the weakest to derive, and the one to keep as a supplied ID if
+  controls can produce any stable one. A batch boundary needs a **load/unload
+  bracket**, not a power or thermal edge (a power edge cannot distinguish "batch
+  finished" from "power cut mid-run" — the governing principle in `lifecycle.py`).
+  PL has a real bracket: chamber pressure returning to atmosphere with pumps off
+  means the chamber was opened and the charge changed. MT has no pressure or pump
+  channel, so no physical batch signature. Note also that a derived counter is an
+  ordinal local to an engine run — unlike a real ID it does not survive a restart,
+  so it would need persisting.
+
+---
+
 ## 5. Still open
 
 | # | Item | Owner | Blocking |
 |---|---|---|---|
-| 1 | `active_heating_s` / `S_Restart` semantics (§2) | engine + controls | Gate 1 signature |
-| 2 | **Convene `gw_` binding not live** — code path exists (`ConvenePublisher`, mapping, tests) but `convene_enabled: false` in both configs; needs https endpoint + credentials on the gateway | gateway | Convene backend |
+| 1 | ~~`active_heating_s` / `S_Restart` semantics~~ — **resolved** by measuring forward power instead of op_state (§2) | — | closed |
+| 2 | ~~Convene `gw_` binding not live~~ — **PROVEN 2026-08-23** on the live gateway (§3c); runtime config already had `convene_enabled: true` (repo templates ship `false` by design) | — | closed |
 | 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
 | 5 | **Signed maps UNSIGNED** — `cycle_id`, `source_op_state`, `active_chamber` and every raw channel are placeholder/unratified | controls | Gate 1 |
-| 6 | Loss-of-data one-command target (§4) | installer scope §E.3 | — |
+| 5b | ~~159 persisted dead-lettered frames~~ — **accepted 2026-08-23**: old frames are not of interest provided new ones publish, and the live probe delivered clean (`delivered 1, failed 0, dead_lettered_session 0`). Data left in place rather than purged; purge is a separate explicit action | — | closed |
+| 6 | ~~Loss-of-data one-command target~~ — **done**, `loss-of-data` profile on 8181 | — | closed |
 | 7 | `deploy\Install-ReclaimLiveTwin.ps1` does not exist; the runsheet path is what executes today | installer scope §E.3 | — |
 
 **Gate status unchanged by this session:** 0 open · 1 open (worksheet unsigned) ·

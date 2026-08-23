@@ -287,7 +287,7 @@ Convene UI acceptance steps.
 - Capture visible Convene correlation and the full lease-aware live predicate.
 - Replace the ephemeral quick tunnel with an approved named route/DNS decision for
   durable operations.
-- Run and capture nominal (`8177`), power-outage (`8178`), and lunar (`8179`)
+- Run and capture nominal (`8177`), power-outage (`8178`), lunar (`8179`), and loss-of-data (`8181`)
   isolated rehearsal profiles. Never route these ports into production bindings.
 - Confirm VM-disk persistence across the outer Kubernetes/VM lifecycle.
 - Keep all predictive outputs advisory. No script or Convene binding created here
