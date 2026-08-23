@@ -27,20 +27,20 @@ py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
 python scripts\check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **55 / 74 / 70**
+### 2. Tests — expect **55 / 76 / 70**
 
 Each suite needs its own package root on `PYTHONPATH`. Green across all three is
 the pre-flight go-signal; **any red means stop, do not deploy.**
 
 ```powershell
 $env:PYTHONPATH="pi_gateway";         python -m pytest pi_gateway -q          # 55
-$env:PYTHONPATH="cloud_engine";       python -m pytest cloud_engine -q        # 74
+$env:PYTHONPATH="cloud_engine";       python -m pytest cloud_engine -q        # 76
 $env:PYTHONPATH="crio_source_record"; python -m pytest crio_source_record -q  # 70
 ```
 
 ```bash
 PYTHONPATH=pi_gateway         python -m pytest pi_gateway -q          # 55
-PYTHONPATH=cloud_engine       python -m pytest cloud_engine -q        # 74
+PYTHONPATH=cloud_engine       python -m pytest cloud_engine -q        # 76
 PYTHONPATH=crio_source_record python -m pytest crio_source_record -q  # 70
 ```
 

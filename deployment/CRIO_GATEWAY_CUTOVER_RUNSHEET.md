@@ -56,7 +56,7 @@ From the repo root on the gateway (matching versions of this branch):
 
 ```
 cd pi_gateway          && PYTHONPATH=%CD% python -m pytest tests -q   REM expect 55
-cd ..\cloud_engine     && PYTHONPATH=%CD% python -m pytest tests -q   REM expect 74
+cd ..\cloud_engine     && PYTHONPATH=%CD% python -m pytest tests -q   REM expect 76
 cd ..\crio_source_record && PYTHONPATH=..  python -m pytest tests -q  REM expect 70
 cd .. && set PYTHONPATH=pi_gateway;cloud_engine;%CD% && python -m crio_source_record.bench_replay
 ```

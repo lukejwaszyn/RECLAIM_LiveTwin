@@ -91,7 +91,7 @@ file-hash inventory under `C:\RECLAIM\pi_gateway`, Python/packages, config +
 
 **Step 1 — Pre-flight (green is the go-signal).** From the checkout:
 `py -3.13 -m uv sync --locked --all-extras --dev --python 3.13`, then run the three
-suites and the bench replay. Expect **55 / 74 / 70** and bench replay
+suites and the bench replay. Expect **55 / 76 / 70** and bench replay
 `accepted 3 / rejected 0`. Any red: **stop**, do not deploy onto a failing build.
 
 **Step 2 — Configure to current spec.**
@@ -168,7 +168,7 @@ would affect control, interlocks, outputs, watchdogs, or the USB logger.
 
 ## 8. Handback report (produce at the end)
 
-Report: SHA deployed; pre-flight results (55/74/70 + bench replay); listener/port
+Report: SHA deployed; pre-flight results (55/76/70 + bench replay); listener/port
 ownership before and after; a redacted `/health` and `/latest` sample; the
 conformance result; any config/mapping deviations; explicit confirmation that no
 command/actuation path was connected; and the standing status — **labeled

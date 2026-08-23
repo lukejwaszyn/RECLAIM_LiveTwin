@@ -51,44 +51,55 @@ across five permutations and behaved correctly in all of them:
 
 ---
 
-## 2. Finding still OPEN — `active_heating_s` vs `consumed_energy_wh`
+## 2. RESOLVED — `active_heating_s` now measured from forward power
 
-**Not fixed. Requires a semantics decision, and is coupled to Gate 1.**
+**Was:** `active_heating_s` excluded 20 s / 19.4 Wh of genuinely powered time in
+`power_outage_scenario`, because `S_Restart` is a member of `suspend_states` and
+the SUSPEND branch returned before the powered check — while `consumed_energy_wh`
+counted those same seconds. Two published fields disagreeing about the same 20 s,
+with any derived average power reading ~3.4% high.
 
-In `power_outage_scenario` (`harness.py:146`) forward power returns to 3500 W at
-t=750 s while `op_state` remains `S_Restart` until t=770 s. `S_Restart` is a member
-of `suspend_states` (`lifecycle.py:51`), and the SUSPEND branch returns at
-`lifecycle.py:108` *before* the powered check. Measured over the full 900 s
+**Resolved by changing the signal, not the state table.** Powered time is now
+measured physically, from forward power alone (`lifecycle.py` step 0):
+
+```python
+if powered:                      # p_fwd > cfg.power_on_w
+    self.active_heating_s += dt
+```
+
+This runs before the SUSPEND early-return, so it is independent of what the
+sequencer calls the phase. Phase labelling (IDLE / ACTIVE / SUSPENDED) still uses
+`op_state` — that is what a sequencer is for — but *duration accounting* no longer
+does.
+
+**Why this beats waiting for Gate 1.** The state vocabulary is unratified and, in
+at least one case, actively misleading: `S_Restart` is classified as a suspend
+state while the coupler delivers full power. Keying the field to the measured
+input makes it mean what its name says, puts it in agreement with
+`consumed_energy_wh` (which already integrated power regardless of phase), and
+**removes the dependency on the signed-map worksheet entirely.** The open Gate 1
+question is no longer blocking this metric.
+
+**Why NOT thermocouple temperature.** Temperature is a lagging, integrating
+signal — the bed stays hot through an outage and a cooldown, which is exactly the
+"thermal coast" the power-outage scenario exists to show. Measured over that
 scenario:
 
-```
-true powered time     : 600 s
-FSM active_heating_s  : 580 s
-uncounted             :  20 s  =  19.4 Wh of 583.3 Wh  (3.3% of cycle energy)
-```
+| Gating signal | Counted | vs true 600 s |
+|---|---:|---|
+| **Forward power (implemented)** | **600 s** | exact |
+| Temperature (`hot`) | 900 s | **+300 s phantom, 50% overcount** |
 
-Both fields are published (`engine.py:261,267`) and are already read together
-downstream (`tools/redteam_ingest.py:169`). Any average power derived as
-`consumed_energy_wh / active_heating_s` reads ~3.4% high for a cycle containing a
-restart.
+Temperature would have booked the entire 300 s outage as heating. It remains the
+right signal for a different question — "is a batch physically present" — which is
+what the churn guard uses `hot` for. Power for *is it heating*, temperature for
+*is something in there*.
 
-The field's own comment is internally contradictory exactly here — "accumulated
-powered time only (**pauses on suspend**)" — so this is a definition question, not
-an obvious coding error:
-
-- **Option A** — `active_heating_s` means *powered seconds*: accumulate it inside
-  the SUSPEND branch when `p_fwd` is above threshold. Preserves hold/no-reset.
-- **Option B** — it means *seconds in a non-suspended phase*: current behavior is
-  correct; document the divergence so nobody derives average power from the pair.
-- **Option C** — `S_Restart` is recovery-with-power and does not belong in
-  `suspend_states` at all.
-
-**Blocked on Gate 1.** `LifecycleConfig`'s docstring already says to "confirm the
-sets and thresholds against the real sequencer," and the acceptance handoff states
-the signed maps are **unsigned** — `source_op_state` is unratified. The open
-question for controls is concrete: **does the real sequencer's `S_Restart` carry
-forward power?** If it does, this gap reaches live data, not just the rehearsal.
-No code was changed pending that answer.
+**Verified:** the scenario that exposed the gap now reports 600 s counted of 600 s
+true, 0 uncounted. Regression tests
+`test_active_heating_counts_powered_time_even_in_a_suspend_state` and
+`test_active_heating_ignores_a_hot_but_unpowered_chamber` pin both halves
+(cloud_engine 74 → 76). All pre-existing tests passed unchanged.
 
 ---
 
@@ -242,7 +253,7 @@ screenshots, deviations. Keep synthetic services clearly labeled rehearsal data.
 
 | # | Item | Owner | Blocking |
 |---|---|---|---|
-| 1 | `active_heating_s` / `S_Restart` semantics (§2) | engine + controls | Gate 1 signature |
+| 1 | ~~`active_heating_s` / `S_Restart` semantics~~ — **resolved** by measuring forward power instead of op_state (§2) | — | closed |
 | 2 | ~~Convene `gw_` binding not live~~ — **PROVEN 2026-08-23** on the live gateway (§3c); runtime config already had `convene_enabled: true` (repo templates ship `false` by design) | — | closed |
 | 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
