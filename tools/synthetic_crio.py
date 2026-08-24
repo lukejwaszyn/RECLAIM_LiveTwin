@@ -262,16 +262,17 @@ def main(argv: list[str] | None = None) -> int:
         while True:
             cycle += 1
             frames = plant_frames(args.scenario, args.env, cycle, args.active_chamber)
-            first_emission = True
+            cycle_started = time.monotonic()
+            emission_index = 0
             for t, frame, _dt in emission_frames(frames, args.speed, args.emit_hz):
-                if not first_emission:
-                    time.sleep(1.0 / args.emit_hz)
-                first_emission = False
+                deadline = cycle_started + emission_index / args.emit_hz
+                time.sleep(max(0.0, deadline - time.monotonic()))
                 if args.dry_run:
                     print(json.dumps(frame))
                 else:
                     crio.send(frame)
                 sent += 1
+                emission_index += 1
                 if args.max_frames and sent >= args.max_frames:
                     log.info("reached --max-frames %d; stopping", args.max_frames)
                     return 0

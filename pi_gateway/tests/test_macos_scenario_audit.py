@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "pi_gateway" / "macos" / "audit-scenario-host.sh"
 RUNNER = ROOT / "pi_gateway" / "macos" / "start-rehearsal-scenario.sh"
+LAUNCH_HELPER = ROOT / "pi_gateway" / "macos" / "scenario_launch_service.py"
 
 
 def test_scenario_audit_checks_route_ownership_and_complete_text_frame():
@@ -34,3 +35,17 @@ def test_scenario_runner_defaults_to_one_fast_bounded_cycle():
     assert 'scenario=lunar_surface_process' in text
     assert 'speed=12.857142857142858' in text
     assert 'speed=15' in text
+    assert 'mkdir "$lock_dir"' in text
+    assert 'duplicate command ignored' in text
+    assert 'launch_label="com.reclaim.scenario-runner"' in text
+    assert 'scenario_launch_service.py' in text
+    assert '"$launch_helper" start --plist' in text
+
+
+def test_scenario_launch_service_is_one_shot_and_not_keepalive():
+    text = LAUNCH_HELPER.read_text(encoding="utf-8")
+    assert '"RunAtLoad": True' in text
+    assert '"KeepAlive": False' in text
+    assert '"ProcessType": "Background"' in text
+    assert '"bootstrap", DOMAIN' in text
+    assert '"bootout", f"{DOMAIN}/{LABEL}"' in text

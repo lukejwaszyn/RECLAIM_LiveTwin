@@ -143,7 +143,10 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 
 `PL` drives the plastics sensor bank and `MT` drives the metals sensor bank. The
 selected value is also published as `active_chamber`. Only one scenario sender
-may run at a time. Each command defaults to one compressed cycle with
+may run at a time. Duplicate Convene Run-command dispatch is rejected by an
+atomic start lock. The sender runs as a separate one-shot launchd job with
+`KeepAlive=false`, so a Convene-agent restart cannot terminate it and launchd
+cannot repeat it after completion. Each command defaults to one compressed cycle with
 profile-specific pacing: power outage emits 211 frames over about 3 minutes 30
 seconds, reaches approximately 680°C (above the 660°C aluminum melt threshold),
 and ends powered off in cooldown. Lunar surface emits 301 frames over about 5

@@ -91,6 +91,11 @@ about 1 minute 40 seconds. Set
 `RECLAIM_SCENARIO_CYCLES=0` to deliberately repeat until stopped. Leave
 `RECLAIM_SCENARIO_EMIT_HZ` at its default of `1` for Convene.
 
+The MacBook starts each scenario as a separate one-shot per-user launchd job,
+not as a child of the Convene agent. Restarting Convene therefore cannot kill an
+active scenario. An atomic start lock rejects duplicated Run-command dispatch,
+and `KeepAlive=false` prevents launchd from restarting a completed cycle.
+
 The MacBook never connects to the real cRIO. Obsolete Windows/Mac direct scenario
 publishers are archived and cannot be invoked from the active tree.
 
@@ -122,7 +127,8 @@ time to reject stale output rather than treating a last-good value as fresh.
 **Verification.** While a scenario runs, the watched value in Convene should
 change on each Convene poll (target approximately one second). Playback speed is
 profile-specific, but the File Watch file is replaced exactly once per
-wall-clock second. Local verification is:
+wall-clock second using monotonic start-to-start deadlines, so processing time
+does not accumulate timing drift. Local verification is:
 
 ```bash
 curl --fail http://127.0.0.1:9080/health

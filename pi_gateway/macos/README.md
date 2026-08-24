@@ -62,6 +62,11 @@ or slow playback. Set `RECLAIM_SCENARIO_CYCLES=0` only when deliberate repetitio
 until `stop` is required. Use `run` in place of `start` only when a foreground
 process is useful. Leave `RECLAIM_SCENARIO_EMIT_HZ=1` for the Convene route.
 
+`start` uses a separate one-shot per-user launchd service with `KeepAlive=false`.
+It survives a Convene-agent restart but never restarts itself after a completed
+cycle. An atomic lock rejects simultaneous duplicate starts before either can
+connect to the loopback receiver.
+
 Examples:
 
 ```bash
@@ -75,7 +80,7 @@ RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
 
 Convene polling is targeted at approximately one second. Playback speed is
 profile-specific, while the complete File Watch frame is replaced exactly once
-per wall-clock second. Power outage therefore produces 211 frames over about
+per wall-clock second on monotonic start-to-start deadlines. Power outage therefore produces 211 frames over about
 3:30, reaches approximately 680°C (above the 660°C aluminum melt threshold),
 then ends powered off in cooldown. Lunar surface produces 301 frames over about
 5:00, reaches approximately 450°C at 700 Torr, and performs an extended
