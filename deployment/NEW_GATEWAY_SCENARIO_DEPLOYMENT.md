@@ -10,7 +10,7 @@
 cRIO or explicitly started TruthPlant scenario
   -> raw LF-delimited JSON -> 192.168.1.1:9070
   -> one RECLAIM-EdgeGateway process
-       -> direct Convene /machine/publish -> gw_*
+       -> direct Convene /machine/publish -> exact raw PL_*/MT_*/MW_* names
        -> durable authenticated HTTPS /ingest
   -> one production VM DualPushEngine
   -> VM state bridge + Convene agent -> sim_*
@@ -85,7 +85,8 @@ and no inbound exposure of loopback status port 9080.
 ## 4. Provision Convene and cloud ingress
 
 Provision the desktop/SYSTEM Convene machine credential through the approved
-pairing procedure. It must publish only the gateway-owned `gw_*` namespace.
+pairing procedure. It publishes gateway-owned raw source names without a `gw_`
+prefix and never publishes `sim_*`.
 Audit it without printing the credential:
 
 ```powershell
@@ -158,7 +159,7 @@ Invoke-RestMethod http://127.0.0.1:9080/latest
 PASS requires received and cloud-delivered counters to advance, Convene-delivered
 to advance without failures, queue depth to return to zero, no dead-letter
 increase, cloud engine run/source/sequence correlation, visible advancing
-`gw_*` and `sim_*`, and stale-state expiry after the stream stops. Tests alone
+raw source names and `sim_*`, and stale-state expiry after the stream stops. Tests alone
 are not live acceptance.
 
 After acceptance, normal scenario operation uses:

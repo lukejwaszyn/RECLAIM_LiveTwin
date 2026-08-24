@@ -60,6 +60,25 @@ _MW_GLOBALS = ("MW_freq", "MW_width", "MW_period", "MW_water_temp", "MW_flow_rat
 _PL_FLAGS = ("PL_process", "PL_preprocess", "PL_postprocess",
              "PL_chamber_pump", "PL_purge_pump")
 
+# Authoritative 34-field source-record contract. These are read-only engine
+# inputs and retain their exact LabVIEW spelling/case at the ingest boundary.
+LABVIEW_RAW_FIELDS = (
+    "PL_surface_temp", "PL_output_pressure", "PL_chamber_pressure",
+    "PL_top_condenser_temp", "PL_bottom_condenser_temp", "PL_wall1",
+    "PL_wall2", "PL_bottom1", "PL_bottom2", "PL_bottom3", "PL_bottom4",
+    "PL_flow_meter", "PL_process", "PL_preprocess", "MW_reverse_coupler",
+    "PL_postprocess", "PL_chamber_pump", "PL_purge_pump",
+    "MT_crucible_temperature", "MT_top", "MT_bottom", "MW_water_state",
+    "MW_flow_state", "MW_RF", "MW_status", "MW_power", "MW_reverse",
+    "MW_period", "MW_width", "MW_freq", "MW_water_temp", "MW_flow_rate",
+    "PL_Probe1", "PL_Probe2",
+)
+LABVIEW_BOOLEAN_FIELDS = frozenset({
+    "PL_process", "PL_preprocess", "PL_postprocess", "PL_chamber_pump",
+    "PL_purge_pump", "MW_water_state", "MW_flow_state", "MW_RF", "MW_status",
+})
+LABVIEW_NUMERIC_FIELDS = frozenset(LABVIEW_RAW_FIELDS) - LABVIEW_BOOLEAN_FIELDS
+
 
 def _temp_K(v):
     """degC -> K. Exact zero is a valid measurement unless a separate,
