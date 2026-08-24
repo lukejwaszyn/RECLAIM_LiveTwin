@@ -49,10 +49,10 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 
 The same command starts, reports, and stops the one allowed scenario process.
 `start` runs in the background. Every start requires an explicit `PL` or `MT`;
-all four profiles support either chamber. The default is one bounded cycle at 4×
-speed with a fixed 1 Hz output cadence. Power outage therefore finishes in about
-3 minutes 46 seconds, while
-nominal, lunar surface, and loss of data finish in about 1 minute 41 seconds.
+all four profiles support either chamber. The default is one bounded, compressed
+cycle with a fixed 1 Hz output cadence. Power outage finishes in about 3 minutes
+30 seconds, lunar surface in about 5 minutes, and nominal/loss of data in about
+1 minute 40 seconds.
 The generated sensor bank,
 `active_chamber`, cycle identity, PL process flag, and shared microwave-power
 attribution all follow that selection. The launcher refuses unless health
@@ -65,7 +65,7 @@ process is useful. Leave `RECLAIM_SCENARIO_EMIT_HZ=1` for the Convene route.
 Examples:
 
 ```bash
-# Default: one complete nominal PL cycle at 4x, then stop automatically
+# Default: one compressed nominal PL cycle, then stop automatically
 pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
 
 # Short accelerated local plumbing check
@@ -73,10 +73,10 @@ RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
   pi_gateway/macos/start-rehearsal-scenario.sh start nominal MT
 ```
 
-Convene polling is targeted at approximately one second. At the 4× default the
-plant advances four simulated seconds between emitted frames, while the complete
-File Watch frame is replaced exactly once per wall-clock second. Power-outage
-and lunar-surface runs therefore remain well sampled while both finish below five minutes. `loss-of-data`
+Convene polling is targeted at approximately one second. Playback speed is
+profile-specific, while the complete File Watch frame is replaced exactly once
+per wall-clock second. Power outage therefore produces 211 frames over about
+3:30, and lunar surface produces 301 frames over about 5:00. `loss-of-data`
 stops updating the watched file after its one cycle.
 
 ## Convene File Watch setup

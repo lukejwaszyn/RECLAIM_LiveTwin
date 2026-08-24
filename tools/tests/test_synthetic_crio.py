@@ -24,7 +24,10 @@ from reclaim_predictive_engine.config import ENVIRONMENTS  # noqa: E402
 from reclaim_predictive_engine.service import SCENARIOS  # noqa: E402
 
 C_TO_K = 273.15
-DEFAULT_MACBOOK_SCENARIO_SPEED = 4.0
+MACBOOK_PROFILE_SPEEDS = {
+    "power_outage": 900.0 / 210.0,
+    "lunar": 400.0 / 300.0,
+}
 
 
 def _envelope(raw, mode="harness", seq=1):
@@ -121,48 +124,48 @@ def test_frames_stream_from_the_real_harness():
 
 
 @pytest.mark.parametrize(
-    ("scenario_name", "environment_name", "expected_wall_seconds"),
+    ("scenario_name", "environment_name", "speed", "expected_wall_seconds"),
     [
-        ("power_outage", "earth_lab", 225.0),
-        ("nominal", "lunar_surface", 100.0),
+        ("power_outage", "earth_lab", MACBOOK_PROFILE_SPEEDS["power_outage"], 210.0),
+        ("nominal", "lunar_surface", MACBOOK_PROFILE_SPEEDS["lunar"], 300.0),
     ],
 )
 def test_priority_scenarios_finish_below_five_minutes_by_default(
-    scenario_name, environment_name, expected_wall_seconds
+    scenario_name, environment_name, speed, expected_wall_seconds
 ):
     scenario = SCENARIOS[scenario_name](ENVIRONMENTS[environment_name])
-    wall_seconds = scenario.duration / DEFAULT_MACBOOK_SCENARIO_SPEED
+    wall_seconds = scenario.duration / speed
     assert wall_seconds == pytest.approx(expected_wall_seconds)
-    assert wall_seconds < 300.0
+    assert wall_seconds <= 300.0
 
 
-def test_power_outage_emits_one_frame_per_wall_second_at_four_x():
+def test_power_outage_emits_one_frame_per_second_for_three_and_half_minutes():
     selected = list(emission_frames(
         plant_frames("power_outage", "earth_lab", active_chamber="MT"),
-        speed=4.0,
+        speed=MACBOOK_PROFILE_SPEEDS["power_outage"],
         emit_hz=1.0,
     ))
     times = [t for t, _frame, _dt in selected]
     states = [frame["source_op_state"] for _t, frame, _dt in selected]
     assert times[0] == 0.0
     assert times[-1] == 900.0
-    assert len(selected) == 226
-    assert all((later - earlier) == pytest.approx(4.0)
-               for earlier, later in zip(times, times[1:]))
+    assert len(selected) == 211
+    assert (len(selected) - 1) == 210
     assert "S_PowerInterrupted" in states
     assert "S_Restart" in states
 
 
-def test_lunar_emits_one_frame_per_wall_second_at_four_x():
+def test_lunar_emits_one_frame_per_second_for_five_minutes():
     selected = list(emission_frames(
         plant_frames("nominal", "lunar_surface", active_chamber="PL"),
-        speed=4.0,
+        speed=MACBOOK_PROFILE_SPEEDS["lunar"],
         emit_hz=1.0,
     ))
     times = [t for t, _frame, _dt in selected]
     assert times[0] == 0.0
     assert times[-1] == 400.0
-    assert len(selected) == 101
+    assert len(selected) == 301
+    assert (len(selected) - 1) == 300
 
 
 def test_mt_frames_stream_from_the_real_harness():

@@ -262,7 +262,11 @@ def main(argv: list[str] | None = None) -> int:
         while True:
             cycle += 1
             frames = plant_frames(args.scenario, args.env, cycle, args.active_chamber)
+            first_emission = True
             for t, frame, _dt in emission_frames(frames, args.speed, args.emit_hz):
+                if not first_emission:
+                    time.sleep(1.0 / args.emit_hz)
+                first_emission = False
                 if args.dry_run:
                     print(json.dumps(frame))
                 else:
@@ -271,7 +275,6 @@ def main(argv: list[str] | None = None) -> int:
                 if args.max_frames and sent >= args.max_frames:
                     log.info("reached --max-frames %d; stopping", args.max_frames)
                     return 0
-                time.sleep(1.0 / args.emit_hz)
             log.info("cycle %d complete (%d frames sent)", cycle, sent)
             if args.cycles and cycle >= args.cycles:
                 return 0

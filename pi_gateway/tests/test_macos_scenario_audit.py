@@ -25,9 +25,11 @@ def test_scenario_audit_rejects_competing_engine_ports_but_not_screen_share():
 
 def test_scenario_runner_defaults_to_one_fast_bounded_cycle():
     text = RUNNER.read_text(encoding="utf-8")
-    assert 'speed=${RECLAIM_SCENARIO_SPEED:-4}' in text
+    assert 'speed=${RECLAIM_SCENARIO_SPEED:-}' in text
     assert 'emit_hz=${RECLAIM_SCENARIO_EMIT_HZ:-1}' in text
     assert 'cycles=${RECLAIM_SCENARIO_CYCLES:-1}' in text
     assert '--emit-hz "$emit_hz"' in text
     assert 'scenario=power_outage' in text
     assert 'environment=lunar_surface' in text
+    assert 'speed=4.285714285714286' in text
+    assert 'speed=1.3333333333333333' in text

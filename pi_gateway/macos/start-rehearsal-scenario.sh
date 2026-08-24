@@ -23,7 +23,7 @@ python_exe="$repository_root/.venv-macbook/bin/python"
 gateway_host=${RECLAIM_GATEWAY_HOST:-127.0.0.1}
 gateway_port=${RECLAIM_GATEWAY_PORT:-9070}
 status_base=${RECLAIM_STATUS_BASE:-http://127.0.0.1:9080}
-speed=${RECLAIM_SCENARIO_SPEED:-4}
+speed=${RECLAIM_SCENARIO_SPEED:-}
 emit_hz=${RECLAIM_SCENARIO_EMIT_HZ:-1}
 max_frames=${RECLAIM_SCENARIO_MAX_FRAMES:-0}
 cycles=${RECLAIM_SCENARIO_CYCLES:-1}
@@ -142,6 +142,20 @@ case "$profile" in
     usage
     ;;
 esac
+
+if [[ -z "$speed" ]]; then
+  case "$profile" in
+    power-outage)
+      speed=4.285714285714286  # 900 simulated seconds -> about 210 wall seconds
+      ;;
+    lunar)
+      speed=1.3333333333333333 # 400 simulated seconds -> about 300 wall seconds
+      ;;
+    *)
+      speed=4
+      ;;
+  esac
+fi
 
 args=(
   "$repository_root/tools/synthetic_crio.py"

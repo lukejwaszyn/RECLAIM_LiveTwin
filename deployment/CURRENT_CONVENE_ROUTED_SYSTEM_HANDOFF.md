@@ -143,11 +143,11 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 
 `PL` drives the plastics sensor bank and `MT` drives the metals sensor bank. The
 selected value is also published as `active_chamber`. Only one scenario sender
-may run at a time. Each command defaults to one cycle at 4× speed: power outage
-finishes in about 3 minutes 46 seconds and lunar surface in about 1 minute 41
-seconds, both below the five-minute wall-time limit. Output is fixed at one
-complete frame per wall-clock second to match Convene's approximately one-second
-poll. The MacBook receiver remains on `127.0.0.1:9070`, its status
+may run at a time. Each command defaults to one compressed cycle with
+profile-specific pacing: power outage emits 211 frames over about 3 minutes 30
+seconds, and lunar surface emits 301 frames over about 5 minutes. Output is fixed
+at one complete frame per wall-clock second to match Convene's approximately
+one-second poll. The MacBook receiver remains on `127.0.0.1:9070`, its status
 surface remains on `127.0.0.1:9080`, and its direct cloud transport remains
 disabled. Its File Watch path is
 `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.
