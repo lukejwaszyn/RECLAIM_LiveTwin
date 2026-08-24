@@ -39,8 +39,8 @@ if printf '%s\n' "$listeners" | grep -E ':(8078|8177|8178|8179|8180|8181)[[:spac
 fi
 
 field_count="$(awk -F ', ' 'NR==1 { print NF }' "$file_watch_path")"
-test "$field_count" = "43"
+test "$field_count" = "35"
 line_count="$(wc -l < "$file_watch_path" | tr -d ' ')"
 test "$line_count" = "1"
 
-echo "MacBook scenario host audit passed: one loopback service, one 43-field text frame, no competing engine ports."
+echo "MacBook scenario host audit passed: one loopback service, one 35-field live-shaped text frame, no competing engine ports."

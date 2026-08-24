@@ -27,7 +27,9 @@ $requiredMarkers = @(
     'normalize_convene_frame',
     '_coerce_file_watch_value',
     'convene_result_variables',
-    'live, harness, or replay mode'
+    'RawIngressMetadata',
+    'convene-routed-frame',
+    'telemetry, live, harness, or replay mode'
 )
 $missingMarkers = @($requiredMarkers | Where-Object { $engineText -notmatch [regex]::Escape($_) })
 

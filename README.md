@@ -27,7 +27,7 @@ uv sync --locked --all-extras --dev --python 3.13
 python3 scripts/check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **260 passed**
+### 2. Tests — expect **264 passed**
 
 Green across the combined gateway, tooling, cloud-engine, and source-record suite
 is the pre-flight go-signal; **any red means stop, do not deploy.**
@@ -75,11 +75,11 @@ publishers are archived and cannot be invoked from the active tree.
 | `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
 
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its
-Convene scenario publisher. They do not enter the Windows 10 live gateway or
+atomic File Watch writer. They do not enter the Windows 10 live gateway or
 directly target the VM. Convene owns the downstream route. The engine accepts the
-flat exact-name snapshot in `live`, `harness`, or `replay` mode and returns
-computed `sim_*` variables in the POST response. Inspect the scenario host on
-loopback `9080`.
+the identical 35-field text input through `/ingest` regardless of origin, then
+returns computed `sim_*` variables in the
+POST response. Inspect the scenario host on loopback `9080`.
 
 **`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
 keep answering and the last values stay readable, but the data stops advancing:
@@ -87,10 +87,10 @@ keep answering and the last values stay readable, but the data stops advancing:
 condition the check exists to rehearse — a consumer must detect staleness rather
 than trust a last-good value.
 
-The source `ts` and monotone `seq` are present in the File Watch snapshot and the
-engine returns `ts_source`, `ts_engine`, `ingest_age_ms`, and the preserved mode.
-Convene must use those fields to reject stale source or computed state rather
-than treating a last-good value as fresh.
+The watched frame intentionally has no source `ts` or `seq`, matching current live
+telemetry. The engine creates unclassified receipt `ts_source`, monotone `seq`,
+`ts_engine`, and `ingest_age_ms`. Convene must use advancing engine receipt/state
+time to reject stale output rather than treating a last-good value as fresh.
 
 **Where to run them.** The scenarios are self-contained — they need only this
 checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
@@ -101,7 +101,7 @@ predictive-engine VM while it serves production: the script's port guard is only
 port-level protection, and `8177`–`8181` must never be routed to production or
 bound as live mission state.
 
-For every run retain: commit SHA, run ID, timestamps, expected vs observed,
+For every run retain: commit SHA, engine receipt run ID/timestamps, expected vs observed,
 screenshots, and deviations. Keep synthetic services clearly labeled as rehearsal
 data.
 

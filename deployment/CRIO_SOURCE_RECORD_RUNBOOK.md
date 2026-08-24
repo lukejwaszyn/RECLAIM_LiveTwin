@@ -14,6 +14,12 @@ touches the cRIO, a VI, the gateway host, or any live endpoint.
   source-side experiment pass. The quality policy is applied at the source layer for
   exactly this reason.
 
+This runbook's canonical frame builder is an offline/proposed enriched-source
+contract. It is not a requirement on today's physical LabVIEW text record. The
+current live record (`active_chamber` plus 34 raw fields) is routed by Convene to
+`/ingest`, where the cloud engine assigns unclassified receipt-owned metadata. Older
+34-field captures use fallback chamber inference during approved replay/testing.
+
 ## 1. Set up and run the suites
 
 ```bash

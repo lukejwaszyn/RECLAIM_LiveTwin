@@ -11,7 +11,7 @@ def test_scenario_audit_checks_route_ownership_and_complete_text_frame():
     assert 'h.get("convene", {}).get("enabled")' in text
     assert 'fw.get("enabled")' in text
     assert 'permissions" = "600"' in text
-    assert 'field_count" = "43"' in text
+    assert 'field_count" = "35"' in text
     assert 'line_count" = "1"' in text
 
 

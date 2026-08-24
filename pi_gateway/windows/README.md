@@ -1,9 +1,10 @@
 # Windows 10 live gateway
 
-The Windows 10 desktop is the sole live cRIO gateway. It receives the exact
-LabVIEW source record and publishes the canonical envelope plus raw source
-variables to its Convene machine. Convene's internal routing owns the cloud
-engine request and computed-state return.
+The Windows 10 desktop is the sole live cRIO gateway. The current physical live
+contract is authoritative `active_chamber` followed by the exact 34-field LabVIEW
+source record. It is not required to contain run/source IDs, sequence, timestamps,
+cycle identity, mode, or source operating state. Convene publishes the exact raw
+names and routes the record to the cloud engine's common `/ingest` endpoint.
 
 ```text
 cRIO / LabVIEW -> Windows gateway TCP 9070 -> Convene live machine
@@ -17,9 +18,11 @@ prefix. It must never emit `sim_*`. Start from
 `deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`.
 
 The receiver binds only the dedicated cRIO-facing interface after controls and
-network approval. Status port `9080` remains loopback-only. The production
-source must publish `mode=live`, authoritative run/cycle/sequence/timestamp,
-`source_op_state`, `active_chamber`, and the approved raw variables.
+network approval. Status port `9080` remains loopback-only. The engine generates
+receipt-owned mode/run/source/sequence/timestamp/cycle metadata when those fields
+are absent. `active_chamber` is authoritative and must be routed unchanged. The
+engine's process-based chamber inference exists only for backward compatibility
+with older retained 34-field captures.
 
 ## Current checks
 
@@ -28,18 +31,15 @@ Invoke-RestMethod http://127.0.0.1:9080/health
 Invoke-RestMethod http://127.0.0.1:9080/latest
 ```
 
-Acceptance requires a correlated fresh source update in Convene, an accepted
-engine frame with the same identity, and the corresponding `sim_*` result back
-in Convene. Source values that are absent or `NaN` are unavailable and must not
-be displayed or inferred as retained fresh measurements.
+Acceptance requires a correlated fresh raw update in Convene, an accepted engine
+receipt sequence/timestamp, and the corresponding `sim_*` result back in Convene.
+Source values that are absent or `NaN` are unavailable and must not be displayed
+or inferred as retained fresh measurements.
 
-## Retained legacy scripts
+## Removed competing paths
 
-Some PowerShell files in this directory still implement the former direct
-gateway-to-VM HTTPS/Cloudflare commissioning route. They are retained as code
-history and are not authorized by the current topology. Do not run
-`finalize-gateway-config.ps1`, direct-VM commissioning scripts, or any step that
-puts a VM ingest URL/token on this gateway unless the architecture is formally
-changed in the current handoff.
+The former direct gateway-to-VM finalizer and commissioning senders are archived
+under `Past_Deprecated/retired-2026-08-24-convene-direct-routing/`. No active
+Windows script puts a VM ingest URL/token on the live gateway.
 
 All predictive output remains advisory and disconnected from actuation.

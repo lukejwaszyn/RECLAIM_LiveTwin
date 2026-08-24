@@ -18,12 +18,6 @@ from .convene import LABVIEW_RAW_FIELDS
 log = logging.getLogger("reclaim_edge.file_watch")
 
 
-ENVELOPE_FIELDS = (
-    "schema_version", "mode", "run_id", "source_id", "cycle_id", "seq", "ts",
-    "source_op_state", "active_chamber",
-)
-
-
 def _text_value(value: Any) -> str:
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
@@ -38,11 +32,11 @@ def _text_value(value: Any) -> str:
 
 
 def frame_to_text(frame: Dict[str, Any]) -> str:
-    """Render the canonical envelope plus raw fields in live LabVIEW order."""
-    items = []
-    for name in ENVELOPE_FIELDS:
-        if name in frame:
-            items.append(f"{name}: {_text_value(frame[name])}")
+    """Render the current live-shaped record: chamber plus 34 raw fields."""
+    active_chamber = frame.get("active_chamber")
+    if active_chamber not in {"PL", "MT", "NONE"}:
+        raise ValueError("File Watch frame requires active_chamber PL, MT, or NONE")
+    items = [f"active_chamber: {active_chamber}"]
     raw = frame.get("vars")
     if not isinstance(raw, dict):
         raise ValueError("canonical frame must contain a vars object")
@@ -53,8 +47,6 @@ def frame_to_text(frame: Dict[str, Any]) -> str:
     # it never substitutes a measurement or silently removes the field.
     for name in LABVIEW_RAW_FIELDS:
         items.append(f"{name}: {_text_value(raw.get(name))}")
-    if not items:
-        raise ValueError("canonical frame produced no File Watch fields")
     return ", ".join(items) + "\n"
 
 

@@ -21,6 +21,8 @@ def test_vm_audit_detects_known_competing_components_without_reading_secrets():
         "sim_vars.json",
         "normalize_convene_frame",
         "_coerce_file_watch_value",
+        "RawIngressMetadata",
+        "convene-routed-frame",
         "convene_result_variables",
         "ReadyForSupervisedContractTest",
     ):

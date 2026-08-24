@@ -63,8 +63,9 @@ source field. Every variable uses the same settings except its name/regex:
 - **Capture regex:** `(?:^|, )FIELD_NAME: ([^,\r\n]+)` with `FIELD_NAME`
   replaced by the exact variable name
 
-Required envelope bindings are `schema_version`, `mode`, `run_id`, `source_id`,
-`cycle_id`, `seq`, `ts`, `source_op_state`, and `active_chamber`.
+Required routing binding is `active_chamber`. Do not add `schema_version`, `mode`,
+`run_id`, `source_id`, `cycle_id`, `seq`, `ts`, or `source_op_state` to the watched
+file. The common `/ingest` endpoint owns unclassified receipt provenance.
 
 Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
 `PL_chamber_pressure`, `PL_top_condenser_temp`, `PL_bottom_condenser_temp`,
@@ -78,9 +79,10 @@ Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
 
 The file is atomically replaced with mode `0600`, so a heartbeat sees either the
 previous complete frame or the next complete frame, never partial text. It
-contains the nine canonical envelope fields followed by all 34 raw fields in
-the live-record order. Booleans are `TRUE`/`FALSE`, finite floats use six decimal
-places, and unavailable fields are `NaN` rather than fabricated measurements.
+contains `active_chamber` followed by all 34 raw fields in the live-record order,
+matching the current one-frame convention. Booleans are `TRUE`/`FALSE`, finite
+floats use six decimal places, and unavailable fields are `NaN` rather than
+fabricated measurements.
 
 ## Windows capture replay
 
@@ -94,8 +96,8 @@ The supplied comma-separated `name: value` capture format is replayed with:
 The replayer preserves exact channel names and scalar values. It labels unknown
 sequencer state `S_Unknown`; it never claims the file is current physical data.
 With the default `--active-chamber auto`, a record-level `active_chamber: PL`
-or `active_chamber: MT` is promoted into the scenario envelope. Explicit command
-selection overrides it. LabVIEW `NaN` sensor readings remain unavailable through
+or `active_chamber: MT` is preserved into the watched 35-field record. Explicit
+command selection overrides it. LabVIEW `NaN` sensor readings remain unavailable through
 the text/regex boundary and are removed before cloud inference.
 
 ## Acceptance
@@ -106,7 +108,7 @@ Run the read-only local interference gate:
 pi_gateway/macos/audit-scenario-host.sh
 ```
 
-It requires one owner-only, one-line, 43-field text frame; only loopback 9070/9080;
+It requires one owner-only, one-line, 35-field text frame; only loopback 9070/9080;
 no local engine/rehearsal ports; File Watch enabled; and both direct cloud and
 direct Convene API publication disabled. Port 6080 and its Cloudflare process
 belong to the separately authorized screen-sharing session and are deliberately

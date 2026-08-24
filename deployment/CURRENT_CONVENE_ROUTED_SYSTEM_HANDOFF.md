@@ -11,8 +11,8 @@
 
 Convene is now the common routing plane for both source telemetry and computed
 state. A gateway/scenario host publishes its machine variables to Convene;
-Convene's internal data routing builds and sends the canonical telemetry frame to
-the cloud engine; the cloud engine runs the stochastic dual-chamber algorithm;
+Convene's internal data routing sends either source record to the same cloud
+endpoint; the cloud engine normalizes it and runs the stochastic dual-chamber algorithm;
 and the computed result returns to Convene for visualization.
 
 There is no production gateway-to-cloud telemetry route over a separately
@@ -39,7 +39,7 @@ Convene internal route -> cloud engine POST /ingest -> stochastic dual engine
 |---|---|---|
 | Real cRIO acquisition | Windows 10 desktop | Sole live-data gateway; publishes exact source variables to its Convene machine |
 | Fabricated/replayed telemetry | MacBook | Scenario-only, loopback receiver, `mode=harness` or `mode=replay`; atomically writes one current Convene File Watch text frame |
-| Telemetry routing | Convene | Routes either machine's source variables to the cloud engine using the canonical envelope |
+| Telemetry routing | Convene | Routes either machine's identical 35-field record to the common engine endpoint |
 | Computation | Cloud-engine VM | Sole stochastic estimator and sole producer of computed state |
 | Result routing and display | Convene | Receives processed state and binds the `sim_*` variables to the visualization |
 
@@ -53,11 +53,10 @@ The Windows live gateway flattens each accepted source frame into scalar Convene
 variables and publishes them to its machine API. The MacBook scenario gateway
 flattens the same contract into one owner-private text file which Convene File
 Watch reads each heartbeat. The file is replaced, not appended. Direct MacBook
-Convene API publishing is disabled.
-Envelope variables are:
-
-`schema_version`, `mode`, `run_id`, `source_id`, `cycle_id`, `seq`, `ts`,
-`source_op_state`, and `active_chamber`.
+Convene API publishing is disabled. The watched scenario/replay record has exactly
+the same current interface shape as live telemetry: authoritative
+`active_chamber` followed by the 34 raw fields. It carries no source envelope.
+The common engine endpoint adds unclassified receipt provenance.
 
 The exact, case-sensitive LabVIEW variables are:
 
@@ -69,6 +68,13 @@ The exact, case-sensitive LabVIEW variables are:
 `MT_bottom`, `MW_water_state`, `MW_flow_state`, `MW_RF`, `MW_status`,
 `MW_power`, `MW_reverse`, `MW_period`, `MW_width`, `MW_freq`, `MW_water_temp`,
 `MW_flow_rate`, `PL_Probe1`, and `PL_Probe2`.
+
+The current physical live record contains authoritative `active_chamber` (`PL`,
+`MT`, or `NONE`) plus the exact 34 raw fields. Older retained captures may lack
+the chamber field; engine inference for those records is fallback-only.
+Convene routes it to `/ingest`, where the engine generates explicitly
+receipt-owned provenance for missing envelope values. It does not claim that
+LabVIEW produced a run ID, source ID, sequence, timestamp, or cycle ID.
 
 Do not add a blanket `gw_` prefix. The source publisher must never emit `sim_*`.
 If an independently defined source field already contains `gw_`, preserve that
@@ -83,10 +89,10 @@ must not invent replacement measurements.
 
 ## Convene-to-engine contract
 
-Convene's internal route sends one newline-delimited JSON object per source
-update to `POST /ingest`. The engine accepts either the flat File Watch snapshot
-or the equivalent canonical envelope with raw fields nested under `vars`. The
-flat form is preferred because Convene can forward the file without renaming:
+Convene's internal route sends live, scenario, and approved replay records to the
+same `POST /ingest`. It accepts the flat 35-field snapshot, the complete one-frame
+LabVIEW-style text record, or a legacy complete canonical envelope with raw fields
+nested under `vars`.
 
 ```json
 {
@@ -108,11 +114,11 @@ The engine collects only exact, case-sensitive LabVIEW names into its internal
 `vars` block. `PL_*` values feed the plastics estimator, `MT_*` values feed the
 metals estimator, shared `MW_*` power is attributed by authoritative
 `active_chamber`, and `sim_*` input is rejected as a feedback loop. Production
-ingest accepts `mode=live`, `mode=harness`, and `mode=replay` without changing
-the label. It preserves `run_id`, monotone `seq`, timestamps, cycle identity,
-operating state, and active chamber.
+Current text ingest assigns `mode=telemetry`, preserves authoritative
+`active_chamber`, and generates clearly receipt-owned run, sequence, timestamp,
+cycle, and state fields. It does not infer whether the frame was live or scenario.
 
-The `POST /ingest` response contains the accepted computed `state` and a flat
+Every ingest-route response contains the accepted computed `state` and a flat
 `variables` object with every finite scalar under its cloud-owned `sim_*` name.
 Convene routes that response directly to the visualization; the old VM file
 state bridge is not part of this path. Authentication and the deployed Convene
@@ -148,13 +154,13 @@ case-sensitive variable name.
 
 Verified locally on 2026-08-24 before the final commit:
 
-- Windows live and MacBook scenario publishers send canonical envelope scalars
-  and exact raw LabVIEW names to Convene without a generated prefix.
+- Windows live and MacBook scenarios publish the identical `active_chamber` plus
+  34-field text contract without fabricated envelope fields or a blanket prefix.
 - The MacBook scenario controller supports nominal, power-outage, lunar, and
   loss-of-data profiles with an explicit `PL` or `MT` chamber.
 - The cloud engine supports the 34-field LabVIEW record and continues gracefully
   when individual raw fields are `NaN`/unavailable.
-- The active local integration suite passes: 260 tests. Historical
+- The active local integration suite passes: 264 tests. Historical
   state-bridge/direct-route tests are archived and intentionally excluded.
 - No predictive engine or direct cloud telemetry transport is intended to run on
   the MacBook.
@@ -163,7 +169,7 @@ Verified locally on 2026-08-24 before the final commit:
 
 1. The deployed Convene internal mapping and authentication have not been
    captured in this repository or exercised by an automated end-to-end test.
-2. The updated flat-frame/multi-mode engine contract must be deployed to the VM
+2. The updated common-frame engine contract must be deployed to the VM
    before Convene forwards MacBook scenarios to it.
 3. One engine process has one active run/model state. Convene must route only one
    live or scenario source stream to that process at a time. Simultaneous streams
@@ -189,9 +195,9 @@ any deviation.
 
 | Test | Source | Pass condition |
 |---|---|---|
-| Live smoke | cRIO through Windows 10 | Exact source fields appear in Convene, engine accepts a fresh `mode=live` frame, and matching `sim_*` identity returns |
-| Nominal PL | MacBook scenario | Full PL processing cycle, monotone sequence, no cross-chamber activation, and correlated result returns through the isolated scenario route |
-| Power outage MT | MacBook scenario | Outage/coast/restart state progression is visible and remains labeled scenario data |
+| Live smoke | cRIO through Windows 10 | Authoritative `active_chamber` plus the exact 34 source fields appear in Convene, `/ingest` generates receipt provenance, and correlated `sim_*` state returns |
+| Nominal PL | MacBook scenario | Full PL processing cycle, monotone engine receipt sequence, no cross-chamber activation, and correlated result returns |
+| Power outage MT | MacBook scenario | Outage/coast/restart state progression is visible while MT remains authoritative |
 | Lunar | MacBook scenario | Lunar profile completes with explicit chamber identity and correlated result |
 | Loss of data | MacBook scenario | Stale state fails closed; the last-good value is not represented as fresh |
 | Unavailable sensors | Either isolated route | `NaN`/omitted sensors do not crash routing or inference and are never fabricated |
@@ -201,12 +207,12 @@ system is an engineering demonstration, not a proven flawless end-to-end path.
 
 ## Pickup order
 
-1. Configure and inspect Convene's File Watch and source-machine route.
-2. Deploy the flat-frame/multi-mode cloud-engine SHA.
-3. Confirm one and only one active source stream and `sim_*` writer.
-4. Deploy the same SHA to the Windows gateway and cloud-engine VM.
-5. Run the three rehearsal profiles and retain correlated end-to-end evidence.
-6. Run the supervised live cRIO smoke test.
+1. Configure and inspect Convene's File Watch and source-machine routes.
+2. Audit the actual VM with the read-only script and preserve rollback evidence.
+3. Deploy the common-frame cloud-engine SHA and exercise its loopback contract.
+4. Confirm one and only one active source stream and `sim_*` writer.
+5. Run the three rehearsal profiles through Convene and retain correlated evidence.
+6. Run the supervised current-frame live cRIO smoke test through `/ingest`.
 
 Older handoffs are retained only as historical evidence under
 `Past_Deprecated/deployment/retired-2026-08-24-convene-routing/`. They are not

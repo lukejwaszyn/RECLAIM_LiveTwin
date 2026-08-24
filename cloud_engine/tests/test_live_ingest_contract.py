@@ -238,6 +238,144 @@ def test_ingest_http_accepts_one_frame_text_plain_and_returns_sim_variables():
     assert all(name.startswith("sim_") for name in payload["variables"])
 
 
+def _raw_live_text_frame():
+    import labview_map
+
+    raw = {
+        name: (False if name in labview_map.LABVIEW_BOOLEAN_FIELDS else math.nan)
+        for name in labview_map.LABVIEW_RAW_FIELDS
+    }
+    raw.update(_frame()["vars"])
+
+    def render(value):
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, float):
+            return f"{value:.6f}"
+        return str(value)
+
+    return ", ".join(f"{name}: {render(value)}" for name, value in raw.items())
+
+
+def test_unclassified_ingest_generates_missing_transport_metadata():
+    engine = DualPushEngine(production=True)
+    parsed = parse_labview_text_frame(_raw_live_text_frame())
+    assert len(parsed) == 34
+    first = engine.ingest_line(
+        parsed,
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+    second = engine.ingest_line(
+        parse_labview_text_frame(_raw_live_text_frame()),
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert first["status"] == second["status"] == "accepted"
+    assert first["state"]["mode"] == "telemetry"
+    assert first["state"]["source_id"] == "convene-routed-frame"
+    assert first["state"]["run_id"].startswith("engine-received-")
+    assert second["state"]["run_id"] == first["state"]["run_id"]
+    assert second["state"]["seq"] == first["state"]["seq"] + 1
+    assert first["state"]["active_chamber"] == "PL"
+    assert first["state"]["source_op_state"] == "S_MicrowaveHeating"
+
+
+def test_raw_record_requires_receipt_defaults_when_bypassing_http_endpoint():
+    disposition = DualPushEngine(production=True).ingest_line(
+        parse_labview_text_frame(_raw_live_text_frame())
+    )
+
+    assert disposition["status"] == "rejected"
+    assert disposition["code"] == "schema_required"
+
+
+def test_current_active_chamber_is_authoritative():
+    parsed = parse_labview_text_frame(
+        "active_chamber: MT, " + _raw_live_text_frame()
+    )
+    disposition = DualPushEngine(production=True).ingest_line(
+        parsed,
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert disposition["status"] == "accepted"
+    assert disposition["state"]["active_chamber"] == "MT"
+    assert disposition["state"]["MT_P_fwd"] == 3000.0
+    assert disposition["state"]["PL_P_fwd"] == 0.0
+
+
+def test_generic_receipt_defaults_preserve_an_explicit_legacy_mode():
+    disposition = DualPushEngine(production=True).ingest_line(
+        _frame(mode="harness"),
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert disposition["status"] == "accepted"
+    assert disposition["state"]["mode"] == "harness"
+
+
+def test_http_ingest_accepts_an_older_raw_34_field_text_record():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(_raw_live_text_frame() + "\n").encode("utf-8"),
+            headers={
+                "Authorization": "Bearer token",
+                "Content-Type": "text/plain",
+                "X-RECLAIM-Source-ID": "convene-routed-frame",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "telemetry"
+    assert payload["state"]["source_id"] == "convene-routed-frame"
+    assert payload["state"]["seq"] == 1
+    assert payload["state"]["run_id"].startswith("engine-received-")
+    assert payload["variables"]["sim_active_chamber"] == "PL"
+
+
+def test_http_ingest_accepts_the_current_35_field_text_record_without_source_classification():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=("active_chamber: MT, " + _raw_live_text_frame() + "\n").encode("utf-8"),
+            headers={"Authorization": "Bearer token", "Content-Type": "text/plain"},
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "telemetry"
+    assert payload["state"]["source_id"] == "convene-routed-frame"
+    assert payload["state"]["active_chamber"] == "MT"
+    assert payload["state"]["MT_P_fwd"] == 3000.0
+    assert payload["variables"]["sim_active_chamber"] == "MT"
+
+
 def test_convene_result_variables_prefixes_only_finite_scalars():
     variables = convene_result_variables({
         "mode": "harness",

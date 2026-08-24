@@ -37,9 +37,10 @@ shared microwave-power attribution follow that selection.
 
 The capture is input data only. Exact field names and values are preserved;
 unknown sequencer state is labeled `S_Unknown`. The gateway atomically writes the
-flat scenario variables to the owner-private, one-frame File Watch text file. Convene's internal routing owns
-the engine request and computed-state return. In automatic mode, a record-level `active_chamber`
-is promoted into the envelope; an explicit command option overrides it. `NaN`
+same 35 fields to the owner-private, one-frame File Watch text file. Convene's
+internal routing owns the engine request and computed-state return. In automatic
+mode, a record-level `active_chamber` is preserved; an explicit command option
+overrides it. `NaN`
 sensor readings are represented as `NaN` and treated as unavailable, never as
 fabricated measurements.
 
@@ -47,9 +48,9 @@ fabricated measurements.
 
 Require matching receive/deliver counts, zero queue depth, drops, dead letters,
 and File Watch failures, plus a scenario-labeled `/latest` frame. Confirm the
-text file advances with `seq` and `ts`. This is source-to-Convene acceptance only
-after Convene heartbeat evidence. The common engine accepts the preserved
-`harness`/`replay` mode, but one engine process must receive only one active
+35-field text file is atomically replaced as values advance. This proves only
+source-to-file behavior until Convene heartbeat evidence exists. The common engine
+records unclassified telemetry, and one engine process must receive only one active
 source stream at a time.
 Never change the MacBook to `mode=live`, a non-loopback listener, or direct cloud
 transport.

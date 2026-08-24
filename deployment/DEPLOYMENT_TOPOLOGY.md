@@ -65,8 +65,7 @@ Sharing, Tailscale, Cloudflare, or a firewall opening.
 
 ## Current acceptance state
 
-The MacBook scenario lifecycle and capture replay are proven to the Convene
-source machine. Cloud code accepts unavailable LabVIEW sensor values without
-fabricating them. The actual Convene internal round trip, including scenario-mode
-handling, still requires correlated acceptance evidence. Live cRIO and Windows
-10 acceptance remain separate.
+The MacBook scenario lifecycle is proven through atomic local File Watch output.
+Cloud code accepts the identical 35-field shape and unavailable LabVIEW sensor
+values without fabrication. The actual Convene internal round trip still requires
+correlated acceptance evidence. Live cRIO and Windows 10 acceptance remain separate.

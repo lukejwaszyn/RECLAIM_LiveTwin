@@ -95,12 +95,14 @@ def main() -> int:
             return r
         return last
 
-    def post(frames, token=ingest):
+    def post(frames, token=ingest, path="/ingest", source_id=None):
         body = "\n".join(json.dumps(f) for f in frames).encode()
         h = {"Content-Type": "application/x-ndjson"}
         if token:
             h["Authorization"] = "Bearer " + token
-        return _retry(lambda: requests.post(base + "/ingest", data=body, headers=h, timeout=30))
+        if source_id:
+            h["X-RECLAIM-Source-ID"] = source_id
+        return _retry(lambda: requests.post(base + path, data=body, headers=h, timeout=30))
 
     def get(path, token=None):
         h = {"Authorization": "Bearer " + token} if token else {}
@@ -119,6 +121,21 @@ def main() -> int:
     r = get("/state"); check("/state requires read token (401)", r.status_code == 401, str(r.status_code))
     r = get("/state", read); check("/state with read token (200)", r.status_code == 200, str(r.status_code))
     r = post([env(1, "A", "S_MicrowaveHeating", lv(300, 180, 2000))], token=""); check("POST /ingest no token -> 401", r.status_code == 401, str(r.status_code))
+    current_record = {"active_chamber": CH, **lv(300, 180, 2000)}
+    raw_live_response = rj(post(
+        [current_record], path="/ingest", source_id="accept-unclassified-frame"
+    ))
+    raw_live_state = raw_live_response.get("state", {})
+    check("raw 35-field contract accepted through /ingest",
+          raw_live_response.get("ingested") == 1 and
+          raw_live_state.get("mode") == "telemetry" and
+          raw_live_state.get("active_chamber") == CH,
+          str(raw_live_response.get("results")))
+    check("raw live receipt metadata generated",
+          raw_live_state.get("source_id") == "accept-unclassified-frame" and
+          str(raw_live_state.get("run_id", "")).startswith("engine-received-") and
+          raw_live_state.get("seq") == 1 and bool(raw_live_state.get("ts_source")),
+          f"{raw_live_state.get('source_id')}/{raw_live_state.get('seq')}")
     harness = env(1, "A", "S_MicrowaveHeating", lv(300, 180, 2000), mode="harness")
     harness.update({"run_id": RUN + "-harness", "source_id": SRC + "-harness"})
     # Convene File Watch forwards a flat object: raw LabVIEW names are peers of

@@ -35,16 +35,20 @@ it. Only the VM/cloud publisher may emit `sim_`.
 
 ## Freshness and provenance
 
-MacBook records must identify a synthetic or file-replay source and use
-`mode=harness` or `mode=replay`. They must never claim current physical data.
-Live freshness and identity are owned by the Windows 10/production path.
+The MacBook watched record deliberately matches the live 35-field text shape and
+contains no provenance envelope. Convene sends either origin to the same
+`POST /ingest`. The engine records `mode=telemetry` and does not classify origin.
 
-Convene may forward the flat File Watch snapshot directly to `POST /ingest` or
-send the equivalent nested envelope. The engine normalizes exact raw names,
-accepts honestly labeled `live`, `harness`, and `replay`, allocates PL/MT by
-prefix plus `active_chamber`, rejects `sim_*` feedback, and returns computed
-`sim_*` variables in the POST response. One engine process must not receive
-simultaneous source streams.
+Convene sends the Windows machine, MacBook scenario machine, or approved replay
+to the same `POST /ingest` interface.
+The current physical live record contains authoritative `active_chamber` plus the
+exact 34 LabVIEW fields; the engine generates receipt-owned
+run/source/sequence/time/cycle metadata rather than
+pretending LabVIEW supplied it. Scenario File Watch records use the same field
+shape. The engine normalizes exact raw names, allocates
+PL/MT by prefix plus `active_chamber`, rejects `sim_*` feedback, and returns
+computed `sim_*` variables in the POST response. One engine process
+must not receive simultaneous source streams.
 
 The predictive engine remains advisory. No command, setpoint, or actuation path
 is authorized by this architecture document.
