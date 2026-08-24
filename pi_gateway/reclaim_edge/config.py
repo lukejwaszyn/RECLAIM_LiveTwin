@@ -185,6 +185,14 @@ class Config:
             if cfg.convene_timeout_s <= 0:
                 raise ValueError("convene_timeout_s must be positive")
         if cfg.file_watch_enabled:
+            if cfg.convene_enabled:
+                raise ValueError("file_watch_enabled and convene_enabled are mutually exclusive")
+            if cfg.transport != "console":
+                raise ValueError("File Watch scenario host requires transport=console")
+            if cfg.mode not in ("harness", "replay"):
+                raise ValueError("File Watch scenario host requires harness or replay mode")
+            if cfg.listen_host not in ("127.0.0.1", "::1", "localhost"):
+                raise ValueError("File Watch scenario host requires a loopback listen_host")
             expanded_path = os.path.expandvars(os.path.expanduser(cfg.file_watch_path))
             if not expanded_path or not os.path.isabs(expanded_path):
                 raise ValueError("file_watch_enabled requires an absolute file_watch_path")

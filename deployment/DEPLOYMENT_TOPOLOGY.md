@@ -30,7 +30,7 @@ cRIO / LabVIEW authoritative source
 
 MacBook local synthetic/file-replay scenario
   -> 127.0.0.1:9070 (harness/replay mode only)
-  -> atomic flat scenario JSON
+  -> atomic one-frame LabVIEW-style text
   -> Convene File Watch heartbeat
   -> Convene scenario machine
 

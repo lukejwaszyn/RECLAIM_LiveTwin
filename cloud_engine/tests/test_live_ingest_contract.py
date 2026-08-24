@@ -30,6 +30,7 @@ from push_ingest_dual import (
     TELEMETRY_SCHEMA,
     _make_handler,
     convene_result_variables,
+    parse_labview_text_frame,
 )
 
 
@@ -184,6 +185,57 @@ def test_flat_text_extractions_restore_labview_scalar_types():
     assert out["MT_sensor_valid"] is True
     assert out["MT_P_fwd"] == 2200.0
     assert out["MW_RF"] is True
+
+
+def _text_frame(active_chamber="MT"):
+    frame = _frame(mode="harness", active_chamber=active_chamber)
+    values = {key: value for key, value in frame.items() if key != "vars"}
+    values.update(frame["vars"])
+    values["MT_crucible_temperature"] = "NaN"
+
+    def render(value):
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, float):
+            return f"{value:.6f}"
+        return str(value)
+
+    return ", ".join(f"{name}: {render(value)}" for name, value in values.items())
+
+
+def test_one_frame_labview_text_parses_through_the_same_flat_adapter():
+    parsed = parse_labview_text_frame(_text_frame())
+    out = DualPushEngine(production=True).ingest(parsed)
+
+    assert out["mode"] == "harness"
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 3000.0
+
+
+def test_ingest_http_accepts_one_frame_text_plain_and_returns_sim_variables():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(_text_frame() + "\n").encode("utf-8"),
+            headers={"Authorization": "Bearer token", "Content-Type": "text/plain"},
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "harness"
+    assert payload["variables"]["sim_active_chamber"] == "MT"
+    assert all(name.startswith("sim_") for name in payload["variables"])
 
 
 def test_convene_result_variables_prefixes_only_finite_scalars():

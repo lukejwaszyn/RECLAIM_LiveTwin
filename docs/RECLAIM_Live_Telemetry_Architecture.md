@@ -11,7 +11,7 @@ cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 SCENARIO DATA
 synthetic generator or approved capture file
   -> MacBook 127.0.0.1:9070 (harness/replay)
-  -> atomic flat local JSON
+  -> atomic one-frame LabVIEW-style text
   -> Convene File Watch heartbeat
   -> MacBook Convene machine
 

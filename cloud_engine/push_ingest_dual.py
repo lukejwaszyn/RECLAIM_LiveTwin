@@ -195,6 +195,30 @@ def _coerce_file_watch_value(name: str, value):
     return stripped
 
 
+def parse_labview_text_frame(line: str) -> dict:
+    """Parse one exact-name ``name: value, ...`` File Watch frame.
+
+    Values intentionally remain strings here and pass through the same flat
+    Convene coercion/validation seam as individually extracted variables.
+    """
+    allowed = _ENVELOPE_FIELDS | frozenset(labview_map.LABVIEW_RAW_FIELDS)
+    frame = {}
+    for item in line.strip().split(", "):
+        if ": " not in item:
+            raise FrameRejected("text_invalid", f"text field has no ': ': {item!r}")
+        name, value = item.split(": ", 1)
+        if name not in allowed:
+            raise FrameRejected("text_field_unknown", f"unknown text field: {name}")
+        if name in frame:
+            raise FrameRejected("text_field_duplicate", f"duplicate text field: {name}")
+        if not value:
+            raise FrameRejected("text_value_empty", f"empty text value: {name}")
+        frame[name] = value
+    if not frame:
+        raise FrameRejected("text_invalid", "empty text frame")
+    return frame
+
+
 def convene_result_variables(state: dict) -> dict:
     """Return finite scalar engine state under the cloud-owned `sim_*` namespace."""
     variables = {}
@@ -965,7 +989,10 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
                     continue
                 i += 1
                 try:
-                    obj = json.loads(line)
+                    obj = json.loads(line) if line.startswith("{") else parse_labview_text_frame(line)
+                except FrameRejected as exc:
+                    d = {"status": "rejected", "code": exc.code,
+                         "message": str(exc), "final": exc.final}
                 except ValueError as exc:
                     d = {"status": "rejected", "code": "json_invalid",
                          "message": str(exc), "final": True}

@@ -18,7 +18,10 @@ cloud engine and computed state back to Convene.
 - `deployment/` and `root-level/` — older 2026-08-23 archives retained from the
   preceding repository cleanup.
 - `pi_gateway/macos/retired-2026-08-24-file-watch/` — former direct Convene API
-  pairing utility, superseded by the scenario File Watch JSON.
+  pairing utility, superseded by the scenario File Watch text file.
+- `retired-2026-08-24-convene-direct-routing/` — former state bridge, direct
+  scenario publishers, quick-tunnel deployment, VM scripts, bindings, and
+  historical tests.
 
 Nothing was deleted during the 2026-08-24 consolidation; files were moved so
 they remain recoverable through Git history and this archive.

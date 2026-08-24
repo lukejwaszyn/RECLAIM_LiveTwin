@@ -100,6 +100,23 @@ the text/regex boundary and are removed before cloud inference.
 
 ## Acceptance
 
+Run the read-only local interference gate:
+
+```bash
+pi_gateway/macos/audit-scenario-host.sh
+```
+
+It requires one owner-only, one-line, 43-field text frame; only loopback 9070/9080;
+no local engine/rehearsal ports; File Watch enabled; and both direct cloud and
+direct Convene API publication disabled. Port 6080 and its Cloudflare process
+belong to the separately authorized screen-sharing session and are deliberately
+outside this telemetry audit.
+
+Configuration validation also refuses to start if File Watch is combined with
+direct Convene publishing, a non-console cloud transport, `mode=live`, or a
+non-loopback listener. A stale config therefore cannot silently recreate a
+competing scenario route.
+
 During a bounded run, `/health` must show received equals delivered, queue depth
 zero, no drops/dead letters, and `file_watch.failed: 0`. `/latest` must show
 `mode: harness` or `replay` and a scenario-labeled `source_id`. This proves

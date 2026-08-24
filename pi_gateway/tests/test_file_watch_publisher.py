@@ -68,7 +68,8 @@ def test_file_watch_submit_coalesces_to_latest_frame(tmp_path: Path) -> None:
 def test_file_watch_requires_absolute_expanded_path(tmp_path: Path) -> None:
     config = tmp_path / "config.yaml"
     config.write_text(
-        "file_watch_enabled: true\nfile_watch_path: relative/scenario.txt\n",
+        "file_watch_enabled: true\nmode: harness\nlisten_host: 127.0.0.1\n"
+        "file_watch_path: relative/scenario.txt\n",
         encoding="utf-8",
     )
 
@@ -83,3 +84,28 @@ def test_text_format_matches_labview_scalar_conventions() -> None:
     assert "MT_crucible_temperature: 313.418000" in record
     assert "MT_top: NaN" in record
     assert "MW_RF: TRUE" in record
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ("convene_enabled: true\n", "mutually exclusive"),
+        ("transport: https\ncloud_url: https://engine.test/ingest\n", "transport=console"),
+        ("mode: live\n", "harness or replay"),
+        ("listen_host: 0.0.0.0\n", "loopback"),
+    ],
+)
+def test_file_watch_configuration_cannot_enable_a_competing_route(
+    tmp_path: Path, extra: str, message: str
+) -> None:
+    config = tmp_path / "config.yaml"
+    base = (
+        "file_watch_enabled: true\n"
+        f"file_watch_path: {tmp_path / 'scenario.txt'}\n"
+        "mode: harness\n"
+        "listen_host: 127.0.0.1\n"
+    )
+    config.write_text(base + extra, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        Config.load(str(config))

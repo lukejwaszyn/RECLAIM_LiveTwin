@@ -154,7 +154,8 @@ Verified locally on 2026-08-24 before the final commit:
   loss-of-data profiles with an explicit `PL` or `MT` chamber.
 - The cloud engine supports the 34-field LabVIEW record and continues gracefully
   when individual raw fields are `NaN`/unavailable.
-- The full local integration suite passes: 324 tests.
+- The active local integration suite passes: 260 tests. Historical
+  state-bridge/direct-route tests are archived and intentionally excluded.
 - No predictive engine or direct cloud telemetry transport is intended to run on
   the MacBook.
 
@@ -171,6 +172,14 @@ Verified locally on 2026-08-24 before the final commit:
    older VM agent, bridge, or Convene mapping that would create a second writer.
 5. The exact repository SHA must be deployed to the VM and Windows live gateway
    before acceptance evidence is valid.
+
+The prepared VM audit/rework procedure is
+`deployment/CLOUD_ENGINE_VM_AUDIT_AND_REWORK.md`. The active
+`deployment/windows-vm/` directory contains only the read-only inventory and
+current contract-test entry points; all former bridge/tunnel deployment scripts
+are archived. These files are prepared on the scenario desktop but are executed
+only after logging onto the actual VM; no cloud engine or `sim_*` publisher runs
+on the MacBook.
 
 ## Required competition acceptance
 

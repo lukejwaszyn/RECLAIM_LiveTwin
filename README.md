@@ -27,16 +27,15 @@ uv sync --locked --all-extras --dev --python 3.13
 python3 scripts/check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **324 passed**
+### 2. Tests — expect **260 passed**
 
-Green across the combined gateway, tooling, cloud-engine, source-record, and
-Convene-bridge suite is the pre-flight go-signal; **any red means stop, do not
-deploy.**
+Green across the combined gateway, tooling, cloud-engine, and source-record suite
+is the pre-flight go-signal; **any red means stop, do not deploy.**
 
 ```bash
 PYTHONPATH=pi_gateway:tools:cloud_engine:crio_source_record \
   python -m pytest -q pi_gateway/tests tools/tests cloud_engine/tests \
-  crio_source_record/tests convene_bridge/tests
+  crio_source_record/tests
 ```
 
 Bench replay must end `{'accepted': 3, ..., 'rejected': 0, 'sent': 3}`:
@@ -65,8 +64,8 @@ pi_gateway/macos/start-rehearsal-scenario.sh status
 pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
-The MacBook never connects to the real cRIO. The retained PowerShell launcher is
-for Windows/live-gateway work and is not the MacBook scenario-host entry point.
+The MacBook never connects to the real cRIO. Obsolete Windows/Mac direct scenario
+publishers are archived and cannot be invoked from the active tree.
 
 | Profile | Scenario/environment | Behavior |
 |---|---|---|

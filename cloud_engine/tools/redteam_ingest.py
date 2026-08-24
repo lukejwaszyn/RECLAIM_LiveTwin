@@ -15,15 +15,13 @@ at the deployed engine endpoint, and asserts two things end to end:
      turnover) DOES reset per-cycle analytics (charge mass recharges, active
      heating / energy zero). See docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md.
 
-This is the go-live gate for the endpoint that previously required a reboot: run it
-after deploy, before wiring Convene. A clean 20/20 means the reboot dependency is
-gone and the pipeline is unchanged.
+This is the supervised go-live gate for the loopback endpoint. Run it after
+deploy with Convene forwarding paused. Every reported check must pass.
 
 Usage (tokens are read from the environment so they do not enter the process list):
     RECLAIM_INGEST_TOKEN=<T> RECLAIM_READ_TOKEN=<T> \
-      python3 redteam_ingest.py --url https://<host>
-    # restricted-DNS networks: pin the endpoint host when explicitly required
-    python3 redteam_ingest.py --url https://<host> ... --pin-ip 104.16.230.132
+      python3 redteam_ingest.py --url http://127.0.0.1:8078
+    # `--pin-ip` remains available only for explicitly approved remote endpoints.
 
 Exit code 0 iff every check passes.
 """
