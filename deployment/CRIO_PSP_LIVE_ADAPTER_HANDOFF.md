@@ -2,8 +2,9 @@
 
 **Date:** 2026-08-20  
 **Branch:** `desktop/edge-gateway`  
-**Status:** Source complete and offline-tested; retained as a diagnostic engineering
-fallback. It is not the selected production seam. See
+**Status:** The CWDataSocket connect-result defect is fixed and offline-tested;
+the live PSP publisher is still unavailable. Retained as a diagnostic engineering
+fallback, not the selected production seam. See
 `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
 
 ## Intended topology
@@ -45,6 +46,49 @@ After LabVIEW was stopped and its remaining process was closed, the new reader c
 
 This isolates the immediate blocker to the cRIO PSP/Scan Engine publisher or its deployed shared-variable state, not JSON framing, gateway TCP, naming, or cloud conversion. The adapter was intentionally left stopped after the bounded probe so it does not publish fake zeros or stale replay.
 
+### 2026-08-23 start-attempt follow-up
+
+`CWDataSocket.SyncConnectTo` was observed returning `False` with `LastError = 0`
+and `Active:Subscription successful.` The adapter no longer treats that Boolean
+as authoritative. It now uses `LastError` for the connection result and still
+requires a successful first read, NI metadata, a floating-point value, finite
+data, freshness, and bounded skew before emitting a frame. The metadata guard was
+not relaxed.
+
+The complete adapter test file passes: 17 tests. A bounded live command used
+`-Source Psp -Sink File -MaxFrames 1`; it advanced past `Mod2/TC0`, proving the
+false-negative defect was removed, then failed on `Mod2/TC1` with NI error
+`-1967390704` (`Can't connect to Server`). No probe output file was created and no
+gateway connection was opened.
+
+Command-line resource inspection of the supplied `Socket Test VI.vi` recovered
+defaults `192.168.1.2`, TCP port `9070`, and request string `GET`. Its resource
+metadata includes `address`, `remote port or service name`, `connection ID`,
+`bytes to read`, `data in`, `data out`, and `bytes written`. This is evidence of a
+desktop TCP client/test harness for the cRIO endpoint, not a publisher into the
+gateway listener at `192.168.1.1:9070`. The VI does not remove the missing wire
+format, deployed-source, supervision, or control-impact gates for the direct-TCP
+path.
+
+The controls clarification is that the cRIO owns this listener and serves a
+response after a client sends `GET`. The repository now includes
+`crio_psp_adapter/windows/capture-crio-tcp-get.ps1` for a single bounded raw
+capture. It hard-codes the exact three-byte request, caps the response at 8192
+bytes, refuses overwrite/partial evidence, and has no gateway sink. Local socket
+tests prove exact request bytes, byte-for-byte response preservation, oversize
+rejection, and evidence-overwrite refusal. A live capture still requires the
+supervised window because the existing acquisition's single/multiple-client
+behavior is not proven.
+
+The direct probe connected and sent `GET` but received no response within both
+25- and 30-second first-byte windows. A transparent loopback proxy was then added
+to preserve the desktop VI's byte exchange while capturing cRIO-to-VI traffic.
+Its local mock-socket test passes, but the live VI/cRIO attempt did not establish
+a usable proxied stream and captured no bytes. These negative results are retained
+as diagnostics; neither tool is installed, persistent, gateway-connected, or an
+approved telemetry source. The working unproxied VI remains the only observed TCP
+consumer, and its exact live exchange still has not been captured.
+
 ## Recovery and acceptance procedure
 
 1. On the cRIO, verify the Scan Engine/shared-variable publisher is running and the deployed variables `Mod2/TC0..TC7` and `Mod3/AI0..AI2` are readable by a fresh remote subscriber. A supervised cRIO reboot/redeploy of the approved existing application may be needed; do not change its logic.
@@ -75,5 +119,5 @@ Stop only the Windows adapter process/task. No cRIO or gateway rollback is requi
 
 - Cloud tests: 67 passed.
 - Bridge tests: 67 passed.
-- Adapter tests: 13 passed. The first final run was blocked by a local pytest temp-directory ACL, not an assertion failure, and was rerun with a repository-local temp base.
+- Adapter tests: 17 passed. The first final run was blocked by a local pytest temp-directory ACL, not an assertion failure, and was rerun with a repository-local temp base.
 - `git diff --check`: required before commit.

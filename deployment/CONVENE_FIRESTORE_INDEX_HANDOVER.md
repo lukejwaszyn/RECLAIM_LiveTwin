@@ -19,6 +19,8 @@ The failing query is a Firestore `machineCommands` lookup that filters on
 `machineId` and `status` and orders by `createdAt`. Firestore requires a composite
 index for that combination and none exists.
 
+Captured 2026-08-23 against machine `BcryPSMP2iLbSRns5uhm`. The desktop agent has
+logged this **2622 consecutive times**; the log line is
 Captured 2026-08-23 against machine `BcryPSMP2iLbSRns5uhm`. As of that date the
 desktop agent had logged this **2841 consecutive times** — one per 30 s heartbeat,
 and still accumulating for as long as the index is missing, so treat the figure as

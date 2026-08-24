@@ -68,6 +68,37 @@ connection:
   -Sink File -OutputPath "$env:TEMP\reclaim-poc.ndjson" -MaxFrames 1
 ```
 
+## Direct TCP `GET` discovery
+
+The supplied Socket Test VI establishes a second, distinct source seam: the cRIO
+listens on `192.168.1.2:9070`, and a Windows client sends exactly the three ASCII
+bytes `GET`. `capture-crio-tcp-get.ps1` performs one fail-closed evidence capture.
+It never connects to the gateway at `192.168.1.1:9070`, never parses unknown bytes
+as telemetry, and refuses to overwrite an existing capture.
+
+Run this only during a controls-approved window in which a second client cannot
+disturb the existing LabVIEW acquisition:
+
+```powershell
+& "$env:WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" `
+  -NoProfile -ExecutionPolicy Bypass `
+  -File .\crio_psp_adapter\windows\capture-crio-tcp-get.ps1 `
+  -OutputPath .\crio-9070-response.bin
+```
+
+The probe sends `474554` (`GET`), waits up to the VI-aligned 25 seconds for the
+first byte, captures at most 8192 bytes, stops on peer close or a bounded idle
+interval, and reports the response length and SHA-256. A relay
+must not be enabled until a captured response proves its framing, field syntax,
+types, units, validity semantics, and snapshot behavior.
+
+`capture_crio_tcp_proxy.py` is a separate diagnostic experiment for observing the
+known-working desktop VI without consuming its socket. It listens only on
+`127.0.0.1:19070`, forwards bytes unchanged to `192.168.1.2:9070`, and records
+only cRIO-to-VI bytes with a timestamped chunk index. Local socket tests pass, but
+the 2026-08-23 live VI/cRIO attempt did not establish a usable proxied stream or
+capture data. Do not install or treat the proxy as a live source.
+
 ## Supervised one-frame live proof
 
 This opens read-only NI-PSP subscriptions and sends one LF-delimited frame to
