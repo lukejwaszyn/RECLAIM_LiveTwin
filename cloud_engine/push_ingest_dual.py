@@ -511,7 +511,9 @@ class DualPushEngine:
             raise FrameRejected("telemetry_invalid", f"{field} must be finite")
         return number
 
-    def _validate_raw_telemetry(self, raw: dict) -> None:
+    def _validate_raw_telemetry(
+        self, raw: dict, *, allow_partial_banks: bool = False
+    ) -> None:
         if not isinstance(raw, dict):
             raise FrameRejected("telemetry_invalid", "vars must be an object")
 
@@ -530,7 +532,8 @@ class DualPushEngine:
         for chamber, expected in (("PL", 4), ("MT", 1)):
             prefix = f"{chamber}_T_bed_tc"
             bank = sorted(k for k in raw if k.startswith(prefix))
-            if bank and bank != [f"{prefix}{i}" for i in range(1, expected + 1)]:
+            if (not allow_partial_banks and bank
+                    and bank != [f"{prefix}{i}" for i in range(1, expected + 1)]):
                 raise FrameRejected(
                     "telemetry_invalid",
                     f"{chamber} bed sensor bank must contain {expected} channels",
@@ -569,19 +572,33 @@ class DualPushEngine:
         if not isinstance(raw_value, dict):
             raise FrameRejected("telemetry_invalid", "vars must be an object")
         raw = dict(raw_value)
+        is_lv = labview_map.looks_like_labview(raw)
+        nan_fields: list[str] = []
+        if is_lv:
+            # LabVIEW uses NaN as an unavailable-channel marker. Treat it as a
+            # missing raw observation instead of rejecting the whole scan. This
+            # policy is intentionally limited to exact raw source names: canonical
+            # model inputs, infinities, booleans, strings and malformed values
+            # remain strict contract violations.
+            for key in sorted(labview_map.LABVIEW_NUMERIC_FIELDS & raw.keys()):
+                value = raw[key]
+                if (not isinstance(value, bool) and isinstance(value, numbers.Real)
+                        and math.isnan(float(value))):
+                    nan_fields.append(key)
+                    raw.pop(key)
         raw["active"] = meta["active_chamber"]
         self._validate_raw_telemetry(raw)
-        is_lv = labview_map.looks_like_labview(raw)
         values, mw_globals, active = labview_map.normalize(raw)
         # Validate normalized values as a second boundary. This protects future
         # adapter changes from introducing a prohibited model input.
-        self._validate_raw_telemetry(values)
+        self._validate_raw_telemetry(values, allow_partial_banks=bool(nan_fields))
         for key, value in mw_globals.items():
             if isinstance(value, bool):
                 continue
             self._require_finite_number(value, key)
         return {"raw": raw, "values": values, "mw_globals": mw_globals,
-                "active": active, "is_labview": is_lv}
+                "active": active, "is_labview": is_lv,
+                "nan_fields": nan_fields}
 
     @staticmethod
     def _clone_service(service: TwinStateService) -> TwinStateService:
@@ -732,6 +749,7 @@ class DualPushEngine:
         mw_globals = prepared["mw_globals"]
         active = prepared["active"]
         is_lv = prepared["is_labview"]
+        nan_fields = prepared["nan_fields"]
 
         # real dt from source timestamps (fix H1); clamped so a first frame or a
         # timestamp hiccup cannot inject a huge or non-positive integration step.
@@ -746,6 +764,8 @@ class DualPushEngine:
         self.count += 1
         self.t += dt
         combined, events = {}, []
+        if nan_fields:
+            events.append(("SYS", "SENSOR_NAN:" + ",".join(nan_fields)))
         cid = meta["cycle_id"]
         # Always publish an explicit availability gate for both chambers. A
         # partially mapped live source must clear retained downstream displays

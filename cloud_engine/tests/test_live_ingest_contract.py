@@ -9,6 +9,8 @@ measurements (C6), sequencer chamber authority (C7), and real-dt integration
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
+import math
 from pathlib import Path
 import sys
 
@@ -222,6 +224,81 @@ def test_active_chamber_with_no_sensors_raises_sensor_missing_event():
     del f["vars"]["MT_bottom"]
     out = engine.ingest(f)
     assert "MT:SENSOR_MISSING" in out["last_event"]
+
+
+def test_raw_labview_nan_is_missing_observation_not_whole_frame_failure():
+    engine = DualPushEngine(production=True)
+    frame = _frame()
+    frame["vars"]["PL_bottom2"] = math.nan
+
+    out = engine.ingest(frame)
+
+    assert out["ingest_status"] == "accepted"
+    assert out["PL_sensor_valid"] is True  # remaining three bed TCs are usable
+    assert "SYS:SENSOR_NAN:PL_bottom2" in out["last_event"]
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+
+def test_mt_nan_scan_is_accepted_and_next_valid_scan_recovers():
+    import labview_map
+
+    engine = DualPushEngine(production=True)
+    first = _frame(active_chamber="MT")
+    first["vars"].update({
+        "PL_process": True,  # contradictory legacy flag; envelope stays authoritative
+        "MT_crucible_temperature": 313.418,
+        "MT_top": math.nan,
+        "MT_bottom": math.nan,
+        "MW_power": 0.0,
+    })
+
+    unavailable = engine.ingest(first)
+
+    assert unavailable["ingest_status"] == "accepted"
+    assert unavailable["active_chamber"] == "MT"
+    assert unavailable["MT_sensor_valid"] is False
+    assert "SENSOR_NAN:MT_bottom,MT_top" in unavailable["last_event"]
+    assert "MT:SENSOR_MISSING" in unavailable["last_event"]
+    assert "CHAMBER_MISMATCH" in unavailable["last_event"]
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+    second = _frame(
+        seq=2,
+        ts=(_now() + timedelta(seconds=1)).isoformat(),
+        active_chamber="MT",
+    )
+    second["vars"].update({
+        "PL_process": False,
+        "MT_crucible_temperature": 313.418,
+        "MT_top": 237.1,
+        "MT_bottom": 313.418,
+        "MW_power": 2200.0,
+    })
+    recovered = engine.ingest(second)
+
+    assert recovered["MT_sensor_valid"] is True
+    assert recovered["MT_T_bed_meas"] == pytest.approx(586.568, abs=1e-3)
+    assert recovered["MT_P_fwd"] == 2200.0
+    assert engine.count == 2
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+    mapped, _mw, active = labview_map.normalize({
+        "active": "MT",
+        "MT_crucible_temperature": 313.418,
+        "MT_top": 237.1,
+        "MT_bottom": math.nan,
+        "MW_power": 2200.0,
+    })
+    assert active == "MT"
+    assert "MT_T_bed_tc1" not in mapped
+
+
+def test_raw_labview_infinity_remains_a_contract_rejection():
+    frame = _frame()
+    frame["vars"]["MT_top"] = math.inf
+
+    with pytest.raises(FrameRejected, match="MT_top must be finite"):
+        DualPushEngine(production=True).ingest(frame)
 
 
 # --------------------------------------------------- C7: sequencer authority

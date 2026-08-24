@@ -52,6 +52,8 @@ TORR_TO_KPA = 0.1333224  # 1 Torr = 0.1333224 kPa
 # Plastics bed-core hot-spot thermocouples -> canonical bed bank.
 _PL_BED = ("PL_bottom1", "PL_bottom2", "PL_bottom3", "PL_bottom4")
 # Metals: bottom = crucible/bed core, top = chamber wall/head (2-TC bank).
+# MT_crucible_temperature remains a preserved raw/display field until controls
+# signs its relationship to this model node; never substitute it silently.
 _MT_BED = ("MT_bottom",)
 # Shared, non-chamber SSMG globals passed straight to /state for display/diagnostics.
 _MW_GLOBALS = ("MW_freq", "MW_width", "MW_period", "MW_water_temp", "MW_flow_rate",
@@ -78,6 +80,7 @@ LABVIEW_BOOLEAN_FIELDS = frozenset({
     "PL_purge_pump", "MW_water_state", "MW_flow_state", "MW_RF", "MW_status",
 })
 LABVIEW_NUMERIC_FIELDS = frozenset(LABVIEW_RAW_FIELDS) - LABVIEW_BOOLEAN_FIELDS
+_LABVIEW_SIGNATURE_FIELDS = LABVIEW_NUMERIC_FIELDS
 
 
 def _temp_K(v):
@@ -110,9 +113,9 @@ def _press_kPa(v):
 def looks_like_labview(raw: dict) -> bool:
     """True if the frame uses the raw LabVIEW schema (needs normalization).
     Detected by any signature real-name key; canonical frames never carry these."""
-    keys = raw.keys()
-    return ("MW_power" in keys or "PL_bottom1" in keys or "PL_surface_temp" in keys
-            or "MT_top" in keys or "PL_chamber_pressure" in keys)
+    # Boolean process flags are also canonical pass-through names, so they
+    # cannot distinguish a raw source record from normalized model input.
+    return bool(_LABVIEW_SIGNATURE_FIELDS.intersection(raw))
 
 
 def active_chamber(raw: dict) -> str | None:
@@ -172,9 +175,13 @@ def normalize(raw: dict) -> tuple[dict, dict, str | None]:
         p_fwd = float(p_fwd) if p_fwd is not None else 0.0
     except (TypeError, ValueError):
         p_fwd = 0.0
+    if not math.isfinite(p_fwd):
+        p_fwd = 0.0
     try:
         p_refl = float(p_refl) if p_refl is not None else 0.0
     except (TypeError, ValueError):
+        p_refl = 0.0
+    if not math.isfinite(p_refl):
         p_refl = 0.0
 
     out: dict = {}
@@ -204,10 +211,11 @@ def normalize(raw: dict) -> tuple[dict, dict, str | None]:
     out["PL_P_refl"] = round(p_refl, 2) if active == "PL" else 0.0
 
     # ---- Metals ----
-    for i, k in enumerate(_MT_BED, start=1):
+    for k in _MT_BED:
         t = _temp_K(raw.get(k))
         if t is not None:
-            out[f"MT_T_bed_tc{i}"] = round(t, 3)
+            out["MT_T_bed_tc1"] = round(t, 3)
+            break
     tw = _temp_K(raw.get("MT_top"))                    # top chamber -> wall/outer node
     if tw is not None:
         out["MT_T_wall_meas"] = round(tw, 3)
@@ -215,7 +223,14 @@ def normalize(raw: dict) -> tuple[dict, dict, str | None]:
     out["MT_P_refl"] = round(p_refl, 2) if active == "MT" else 0.0
 
     # ---- shared SSMG globals (not chamber-tagged) ----
-    mw = {k: raw[k] for k in _MW_GLOBALS if k in raw}
+    mw = {
+        k: raw[k]
+        for k in _MW_GLOBALS
+        if k in raw and (
+            isinstance(raw[k], bool)
+            or (isinstance(raw[k], (int, float)) and math.isfinite(float(raw[k])))
+        )
+    }
 
     return out, mw, active
 

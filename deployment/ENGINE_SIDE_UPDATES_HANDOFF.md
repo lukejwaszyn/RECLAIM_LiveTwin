@@ -1,5 +1,13 @@
 # Engine-Side Updates — Owner Handoff
 
+> **Applied update — 2026-08-24:** `cloud_engine` now recognizes the exact
+> 34-field LabVIEW naming contract, honors envelope `active_chamber` as
+> authoritative, and treats raw numeric `NaN` as a missing observation instead
+> of rejecting the whole frame. It emits `SENSOR_NAN`/`SENSOR_MISSING`, keeps
+> sequence processing alive, and recovers on later valid scans. Canonical NaN,
+> infinities, and malformed values remain rejected. The proposal-only wording
+> below is retained as historical owner context.
+
 > **For:** the `cloud_engine` owner. **Why this is a document and not a commit:**
 > `cloud_engine` is the Windows VM's software and is **not deployed on the gateway**,
 > so changes there cannot be validated in their real runtime from here. Everything
