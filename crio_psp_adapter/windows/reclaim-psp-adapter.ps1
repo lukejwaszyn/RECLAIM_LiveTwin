@@ -144,8 +144,12 @@ function Open-PspReaders {
         $Url = "psp://$CrioHost/$($Entry.Value)"
         # CWDS access mode 2 is cwdsRead. It is read-only; this adapter never
         # calls SyncWrite, Update in a write mode, or a CWData setter.
-        $Connected = $Reader.SyncConnectTo($Url, 2, $FreshnessMs)
-        if (-not $Connected -or $Reader.LastError -ne 0) {
+        # CWDataSocket can return False even when a read subscription succeeds
+        # (LastError 0, "Active:Subscription successful."). Treat LastError as
+        # the connection result; the first SyncRead plus the metadata/type
+        # checks below establish that the requested item actually exists.
+        $null = $Reader.SyncConnectTo($Url, 2, $FreshnessMs)
+        if ($Reader.LastError -ne 0) {
             $Code = $Reader.LastError
             $Message = $Reader.LastMessage
             try { $Reader.Disconnect() } catch {}
