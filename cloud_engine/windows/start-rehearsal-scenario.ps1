@@ -102,7 +102,7 @@ if ($GatewayHealth.mode -ne "live") {
 Write-Host "RECLAIM synthetic rehearsal - advisory-only, no actuator authority"
 Write-Host "Profile: $Scenario | scenario=$($Selected.EngineScenario) | environment=$($Selected.Environment) | speed=$($Selected.Speed)x"
 Write-Host "Expected: $($Selected.Expected)"
-Write-Host "ONE PATH: scenario -> gateway ${GatewayAddress}:$GatewayPort -> raw Convene names + cloud engine -> sim_* Convene"
+Write-Host "ONE PATH: scenario -> gateway ${GatewayAddress}:$GatewayPort -> raw Convene variables + cloud engine -> sim_* Convene"
 Write-Host "Monitor gateway: Invoke-RestMethod $StatusBase/health"
 Write-Host "Inspect canonical frame: Invoke-RestMethod $StatusBase/latest"
 Write-Host "Stop with Ctrl+C."

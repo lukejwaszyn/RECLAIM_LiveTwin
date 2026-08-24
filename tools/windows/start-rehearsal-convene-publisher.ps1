@@ -7,7 +7,7 @@
     collectors. That path is dead while the backend lacks its machineCommands
     composite index (deployment\CONVENE_FIRESTORE_INDEX_HANDOVER.md), so this
     pushes instead -- the same direct /machine/publish technique the gateway's
-    gw_ audit tap already proves.
+    raw gateway audit tap already proves.
 
     Each profile publishes under its own non-live identity and rehearsal_ prefix
     per the isolation contract. Start the scenario first with

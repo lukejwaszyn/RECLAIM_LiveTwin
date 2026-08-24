@@ -367,7 +367,7 @@ Remaining **stakeholder calls** (not blocking; defaults chosen are safe):
 
 ## 8. V&V implications
 
-- The three-column V&V (LabVIEW ↔ `gw_` ↔ `sim_`) is unaffected by these changes —
+- The three-column V&V (LabVIEW ↔ raw gateway ↔ `sim_`) is unaffected by these changes —
   they are downstream of ingest and change only engine-internal analytics, not the
   transported frame identity the audit compares.
 - Per-cycle metrics become **reproducible**: the same batch yields the same

@@ -1,69 +1,70 @@
-# RECLAIM Live Deployment Topology
+# RECLAIM live deployment topology
 
 **Status:** authoritative platform record
-**Effective:** 2026-08-17
+**Effective:** 2026-08-24
+**Competition:** LunaRecycle demonstration, 2026-08-24
 
-## Live systems
+## Platform decision
+
+The Windows 10 desktop remains the sole live-data client/gateway. The MacBook is
+scenario-only and cannot receive cRIO live data or publish directly to the cloud
+engine. The predictive-engine VM remains Windows Server 2025.
 
 | Component | Platform | Responsibility |
 |---|---|---|
 | RECLAIM hardware | cRIO + LabVIEW | Authoritative telemetry and process sequencing |
-| Edge gateway | Windows 10 laptop | Receives cRIO TCP telemetry, frames and buffers it, and posts authenticated live telemetry |
-| Predictive-engine VM | Cloud-hosted Windows Server 2025 guest in Kubernetes-managed infrastructure | Clean deployment target; this integration installs the dual predictive engine, Cloudflare client, state bridge, and headless VM Convene agent |
-| Convene | External service | Receives the VM `sim_` predictive namespace and separate laptop `gw_` audit namespace |
+| Live gateway | Windows 10 desktop | Receives the real cRIO/LabVIEW stream and owns the production live-data path |
+| Scenario host | MacBook running macOS | Serves local synthetic/capture scenarios to its Convene machine; loopback input only |
+| Predictive-engine VM | Cloud-hosted Windows Server 2025 guest | Runs the production dual engine, Cloudflare route, state bridge, and VM Convene agent |
+| Convene | External service | Receives MacBook scenario variables and VM `sim_` predictive variables |
 
-The Kubernetes layer hosts/orchestrates the Windows VM. Guest deployment and
-troubleshooting use Windows services, PowerShell, NTFS paths, and Windows ACLs.
-Linux guest commands such as `systemctl`, `journalctl`, `hostnamectl`, `ss`, and
-paths under `/opt`, `/etc`, or `/var/lib` do not apply.
+The repository directory name `pi_gateway` is retained for compatibility. Its
+Windows tooling applies to the live gateway; its macOS tooling is scenario-only.
 
-There is no Raspberry Pi and no Linux host in the live telemetry path. The
-repository directory name `pi_gateway` is retained temporarily to avoid a risky
-pre-demonstration package rename; it denotes software running on the Windows 10
-laptop.
-
-## Live data paths
+## Live data path
 
 ```text
-cRIO / LabVIEW
-  -> direct Ethernet TCP 9070
-Windows 10 laptop gateway
-  -> authenticated HTTPS POST /ingest
-Cloudflare route
-  -> 127.0.0.1:8078
-Windows Server 2025 predictive engine
-  -> authenticated loopback GET /state
+cRIO / LabVIEW authoritative source
+  -> Windows 10 desktop live gateway
+  -> production live-data path prepared separately
+  -> Windows Server 2025 VM
+  -> authenticated GET /state
 Windows state bridge
-  -> atomic C:\ConveneAgent\sim_vars.json
-Headless VM Convene agent installed during bootstrap
+  -> C:\ConveneAgent\sim_vars.json
+VM Convene agent
   -> Convene sim_ namespace
 
-Windows 10 gateway canonical frame (also visible at 127.0.0.1:9080/latest)
-  -> nonblocking direct /api/machine/publish using the paired desktop credential
-  -> separate Convene gw_ audit namespace
+MacBook local synthetic/file-replay scenario
+  -> 127.0.0.1:9070 (harness/replay mode only)
+  -> nonblocking /api/machine/publish
+  -> Convene scenario machine
+  -> separately owned Convene-to-VM scenario pipe
 ```
 
-The predictive `/command` representation remains advisory. Neither Convene,
-the state bridge, nor the gateway may treat it as actuator authority in this
-integration phase.
+Port `9080` is loopback-only and must never be exposed through Wi-Fi, Internet
+Sharing, Tailscale, Cloudflare, or a firewall opening.
 
-## Platform ownership boundary
+## Network record
 
-- Kubernetes/hosting operators own the outer VM workload, persistence, network,
-  and recovery policy.
-- Windows VM operators own the guest services, release directory, ACLs, secrets,
-  port 8078, Cloudflare client, bridge, and VM Convene agent.
-- Gateway operators own the Windows 10 laptop, direct cRIO network, firewall rule,
-  durable queue, gateway task, and `gw_` audit publication.
-- Controls operators retain hardware interlock and process authority.
+- MacBook scenario ingress is fixed to `127.0.0.1:9070`; no MacBook OT address is
+  required or authorized.
+- Windows 10 live-gateway addressing and cRIO interface details remain owned by
+  the live-data workstream.
 
-Do not use Kubernetes container lifecycle as a substitute for the engine's
-persistent run/sequence state. The Windows guest state file must survive an engine
-service restart; the infrastructure owner must separately confirm whether it also
-survives VM/workload rescheduling.
+## Ownership and authority
 
-## Historical artifacts
+- Live-gateway operator: Windows 10 cRIO interface and production forwarding.
+- Scenario operator: MacBook loopback runtime, scenario files/generators,
+  `launchd`, and Convene scenario publisher.
+- VM operator: Windows service, release, ACLs, secrets, port `8078`, Cloudflare,
+  durable ingest identity, state bridge, and `sim_` publisher.
+- Controls operator: cRIO build, telemetry producer, channel/quality maps,
+  sequencing, interlocks, actuation, and rollback.
+- Convene is visualization only. `/command` remains advisory and is not connected
+  to any actuator path.
 
-Git history contains earlier Linux-cloud-VM and Raspberry-Pi deployment plans.
-They are not deployment alternatives. Current operational documents must link to
-this topology and use Windows procedures exclusively.
+## Current acceptance state
+
+The MacBook scenario lifecycle and capture replay are proven. Live cRIO and
+Windows 10 acceptance remain separate. The MacBook is not part of that live-client
+acceptance gate.

@@ -1,14 +1,16 @@
 # RECLAIM Live Twin — Hardening Changes (2026-08-10)
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 Implements the full priority fix order from `CODE_REVIEW.md` for the flight
-deployment: NI cRIO → Windows laptop gateway → Cloudflare Tunnel → cloud-VM
+deployment: NI cRIO → Windows 10 desktop live gateway → production path → cloud-VM
 dual predictive engine → Convene. Every fix is covered by a test; both suites
 pass (18 cloud + 9 gateway) plus an end-to-end HTTP exercise of the real
 publisher against the real production server.
 
 > **Platform note (2026-08-14):** this document was written against a
 > Raspberry Pi 3B+ gateway. The deployment target is now an onsite
-> Windows 10 laptop; hardware references have been updated accordingly.
+> Windows 10 desktop; hardware references have been updated accordingly.
 > The fixes themselves are unchanged — several were motivated by Pi 3B+
 > constraints and are noted as such where the rationale still matters.
 
@@ -41,7 +43,7 @@ wedge modes found in review:
 | H2 | Receiver: TCP keepalive + configurable idle drop (`conn_idle_timeout_s`), so a half-open socket from a cRIO power-cycle can no longer stall telemetry until a manual restart. |
 | H4 | GET `/state` `/manifest` `/history` `/command` now support a `RECLAIM_READ_TOKEN` bearer (give it to the Convene publisher, which also feeds the Convene-native `.stp` visualization); `/health` stays open for probes. Token checks are constant-time. `/state` adds `state_age_ms` computed at read time, so every consumer can gate DATA NOT LIVE without trusting a stored age. |
 | H5 | Ingest token removed from the systemd command line; consumed from the (now required, mode-600) `EnvironmentFile` only. |
-| H6 | Linux unit: `StateDirectory=reclaim-edge` (fixes the first-boot crash-loop under `ProtectSystem=strict`), config path corrected to `/etc/reclaim-edge/config.yaml`, folder naming unified on `pi_gateway`, docstrings updated for the gateway flight computer (Pi 3B+ at the time; now the Windows laptop). |
+| H6 | Historical Linux unit: `StateDirectory=reclaim-edge` fixed the then-current first-boot crash loop. The package name remains `pi_gateway`; the authoritative live gateway is now the Windows 10 desktop. The MacBook uses `launchd` only for its loopback scenario-host service. |
 | H7 | Config fail-fast: explicit-but-missing path, unparseable YAML, unknown (typo) keys, invalid transport/mode, and live-HTTPS-without-token all refuse to start; defaults-only operation is a logged dev mode. Cloud side: `EnvironmentFile` is now mandatory. |
 | M1 | `--feed replay` raises a clear, actionable error instead of a bare ImportError. |
 | M2 | All identity decisions + estimator stepping run under one lock; the HTTP handler consumes per-call dispositions instead of racing on shared `last_ingest`. |

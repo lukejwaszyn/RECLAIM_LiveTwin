@@ -2,7 +2,7 @@
 
 > **For:** the Convene backend owner. **Not actionable from the RECLAIM side.**
 > **Impact:** blocks Convene from displaying the RECLAIM rehearsal scenarios.
-> Does **not** affect live `gw_` telemetry publishing.
+> Does **not** affect live raw gateway telemetry publishing.
 
 ---
 
@@ -95,7 +95,7 @@ Consequence: **the RECLAIM rehearsal scenarios cannot appear in Convene at all.*
 Those services are GET-only by design (`127.0.0.1:8177`–`8181`) and never push —
 Convene is supposed to read them via collectors. No collectors, no rehearsal data.
 
-**What is NOT affected:** live gateway telemetry. The `gw_` audit tap posts
+**What is NOT affected:** live gateway telemetry. The raw gateway audit tap posts
 directly to `/api/machine/publish` with the agent token and never touches the
 heartbeat. Verified under sustained load on 2026-08-23: 450 frames, 270 delivered
 plus 180 coalesced, **0 failed**. Machine presence also still works, because

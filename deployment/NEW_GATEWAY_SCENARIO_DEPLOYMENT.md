@@ -1,10 +1,9 @@
-# New Windows gateway deployment: live source and scenarios
+# MacBook scenario-host deployment
 
-> **Target:** replacement Windows edge-gateway laptop.
-> **Rule:** deploy one exact Git commit and retain one data engine. Scenarios and
-> the cRIO enter the same TCP listener; they never start a side estimator.
+> Windows 10 remains the sole live-data client/gateway. This procedure deploys
+> only the MacBook scenario service.
 
-## Required topology
+## Configure
 
 ```text
 cRIO or explicitly started TruthPlant scenario
@@ -16,96 +15,23 @@ cRIO or explicitly started TruthPlant scenario
   -> VM state bridge + Convene agent -> sim_*
 ```
 
-Never run the old 8177-8181 scenario services or the `rehearsal_*` direct
-publisher as the operational scenario path. Never run a scenario while the real
-cRIO/adapter owns port 9070.
+Confirm `src=reclaim-macbook-scenario-01`, `mode=harness`, `transport=console`,
+and no cloud token. Confirm ports 9070 and 9080 listen only on loopback.
 
-## 1. Stage the exact revision
+## Run generated scenarios
 
-From an elevated PowerShell session on the new gateway:
-
-```powershell
-New-Item -ItemType Directory -Force C:\RECLAIM | Out-Null
-Set-Location C:\RECLAIM
-git clone https://github.com/lukejwaszyn/RECLAIM_LiveTwin.git source
-Set-Location C:\RECLAIM\source
-git fetch --tags --prune
-git checkout <APPROVED_COMMIT_SHA>
-git status --short
-git rev-parse HEAD
+```bash
+pi_gateway/macos/start-rehearsal-scenario.sh nominal
+pi_gateway/macos/start-rehearsal-scenario.sh power-outage
+pi_gateway/macos/start-rehearsal-scenario.sh lunar
+pi_gateway/macos/start-rehearsal-scenario.sh loss-of-data
 ```
 
-The status must be clean and `HEAD` must equal the approved SHA. Do not deploy
-from a ZIP, Downloads copy, or a moving branch tip.
+## Replay a capture
 
-Create the locked repository environment used by the scenario generator/tests:
-
-```powershell
-py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
-```
-
-## 2. Stage the service directory
-
-The Windows service uses `C:\RECLAIM\pi_gateway`; the Git checkout remains the
-traceable source and scenario workspace.
-
-```powershell
-$source = 'C:\RECLAIM\source\pi_gateway'
-$target = 'C:\RECLAIM\pi_gateway'
-New-Item -ItemType Directory -Force $target | Out-Null
-robocopy $source $target /E /PURGE /XD .venv __pycache__ .pytest_cache /XF config.windows.yaml
-if ($LASTEXITCODE -gt 7) { throw "robocopy failed: $LASTEXITCODE" }
-
-py -3.13 -m venv C:\RECLAIM\pi_gateway\.venv
-& C:\RECLAIM\pi_gateway\.venv\Scripts\python.exe -m pip install `
-  --requirement C:\RECLAIM\pi_gateway\requirements.txt
-```
-
-`/PURGE` applies only to the explicit service directory above. The exclusion
-preserves an existing secret-bearing `config.windows.yaml` during updates. On a
-new machine, create it from `config.crio-live.example.yaml`, review every
-non-secret field, and do not enter a real token by hand into a console command.
-
-## 3. Configure the isolated interface and firewall
-
-Use the actual cRIO-facing adapter name:
-
-```powershell
-Set-Location C:\RECLAIM\source
-.\pi_gateway\windows\configure-crio-network-firewall.ps1 `
-  -Mode Apply -InterfaceAlias '<CRIO_ETHERNET_ALIAS>'
-.\pi_gateway\windows\configure-crio-network-firewall.ps1 `
-  -Mode Audit -InterfaceAlias '<CRIO_ETHERNET_ALIAS>'
-```
-
-Required state: gateway `192.168.1.1/24`, cRIO `192.168.1.2/24`, Private profile,
-no default route on that adapter, TCP 9070 allowed only on the isolated link,
-and no inbound exposure of loopback status port 9080.
-
-## 4. Provision Convene and cloud ingress
-
-Provision the desktop/SYSTEM Convene machine credential through the approved
-pairing procedure. It publishes gateway-owned raw source names without a `gw_`
-prefix and never publishes `sim_*`.
-Audit it without printing the credential:
-
-```powershell
-.\pi_gateway\windows\repair-convene-desktop-agent.ps1 -Mode Audit
-.\pi_gateway\windows\repair-convene-desktop-agent.ps1 -Mode Validate
-```
-
-Obtain privately from the VM owner:
-
-- current HTTPS endpoint ending exactly `/ingest`;
-- the ingest token only (never the read token);
-- deployed engine SHA and active freshness contract.
-
-Finalize the deployed config; the script prompts for the token invisibly:
-
-```powershell
-.\pi_gateway\windows\finalize-gateway-config.ps1 `
-  -GatewayDirectory C:\RECLAIM\pi_gateway `
-  -CloudUrl 'https://<CURRENT-ENGINE-HOST>/ingest'
+```bash
+.venv-macbook/bin/python tools/replay_windows_data_stream.py \
+  "/path/to/data_stream.txt" --max-frames 100 --speed 10
 ```
 
 ## 5. Verify and install the one gateway service
@@ -174,11 +100,8 @@ conservative 1 Hz shared-engine cadence.
 
 ## 7. Cut over to the real source
 
-Stop every scenario sender and confirm no established synthetic connection.
-Then connect/start exactly one approved cRIO or PSP-adapter producer. Repeat the
-same counter/run/sequence/freshness checks. `/command` remains advisory and must
-not connect to an actuator path.
+## Accept
 
-Record the gateway source SHA, deployed service-file hashes, VM engine SHA,
-Convene machine IDs, tunnel hostname, acceptance timestamps/counters, and
-rollback directory. Never record tokens.
+Require matching receive/deliver counts, zero queue depth, drops, dead letters,
+and Convene failures, plus a scenario-labeled `/latest` frame. Never change the
+MacBook to `mode=live`, a non-loopback listener, or direct cloud transport.

@@ -1,5 +1,7 @@
 # Past / Deprecated — archived material
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 This folder holds RECLAIM Live Twin documents that are **historical, superseded,
 or spent** and are **not** current work plans. Nothing here is deleted — it is
 relocated so the active `deployment/` set stays clean and unambiguous. Every file

@@ -1,5 +1,7 @@
 # Claude Code — Gateway Staging Prompt Pack (cRIO offline)
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Stage:** 0 — Offline staging · **Status:** HISTORICAL — one-off session prompt
 > pack, already executed. Kept as a record of how the gateway was staged.
 

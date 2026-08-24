@@ -104,7 +104,7 @@ LabVIEW communication API ever shipped is useful here.
 | A2 | Existing per-item NI-PSP subscriber | none | limited until skew is measured | not yet proven | low unless metadata items exist | high | Engineering POC/diagnostic; not rejected outright, not production-approved |
 | A3 | Existing bundle plus separately published metadata | none | high for sensors; metadata alignment must be measured | unknown | medium/high | high | Viable only if temporal alignment and publisher independence are proven |
 | B1 | Publish one existing cluster/string as one network shared variable | small | high | high if deployed SVE is stable | high if metadata is included | high via desktop relay | Smallest likely RT change |
-| B2 | Direct RT TCP producer to `192.168.1.1:9070` | yes | high | high | high | **highest** | Preferred deliberate production change when authorized |
+| B2 | Direct RT TCP producer to `<WINDOWS10_GATEWAY_IP>:9070` | yes | high | high | high | **highest** | Preferred deliberate production change when authorized |
 | B3 | NI Network Stream from RT to Windows host | yes | high | high | high | medium; requires host relay | Supported on LabVIEW RT, including published NI measurements on cRIO-9024; manage buffers so stale data is not replayed |
 | B4 | UDP push from RT to gateway | yes | high | high for a lossy stream | high | low; gateway needs UDP input | Useful if minimal RT overhead outweighs gateway change |
 | B5 | Modbus TCP | yes | high if registers are latched together | high | medium | low; requires register-map translation | Only with an existing site Modbus standard |

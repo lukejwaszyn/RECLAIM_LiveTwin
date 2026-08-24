@@ -1,11 +1,13 @@
 # Prompt — cRIO Source-Record Telemetry Implementation Session
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 You are the implementation and evidence coordinator for the RECLAIM Live Twin's
 cRIO telemetry seam. Work alongside the named controls/NI engineer and onsite
 operator. The architecture decision has already been made conditionally: preserve
 the existing USB logger, reuse its source-assembled record, and—only after the
 controls gates pass—feed a bounded lower-priority direct TCP producer into the
-existing Windows gateway.
+existing MacBook scenario host.
 
 This prompt does not authorize a cRIO edit, VI execution, deployment, startup-app
 change, network change, or live send. Those actions require the explicit gate and
@@ -40,8 +42,8 @@ a diagnostic engineering fallback, not the production source.
 
 ## Endpoint identities
 
-- cRIO-9024/VxWorks/PowerPC target: `192.168.1.2/24`.
-- Windows 10 edge gateway: `192.168.1.1/24`, TCP receiver `9070`.
+- cRIO-9024/VxWorks/PowerPC target: `<CRIO_SOURCE_IP>/24`.
+- Windows 10 desktop live gateway: `<WINDOWS10_GATEWAY_IP>/24`, TCP receiver `9070`.
 - Gateway health/latest endpoint: loopback-only `127.0.0.1:9080`.
 - Windows Server 2025 predictive-engine VM: downstream of the gateway.
 - Convene: downstream visualization only.
@@ -75,7 +77,7 @@ Do not call an endpoint "this machine" or "here." Name it precisely.
 - The current evidence hashes differ from the earlier PSP-plan hashes, and the
   evidence project has no populated build specification proving that it produced
   the deployed `startup.rtexe`.
-- The gateway, VM, and separate `gw_`/`sim_` Convene paths are commissioned for
+- The gateway, VM, and separate raw gateway/`sim_` Convene paths are commissioned for
   synthetic input. Do not rebuild or replace them during source work.
 
 Do not commit the raw LabVIEW binaries, raw data runs, screenshots containing
@@ -97,7 +99,7 @@ existing USB logger     bounded depth-one handoff
                               |
                     low-priority TCP producer
                               |
-                   192.168.1.1:9070
+                   <WINDOWS10_GATEWAY_IP>:9070
                               |
                     existing gateway/VM
 ```
@@ -253,7 +255,7 @@ The design must:
 - copy one reviewed snapshot into a depth-one/latest-wins, non-blocking handoff;
 - perform JSON serialization and TCP operations only in a lower-priority telemetry
   loop;
-- maintain one TCP client to `192.168.1.1:9070`;
+- maintain one TCP client to `<WINDOWS10_GATEWAY_IP>:9070`;
 - use finite connect/write timeouts and bounded reconnect backoff;
 - discard stale unsent frames after disconnect;
 - expose local counters for snapshot accepted/rejected, overwrite/drop, serialize
@@ -316,7 +318,7 @@ The controls engineer—not the agent—performs the deployment:
 3. Deploy only the reviewed build.
 4. Prove one frame at gateway `/latest`.
 5. Compare the same instant across LabVIEW indicators, the USB record, gateway
-   `/latest`, raw `gw_`, and converted/derived VM `sim_` state.
+   `/latest`, raw gateway variables, and converted/derived VM `sim_` state.
 6. Run at least five minutes of shadow telemetry while monitoring cRIO CPU/memory,
    loop timing, watchdogs, USB logging, gateway counters, VM freshness, and
    physical outputs.

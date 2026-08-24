@@ -1,5 +1,7 @@
 # RECLAIM cRIO NI-PSP Telemetry Adapter Development and Deployment Plan
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Stage:** 2-3 — real-source telemetry seam and contract validation
 >
 > **Status:** HISTORICAL DEVELOPMENT PLAN. The adapter was completed and exercised

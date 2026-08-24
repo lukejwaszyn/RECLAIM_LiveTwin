@@ -1,5 +1,7 @@
 # START HERE — Claude Code gateway staging run
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Stage:** 0 — Offline staging (cRIO + cloud offline) · **Status:** HISTORICAL —
 > that staging session is complete (see GATEWAY_GO_LIVE §1). Kept for context;
 > for current pickup read `HANDOFF.md`, not this file.

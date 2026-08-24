@@ -4,8 +4,8 @@ Wires receiver -> framer -> buffer -> publisher and runs them as daemon threads
 around the durable buffer. Emits a periodic health line and shuts down gracefully.
 
 Run:  python -m reclaim_edge.main
-Windows deployment sets RECLAIM_EDGE_CONFIG to config.windows.yaml.
-      RECLAIM_EDGE_CONFIG=./config.yaml python -m reclaim_edge.main
+MacBook deployment sets RECLAIM_EDGE_CONFIG to the protected configuration under
+~/Library/Application Support/RECLAIM/edge-gateway/config.yaml.
 
 Author: LJW.
 """
@@ -66,9 +66,13 @@ def main() -> None:
     died = None
     while not stop.is_set():
         time.sleep(0.5)
+        # A requested shutdown lets workers observe the stop event immediately.
+        # Do not misclassify their orderly exit during this sleep as a crash.
+        if stop.is_set():
+            break
         # Thread liveness supervision (fix M6): a dead receiver (port in use,
         # unhandled error) or dead publisher must not leave a healthy-looking
-        # zombie service. Exit non-zero so the Windows task supervisor recovers it.
+        # zombie service. Exit non-zero so launchd recovers it.
         for th in (receiver, publisher):
             if not th.is_alive():
                 died = th.name

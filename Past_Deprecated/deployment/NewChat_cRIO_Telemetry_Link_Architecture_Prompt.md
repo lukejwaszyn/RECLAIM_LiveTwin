@@ -1,5 +1,7 @@
 # Prompt — cRIO/LabVIEW Telemetry Link Architecture and Integration
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Historical prompt:** the broad architecture phase is complete. For current
 > source-record implementation and controls coordination, use
 > `NewChat_cRIO_Source_Record_TCP_Implementation_Prompt.md`.

@@ -1,5 +1,7 @@
 # Windows Server 2025 Predictive-Engine VM Runbook
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Stage:** VM engine, tunnel, and local state publication
 > **Status:** CURRENT
 > **Platform:** cloud-hosted Windows Server 2025 VM in Kubernetes-managed infrastructure
@@ -296,7 +298,7 @@ Convene-generated IDs; names alone are not a sufficient binding record.
 
 ## 11. Gateway handoff
 
-Send the Windows 10 gateway operator, through an approved private channel:
+Send the MacBook scenario host operator, through an approved private channel:
 
 - `https://<engine-host>/ingest`;
 - ingest token only;
@@ -311,7 +313,7 @@ it. ACL-lock the gateway configuration after inserting its credential.
 
 The synthetic nominal, power-outage, and lunar demonstrations are separate
 GET-only services. They do not use port 8078, production credentials, the
-production state bridge, or live `sim_`/`gw_` bindings. Start one per foreground
+production state bridge, or live `sim_`/raw gateway bindings. Start one per foreground
 PowerShell terminal from the release root:
 
 ```powershell

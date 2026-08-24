@@ -1,25 +1,21 @@
-"""Synthetic cRIO — drive the real pipeline with synthetic telemetry.
+"""Synthetic scenario source for the loopback-only MacBook scenario host.
 
 The rehearsal services on 8177-8181 run their own estimator in-process and
 publish finished answers. That exercises the physics but *short-cuts the
 pipeline*: nothing downstream of the plant is tested.
 
-This does the opposite. It impersonates the cRIO at the head of the real path,
-so every stage afterwards runs unmodified and cannot tell the difference:
+It emits the same channel shape as the cRIO for explicit scenario runs, but it
+does not participate in the Windows 10 desktop's live-data path:
 
-    synthetic_crio -> gateway TCP receiver (Seam A) -> framer -> buffer
-                   -> publisher -> VM /ingest -> dual engine -> /state
-                   -> bridge -> Convene
+    synthetic_crio -> MacBook loopback receiver -> framer -> Convene scenario machine
 
-Nothing in this file is new machinery. It writes the same line-delimited raw
-LabVIEW frames the cRIO writes, in the same units, to the same socket.
+It writes line-delimited raw LabVIEW-shaped scenario frames in the same units to
+the MacBook's local socket.
 
-The installed gateway remains the one envelope owner and fan-out point. During
-an explicitly initiated scenario run it stamps its configured ``mode=live`` so
-the production cloud engine accepts the frame and its existing bridge produces
-``sim_*``. The raw frame carries a conspicuous ``reclaim-synthetic-scenario``
-source identity, and the launcher refuses to run while the real cRIO is
-connected. This is the same guarded commissioning path, with realistic values.
+The installed MacBook service owns the scenario envelope and stamps
+``mode=harness`` or ``mode=replay``. The raw frame carries a conspicuous
+``reclaim-synthetic-scenario`` source identity. Any Convene-to-VM scenario pipe
+is configured separately.
 
 Read-only with respect to `cloud_engine`: it imports the physics harness and
 changes nothing there.
@@ -55,7 +51,7 @@ C_TO_K = 273.15
 TORR_TO_KPA = 0.1333224
 
 #: Deterministic per-thermocouple offsets (degC) around the true bed
-#: temperature. The four-TC mean stays the true value, which is what the gw_
+#: temperature. The four-TC mean stays the true value, which is what the raw
 #: audit compares against sim_PL_T_bed_meas.
 _TC_OFFSETS = (-0.35, -0.12, 0.12, 0.35)
 
@@ -205,8 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     log.info("synthetic cRIO: scenario=%s env=%s speed=%sx -> %s:%d%s",
              args.scenario, args.env, args.speed, args.host, args.port,
              "  [DRY RUN, no socket]" if args.dry_run else "")
-    log.info("one path: gateway fans each canonical frame to Convene gw_* and "
-             "the cloud engine; the engine's bridge produces Convene sim_*")
+    log.info("scenario path: local source -> MacBook -> Convene exact-name variables")
 
     crio = None if args.dry_run else SyntheticCrio(args.host, args.port)
     if crio is not None:

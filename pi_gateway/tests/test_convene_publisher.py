@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from reclaim_edge.buffer import Buffer
 from reclaim_edge.config import Config
@@ -24,6 +25,7 @@ def _frame():
         "vars": {
             "PL_bottom1": 100.2,
             "MW_RF": True,
+            "gw_quality_code": 7,
             "missing": None,
             "nested": {"unsafe": 1},
         },
@@ -57,6 +59,18 @@ def test_all_34_live_source_fields_are_published_verbatim():
 
     assert set(LABVIEW_RAW_FIELDS) <= variables.keys()
     assert all(variables[name] == frame["vars"][name] for name in LABVIEW_RAW_FIELDS)
+
+
+def test_frame_to_variables_rejects_cloud_owned_sim_name():
+    frame = _frame()
+    frame["vars"]["sim_forbidden"] = 1
+
+    try:
+        frame_to_variables(frame)
+    except ValueError as exc:
+        assert "sim_" in str(exc)
+    else:
+        raise AssertionError("gateway accepted a cloud-owned sim_ variable")
 
 
 def test_direct_publish_uses_machine_token_and_does_not_emit_sim(tmp_path):
@@ -125,3 +139,33 @@ def test_submit_coalesces_without_blocking():
 
     assert publisher.coalesced == 1
     assert publisher._pending.get_nowait()["seq"] == 2
+
+
+def test_transient_failure_retries_latest_value_until_success(tmp_path):
+    credential = tmp_path / "credential.json"
+    credential.write_text(json.dumps({"machineId": "desktop-1", "agentToken": "secret"}))
+    stop = threading.Event()
+    publisher = ConvenePublisher(
+        Config(convene_enabled=True, convene_credentials_path=str(credential)), stop
+    )
+    delivered = []
+
+    def flaky(frame):
+        if not delivered:
+            delivered.append(("failed", frame["seq"]))
+            raise RuntimeError("transient")
+        delivered.append(("accepted", frame["seq"]))
+        return True
+
+    publisher._deliver = flaky
+    publisher.start()
+    publisher.submit({"seq": 1})
+    deadline = time.time() + 3
+    while publisher.delivered < 1 and time.time() < deadline:
+        time.sleep(0.02)
+    stop.set()
+    publisher.join(timeout=2)
+
+    assert delivered == [("failed", 1), ("accepted", 1)]
+    assert publisher.failed == 1
+    assert publisher.delivered == 1

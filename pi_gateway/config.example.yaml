@@ -1,6 +1,6 @@
-# RECLAIM Windows 10 Edge Gateway config — copy to
-# C:/RECLAIM/pi_gateway/config.windows.yaml and edit.
-# Secrets live here under a restricted NTFS ACL, never in code.
+# RECLAIM generic/live-gateway config. The live deployment owner is the
+# Windows 10 desktop; use config.macbook.example.yaml for MacBook scenarios.
+# Secrets live in a mode-0600 file, never in code.
 
 src: reclaim-crio-01
 # Leave run_id blank to generate a new UUID when the gateway starts. Set it only
@@ -9,11 +9,13 @@ run_id: ""
 mode: live
 schema_version: reclaim.telemetry.v1
 
-# Seam A — cRIO -> Windows 10 gateway laptop (trusted LAN, plaintext TCP)
-listen_host: 0.0.0.0
+# Seam A — cRIO -> Windows 10 desktop live gateway
+# Safe staging default. Replace only after assigning/confirming a dedicated
+# Windows live-gateway OT interface address.
+listen_host: 127.0.0.1
 listen_port: 9070
 
-# Seam B — Windows 10 gateway laptop -> cloud
+# Seam B — Windows 10 desktop live gateway -> cloud
 # transport: console | https | mqtts
 transport: console            # start here for E0 (no cloud needed)
 cloud_url: https://vm.example/ingest
@@ -28,17 +30,18 @@ verify_tls: true
 # directly to Convene; failures never block or acknowledge the durable VM queue.
 convene_enabled: false
 convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
-convene_credentials_path: C:/Windows/System32/config/systemprofile/.convene_agent.json
+convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
 convene_timeout_s: 10.0
 
 # buffer (store-and-forward)
-buffer_path: /var/lib/reclaim-edge/queue.db
+buffer_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/edge-gateway/queue.db
 buffer_max_frames: 500000
 
 # runtime
 publish_batch: 50
 publish_interval_s: 0.5
 health_interval_s: 10.0
+status_port: 9080
 # drop a silent cRIO connection after this many seconds (half-open TCP guard);
 # set to several telemetry periods. 0 disables.
 conn_idle_timeout_s: 30.0

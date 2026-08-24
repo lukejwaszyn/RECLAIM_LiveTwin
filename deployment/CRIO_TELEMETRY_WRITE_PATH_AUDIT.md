@@ -2,7 +2,7 @@
 
 A read-only audit of every place a telemetry frame is written, validated, transformed,
 or could conceivably become an actuation path — from the gateway ingress at
-`192.168.1.1:9070` to the cloud estimator. Line references are against this branch
+`<WINDOWS10_GATEWAY_IP>:9070` to the cloud estimator. Line references are against this branch
 (`desktop/edge-gateway`) and were re-verified here, not carried over from the earlier
 zip. Purpose: prove the shadow-stream design cannot backpressure or actuate the
 physical process, and record the exact validity/quality behavior the source layer must
@@ -84,7 +84,7 @@ loopback status port must not be exposed through a tunnel.
 ## 7. RT-side producer constraints (for Gate 3, not authorized here)
 
 When Gate 3 is authorized, the producer must be an outbound TCP **client** only (one
-connection to `192.168.1.1:9070`), branch one immutable snapshot into a depth-one,
+connection to `<WINDOWS10_GATEWAY_IP>:9070`), branch one immutable snapshot into a depth-one,
 latest-wins handoff with no wait, run serialize+connect+write in a lower-priority loop
 with finite timeouts and drop-on-stall, discard stale unsent frames after disconnect
 (no replay), and apply the signed quality map so bad channels never reach the

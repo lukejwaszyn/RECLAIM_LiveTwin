@@ -1,4 +1,4 @@
-# Convene `gw_` Audit Mapping — gateway `/latest` → Convene Variables
+# Convene Raw Gateway Mapping — gateway `/latest` → Convene Variables
 
 > **Naming contract changed 2026-08-24:** the active publisher no longer emits
 > the `gw_` prefix. Every table entry below should be read with that leading
@@ -16,21 +16,27 @@
 > release remains a separate supervised deployment gate.
 
 **Purpose.** Wire the laptop gateway into Convene as its **own machine**, publishing
-the `gw_` audit set defined in `convene/RECLAIM_Convene_Live_Binding.md`
+the raw gateway audit set defined in `convene/RECLAIM_Convene_Live_Binding.md`
 ("Gateway audit machine"). This is the §6 losslessness audit of the preflight:
-LabVIEW indicator ↔ `gw_*` submitted frame ↔ `sim_*` cloud state, three columns
+LabVIEW indicator ↔ exact-name gateway submitted frame ↔ `sim_*` cloud state, three columns
 per signal.
 
 **Hard rule.** This machine **never writes a `sim_` variable.** The cloud engine's
-publisher is the single writer of the `sim_` set. The `gw_` tap is read-only and
+publisher is the single writer of the `sim_` set. The raw gateway tap is read-only and
 sits outside the delivery path — it can never block, slow, or reorder the durable
 queue feeding the cloud.
 
 **Audit source:** the same canonical frame exposed at
 `http://127.0.0.1:9080/latest`. After the frame is durably enqueued for VM
 delivery, `reclaim_edge.convene` flattens the nine envelope values and scalar raw
-channels with `gw_` prefixes and submits them to `/api/machine/publish` using the
-desktop machine credential. Port 9080 remains loopback-only.
+channels under their exact canonical names and submits them to
+`/api/machine/publish` using the
+MacBook machine credential. Port 9080 remains loopback-only.
+
+The publisher does not blindly add or strip `gw_`: normal engine-input fields
+remain unprefixed, and any approved field whose canonical source name already
+contains `gw_` retains it. The binding must therefore follow the active source
+profile exactly. `sim_` remains forbidden on the MacBook.
 
 > **Current backend blocker (2026-08-19):** a heartbeat can update machine
 > presence but then returns HTTP 500 because the Convene backend lacks the
@@ -39,7 +45,7 @@ desktop machine credential. Port 9080 remains loopback-only.
 > gateway does **not** depend on that response: direct `/machine/publish` reached
 > authenticated request validation successfully. The missing index still
 > degrades the separate connected-machine heartbeat/command plane and should be
-> fixed, while `gw_` acceptance is proven from the gateway's Convene counters.
+> fixed, while raw gateway acceptance is proven from the gateway's Convene counters.
 
 **Derived from code, not invented.** Every row below traces to
 `pi_gateway/reclaim_edge/status.py`, `framer.py`, `main.py`, and
@@ -91,18 +97,18 @@ cRIO disconnected.
 
 | Convene variable | jsonPath | Type | Notes / code |
 |---|---|---|---|
-| `gw_schema_version` | `$.schema_version` | string | `framer.py:85`, from config (`reclaim.telemetry.v1`) |
-| `gw_mode` | `$.mode` | string | `framer.py:86`, from config (`live`) |
-| `gw_run_id` | `$.run_id` | string | `framer.py:87`. Fresh uuid4 per gateway start unless `run_id` is pinned (`framer.py:36`) |
-| `gw_source_id` | `$.source_id` | string | `framer.py:88`. `reclaim-crio-laptop-01` unless the cRIO overrides |
-| `gw_cycle_id` | `$.cycle_id` | string | `framer.py:89`. **Empty string** if the cRIO omits it |
-| `gw_seq` | `$.seq` | integer | `framer.py:90`. Monotone from 1; resumes past the high-water mark on restart when `run_id` is pinned (M7) |
-| `gw_ts` | `$.ts` | string (ISO-8601 UTC) | `framer.py:91`. Source `ts` preferred; the gateway stamps arrival time only if absent |
-| `gw_source_op_state` | `$.source_op_state` | string | `framer.py:82`. **null** if the cRIO sends neither `source_op_state` nor `op_state` |
-| `gw_active_chamber` | `$.active_chamber` | string | `framer.py:83`. `PL` / `MT` / `NONE`; **null** if absent |
+| `schema_version` | `$.schema_version` | string | `framer.py:85`, from config (`reclaim.telemetry.v1`) |
+| `mode` | `$.mode` | string | `framer.py:86`, from config (`live`) |
+| `run_id` | `$.run_id` | string | `framer.py:87`. Fresh uuid4 per gateway start unless `run_id` is pinned (`framer.py:36`) |
+| `source_id` | `$.source_id` | string | `framer.py:88`. `reclaim-crio-laptop-01` unless the cRIO overrides |
+| `cycle_id` | `$.cycle_id` | string | `framer.py:89`. **Empty string** if the cRIO omits it |
+| `seq` | `$.seq` | integer | `framer.py:90`. Monotone from 1; resumes past the high-water mark on restart when `run_id` is pinned (M7) |
+| `ts` | `$.ts` | string (ISO-8601 UTC) | `framer.py:91`. Source `ts` preferred; the gateway stamps arrival time only if absent |
+| `source_op_state` | `$.source_op_state` | string | `framer.py:82`. **null** if the cRIO sends neither `source_op_state` nor `op_state` |
+| `active_chamber` | `$.active_chamber` | string | `framer.py:83`. `PL` / `MT` / `NONE`; **null** if absent |
 
-**Pipeline-lag readout (§6):** `gw_seq − sim_seq`, displayed beside
-`sim_ingest_age_ms`. `gw_source_op_state` must equal `sim_source_op_state` at every
+**Pipeline-lag readout (§6):** `seq − sim_seq`, displayed beside
+`sim_ingest_age_ms`. `source_op_state` must equal `sim_source_op_state` at every
 state transition — that equality is the losslessness proof.
 
 ---
@@ -123,13 +129,13 @@ See §4.
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_PL_bottom1` | `$.vars.PL_bottom1` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
-| `gw_PL_bottom2` | `$.vars.PL_bottom2` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
-| `gw_PL_bottom3` | `$.vars.PL_bottom3` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
-| `gw_PL_bottom4` | `$.vars.PL_bottom4` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
-| `gw_PL_surface_temp` | `$.vars.PL_surface_temp` | `sim_PL_T_wall_meas` | +273.15 |
-| `gw_PL_top_condenser_temp` | `$.vars.PL_top_condenser_temp` | `sim_PL_T_cond_top` | +273.15 |
-| `gw_PL_bottom_condenser_temp` | `$.vars.PL_bottom_condenser_temp` | `sim_PL_T_cond_bottom` | +273.15 |
+| `PL_bottom1` | `$.vars.PL_bottom1` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `PL_bottom2` | `$.vars.PL_bottom2` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `PL_bottom3` | `$.vars.PL_bottom3` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `PL_bottom4` | `$.vars.PL_bottom4` | `sim_PL_T_bed_meas` (bank aggregate) | mean after +273.15 |
+| `PL_surface_temp` | `$.vars.PL_surface_temp` | `sim_PL_T_wall_meas` | +273.15 |
+| `PL_top_condenser_temp` | `$.vars.PL_top_condenser_temp` | `sim_PL_T_cond_top` | +273.15 |
+| `PL_bottom_condenser_temp` | `$.vars.PL_bottom_condenser_temp` | `sim_PL_T_cond_bottom` | +273.15 |
 
 The target worksheet associates the bed bank with NI-9213 TC4..TC7 ("Hot Spot
 1..4"); that association is not active in the evidence-gated POC. In the
@@ -141,18 +147,18 @@ target model, `PL_surface_temp` is the AI2 IR pyrometer, mapped to the
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_PL_chamber_pressure` | `$.vars.PL_chamber_pressure` | `sim_PL_P_chamber` | ×0.1333224 (Torr→kPa) |
-| `gw_PL_output_pressure` | `$.vars.PL_output_pressure` | `sim_PL_P_downstream` | ×0.1333224 |
+| `PL_chamber_pressure` | `$.vars.PL_chamber_pressure` | `sim_PL_P_chamber` | ×0.1333224 (Torr→kPa) |
+| `PL_output_pressure` | `$.vars.PL_output_pressure` | `sim_PL_P_downstream` | ×0.1333224 |
 
 ### Plastics chamber — process flags (boolean)
 
 | Convene variable | jsonPath | `sim_` counterpart |
 |---|---|---|
-| `gw_PL_process` | `$.vars.PL_process` | `sim_PL_process` |
-| `gw_PL_preprocess` | `$.vars.PL_preprocess` | `sim_PL_preprocess` |
-| `gw_PL_postprocess` | `$.vars.PL_postprocess` | `sim_PL_postprocess` |
-| `gw_PL_chamber_pump` | `$.vars.PL_chamber_pump` | `sim_PL_chamber_pump` |
-| `gw_PL_purge_pump` | `$.vars.PL_purge_pump` | `sim_PL_purge_pump` |
+| `PL_process` | `$.vars.PL_process` | `sim_PL_process` |
+| `PL_preprocess` | `$.vars.PL_preprocess` | `sim_PL_preprocess` |
+| `PL_postprocess` | `$.vars.PL_postprocess` | `sim_PL_postprocess` |
+| `PL_chamber_pump` | `$.vars.PL_chamber_pump` | `sim_PL_chamber_pump` |
+| `PL_purge_pump` | `$.vars.PL_purge_pump` | `sim_PL_purge_pump` |
 
 Booleans ride through prefixed but otherwise untouched (`labview_map.py:181-183`).
 
@@ -160,8 +166,8 @@ Booleans ride through prefixed but otherwise untouched (`labview_map.py:181-183`
 
 | Convene variable | jsonPath | `sim_` counterpart | Conversion |
 |---|---|---|---|
-| `gw_MT_bottom` | `$.vars.MT_bottom` | `sim_MT_T_bed_meas` | +273.15 |
-| `gw_MT_top` | `$.vars.MT_top` | `sim_MT_T_wall_meas` | +273.15 |
+| `MT_bottom` | `$.vars.MT_bottom` | `sim_MT_T_bed_meas` | +273.15 |
+| `MT_top` | `$.vars.MT_top` | `sim_MT_T_wall_meas` | +273.15 |
 
 Bottom = crucible/bed core, top = chamber wall/head (`labview_map.py:52-53`).
 
@@ -169,22 +175,22 @@ Bottom = crucible/bed core, top = chamber wall/head (`labview_map.py:52-53`).
 
 | Convene variable | jsonPath | `sim_` counterpart |
 |---|---|---|
-| `gw_MW_power` | `$.vars.MW_power` | `sim_PL_P_fwd` **or** `sim_MT_P_fwd` — see §4.3 |
-| `gw_MW_reverse` | `$.vars.MW_reverse` | `sim_PL_P_refl` **or** `sim_MT_P_refl` |
+| `MW_power` | `$.vars.MW_power` | `sim_PL_P_fwd` **or** `sim_MT_P_fwd` — see §4.3 |
+| `MW_reverse` | `$.vars.MW_reverse` | `sim_PL_P_refl` **or** `sim_MT_P_refl` |
 
 ### Shared SSMG — globals (pass-through)
 
 | Convene variable | jsonPath | Type |
 |---|---|---|
-| `gw_MW_freq` | `$.vars.MW_freq` | number |
-| `gw_MW_width` | `$.vars.MW_width` | number |
-| `gw_MW_period` | `$.vars.MW_period` | number |
-| `gw_MW_water_temp` | `$.vars.MW_water_temp` | number |
-| `gw_MW_flow_rate` | `$.vars.MW_flow_rate` | number |
-| `gw_MW_water_state` | `$.vars.MW_water_state` | boolean |
-| `gw_MW_flow_state` | `$.vars.MW_flow_state` | boolean |
-| `gw_MW_RF` | `$.vars.MW_RF` | boolean |
-| `gw_MW_status` | `$.vars.MW_status` | boolean |
+| `MW_freq` | `$.vars.MW_freq` | number |
+| `MW_width` | `$.vars.MW_width` | number |
+| `MW_period` | `$.vars.MW_period` | number |
+| `MW_water_temp` | `$.vars.MW_water_temp` | number |
+| `MW_flow_rate` | `$.vars.MW_flow_rate` | number |
+| `MW_water_state` | `$.vars.MW_water_state` | boolean |
+| `MW_flow_state` | `$.vars.MW_flow_state` | boolean |
+| `MW_RF` | `$.vars.MW_RF` | boolean |
+| `MW_status` | `$.vars.MW_status` | boolean |
 
 These are not chamber-tagged; they ride through to `/state` untouched
 (`labview_map.py:55-56, 199`).
@@ -195,10 +201,10 @@ These are not chamber-tagged; they ride through to `/state` untouched
 
 Four behaviors will otherwise look like faults when the chain is healthy.
 
-### 4.1 `gw_` is raw, `sim_` is SI
+### 4.1 Gateway variables are raw; `sim_` is SI
 
 The audit view compares **unlike units**. A bed TC at 100.2 °C appears as
-`gw_PL_bottom1 = 100.2`, while `/state` publishes one
+`PL_bottom1 = 100.2`, while `/state` publishes one
 `sim_PL_T_bed_meas` equal to the mean of the valid four-channel bank after the
 °C→K conversion. The current cloud record does **not** publish individual
 `sim_PL_T_bed_tc1..4` fields. Compare the converted bank mean, not each raw TC,
@@ -211,7 +217,7 @@ range-and-quality rule, exact zero is preserved. Thus `0 degC` becomes `273.15 K
 and `0 Torr` becomes `0 kPa`. A later approved quality channel may mark a zero
 invalid, but neither the adapter nor cloud infers that from the numeric value.
 
-### 4.3 `gw_MW_power` is shared and unattributed
+### 4.3 `MW_power` is shared and unattributed
 
 There is one SSMG serving both chambers. The cloud attributes its power to the
 **active chamber** and zeroes the idle one (`labview_map.py:184-196`):
@@ -221,8 +227,8 @@ There is one SSMG serving both chambers. The cloud attributes its power to the
 - `active_chamber == "NONE"` or null → **both** are `0.0` (sequencer-authoritative
   idle, `labview_map.py:113-114`)
 
-So `gw_MW_power` will not equal either `sim_*_P_fwd` unless you account for the
-attribution. Gate the comparison on `gw_active_chamber`.
+So `MW_power` will not equal either `sim_*_P_fwd` unless you account for the
+attribution. Gate the comparison on `active_chamber`.
 
 ### 4.4 Missing channels do not refresh; retained values are not live
 
@@ -231,24 +237,24 @@ field the cRIO omitted. `/latest` and the VM frame therefore contain no value fo
 an absent channel. The Convene connected-machine store is last-value retained,
 however, so a value written by an older commissioning source can remain visible
 even though the current source no longer publishes that name. That is exactly
-what happened for `gw_MW_width`, `gw_MW_period`, `gw_MW_flow_rate`,
-`gw_MW_flow_state`, `gw_MW_status`, the other `gw_MW_*` fields, and
-`gw_PL_purge_pump`: they came from the synthetic commissioning shape and are not
+what happened for `MW_width`, `MW_period`, `MW_flow_rate`,
+`MW_flow_state`, `MW_status`, the other `MW_*` fields, and
+`PL_purge_pump`: they came from the synthetic commissioning shape and are not
 present in the current PSP scan stream.
 
 Never refresh these names with fabricated zero/false values. The audit view must
-gate them unavailable unless their update carries the current `gw_source_id`,
-`gw_run_id`, `gw_seq`, and fresh `gw_ts` from a source profile that actually
+gate them unavailable unless their update carries the current `source_id`,
+`run_id`, `seq`, and fresh `ts` from a source profile that actually
 contains them. Until the approved PSP/readback mapping supplies those fields,
 their retained values are historical, not telemetry.
 
 The evidence-gated PSP profile also withholds every earlier semantic TC alias.
-Its current audit values are `gw_scan_Mod2_TC0_degC` through
-`gw_scan_Mod2_TC7_degC` and `gw_scan_Mod3_AI0_raw` through
-`gw_scan_Mod3_AI2_raw`. They have no `sim_` counterpart and must not enter PL or
+Its current audit values are `scan_Mod2_TC0_degC` through
+`scan_Mod2_TC7_degC` and `scan_Mod3_AI0_raw` through
+`scan_Mod3_AI2_raw`. They have no `sim_` counterpart and must not enter PL or
 MT normalization until the approved profile exists. Any retained
-`gw_PL_top_condenser_temp`, `gw_PL_bottom_condenser_temp`, `gw_MT_top`,
-`gw_MT_bottom`, or `gw_PL_bottom1..4` value is therefore historical when this
+`PL_top_condenser_temp`, `PL_bottom_condenser_temp`, `MT_top`,
+`MT_bottom`, or `PL_bottom1..4` value is therefore historical when this
 profile is the active source.
 
 ---

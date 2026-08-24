@@ -22,9 +22,9 @@ source workspace but are not part of this release.
 The root `uv.lock` is the reproducible dependency source. Supported CI matrix is
 Python 3.11 and 3.13.
 
-```powershell
-py -3.13 -m uv sync --locked --all-extras --dev --python 3.13
-python scripts\check_repository_hygiene.py
+```bash
+uv sync --locked --all-extras --dev --python 3.13
+python3 scripts/check_repository_hygiene.py
 ```
 
 ### 2. Tests — expect **55 / 76 / 70**
@@ -46,8 +46,8 @@ PYTHONPATH=crio_source_record python -m pytest crio_source_record -q  # 70
 
 Bench replay must end `{'accepted': 3, ..., 'rejected': 0, 'sent': 3}`:
 
-```powershell
-$env:PYTHONPATH="pi_gateway;cloud_engine;$PWD"; python -m crio_source_record.bench_replay
+```bash
+PYTHONPATH="pi_gateway:cloud_engine:$PWD" python -m crio_source_record.bench_replay
 ```
 
 ### 3. Rehearsal scenarios — one command each, any time
@@ -57,57 +57,30 @@ command — there is no setup step, and nothing above it needs to be run first. 
 the locked environment does not exist yet, the runner builds it once on first use,
 so these work from a fresh checkout.
 
-Run the nominal scenario:
+On the MacBook, scenarios enter the loopback-only scenario listener. Run exactly
+one sender at a time:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
+```bash
+.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env earth_lab --host 127.0.0.1 --port 9070 --speed 1
+.venv-macbook/bin/python tools/synthetic_crio.py --scenario power_outage --env earth_lab --host 127.0.0.1 --port 9070 --speed 1
+.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env lunar_surface --host 127.0.0.1 --port 9070 --speed 1
+.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env earth_lab --host 127.0.0.1 --port 9070 --speed 1 --cycles 1
 ```
 
-...or the power-outage scenario:
+Stop looping scenarios with `Ctrl+C`. The MacBook never connects to the real
+cRIO. The retained PowerShell launcher is for Windows/live-gateway rehearsal
+work and is not the MacBook scenario host entry point.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 power-outage
-```
+| Profile | Scenario/environment | Behavior |
+|---|---|---|
+| `nominal` | `nominal` / `earth_lab` | Stable heat-and-hold; repeats until Ctrl+C |
+| `power-outage` | `power_outage` / `earth_lab` | Outage, coast, and `S_Restart`; repeats until Ctrl+C |
+| `lunar` | `nominal` / `lunar_surface` | Same source sequence under lunar physics |
+| `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
 
-...or the lunar scenario:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 lunar
-```
-
-...or the loss-of-data / freshness rehearsal:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cloud_engine\windows\start-rehearsal-scenario.ps1 loss-of-data
-```
-
-Each runs in the foreground and prints what to expect; stop it with `Ctrl+C`. They
-use different ports, so you may run several at once in separate windows if you
-want to compare them side by side.
-
-`-ExecutionPolicy Bypass` is required because a default Windows install blocks
-unsigned local scripts; this is the invocation form already used elsewhere in the
-repo. If your session already permits scripts, you can call the `.ps1` directly:
-`.\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal`
-
-| Profile | Port | Physics | Cycle | Behavior |
-|---|---:|---|---:|---|
-| `nominal` | 8177 | `earth_lab`, 2x | ~3 min 20 s | Stable 2200 W heat-and-hold; **repeats until Ctrl+C** |
-| `power-outage` | 8178 | `earth_lab`, 4x | ~3 min 45 s | Outage at ~1 min 53 s, coast, `S_Restart` at ~3 min 8 s; **repeats until Ctrl+C** |
-| `lunar` | 8179 | `lunar_surface`, 2x | ~3 min 20 s | Same cycle under lunar physics; **repeats until Ctrl+C** |
-| `loss-of-data` | 8181 | `earth_lab`, 2x | ~3 min 20 s | Runs **one** cycle, then stops updating while still serving — the freshness rehearsal |
-
-Each is fully synthetic (`--feed harness`), binds loopback-only, refuses to start
-if its port is already taken, and prints its expected behavior first. Pass
-`-PythonExe <path>` to use a different interpreter.
-
-Inspect any running scenario on loopback (substitute the port):
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8177/health
-Invoke-RestMethod http://127.0.0.1:8177/state
-Invoke-RestMethod http://127.0.0.1:8177/history
-```
+These profiles traverse only the MacBook's loopback `9070` scenario ingress and
+Convene scenario publisher. They do not enter the Windows 10 live gateway or
+directly target the production VM. Inspect the scenario host on loopback `9080`.
 
 **`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
 keep answering and the last values stay readable, but the data stops advancing:
@@ -125,7 +98,7 @@ its HTTP surface, **not** the bridge's freshness/identity gating.
 **Where to run them.** The scenarios are self-contained — they need only this
 checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
 that is **not** currently serving production `8078`. In practice that means the
-Windows 10 desktop/gateway during a deploy or demo session, which keeps
+MacBook scenario host during a deploy or demo session, which keeps
 machine-level separation from the VM's production port. Do not run them on the
 predictive-engine VM while it serves production: the script's port guard is only
 port-level protection, and `8177`–`8181` must never be routed to production or
@@ -140,15 +113,18 @@ data.
 ## Runtime topology
 
 ```text
-cRIO / LabVIEW -> Windows 10 gateway -> Cloudflare -> Windows Server 2025 VM
-                                                       -> dual engine on loopback
-                                                       -> Windows state bridge
-                                                       -> headless VM Convene agent installed during bootstrap
-                                                       -> Convene-native .stp visualization
+cRIO / LabVIEW -> Windows 10 desktop live gateway -> production live-data path
+
+MacBook local scenarios -> loopback scenario service -> Convene scenario machine
+                                                   -> separately owned Convene-to-VM pipe
+
+Windows Server 2025 VM -> dual engine -> state bridge -> VM Convene agent
+                                          -> Convene-native .stp visualization
 ```
 
-The VM is cloud-hosted in Kubernetes-managed infrastructure, but the guest and
-all repository-owned runtime procedures are Windows. There is no Linux host or
+The VM is cloud-hosted in Kubernetes-managed infrastructure and its guest
+procedures are Windows. Live-gateway procedures are Windows 10; MacBook
+procedures are scenario-only. There is no Linux host or
 Raspberry Pi in the live path. The cloud engine owns state processing. The
 headless VM Convene agent consumes the bridge's validated copy of the cloud
 `/state` record; its native visualization binds the incoming variables to
@@ -157,12 +133,12 @@ changes. The visualization is a read-only view of the same `/state` record — i
 does not talk to the cRIO and is not a second predictive engine.
 
 The VM is the sole publisher of the `sim_` namespace; the gateway publishes only
-the read-only `gw_` audit namespace, and never writes a `sim_` variable.
+the read-only raw gateway audit namespace, and never writes a `sim_` variable.
 
 ## Contents
 
-- `pi_gateway/` — Windows 10 cRIO receiver, provenance framer, durable queue, HTTPS
-  publisher, configuration template, Windows service + scheduled-task templates, tests.
+- `pi_gateway/` — shared gateway/scenario framing package, Windows live-gateway
+  tooling, MacBook loopback scenario configuration, Convene publisher, and tests.
 - `cloud_engine/` — Windows Server 2025 dual plastics/metals predictive engine with the
   autonomous per-chamber lifecycle (idle/running/suspended, self-resetting at batch
   boundaries), LabVIEW adapter, production ingest service, rehearsal scenario runner,

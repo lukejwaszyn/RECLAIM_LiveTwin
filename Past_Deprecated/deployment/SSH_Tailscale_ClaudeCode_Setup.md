@@ -1,5 +1,7 @@
 # RECLAIM Laptop — Admin SSH + Claude Code Bootstrap
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Stage:** 0 — Access base · **Status:** PARTIALLY SUPERSEDED. The inbound-SSH
 > approach here does not work on this laptop (WDAC blocks inbound listeners); the
 > access model is now outbound-only — TeamViewer + Tailscale + the Convene agent

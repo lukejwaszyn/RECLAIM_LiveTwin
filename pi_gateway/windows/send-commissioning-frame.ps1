@@ -5,7 +5,7 @@ Sends one clearly identified commissioning frame through the running gateway.
 .DESCRIPTION
 This exercises the real desktop fan-out without reading any credential:
 TCP 9070 -> durable VM queue -> Cloudflare /ingest, plus the independent
-Convene gw_ publisher. It refuses to inject while the real cRIO peer has an
+Convene raw-variable publisher. It refuses to inject while the real cRIO peer has an
 established connection. The frame is synthetic and explicitly labeled in its
 source_id and cycle_id; use only for supervised commissioning.
 #>
@@ -153,4 +153,3 @@ $result = [ordered]@{
 if (-not $result.Passed) {
     throw 'Commissioning frame did not complete every desktop/VM/Convene gate before timeout.'
 }
-

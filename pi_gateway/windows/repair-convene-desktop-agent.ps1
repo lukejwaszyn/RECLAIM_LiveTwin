@@ -12,7 +12,7 @@ Repair validates the newer user-profile pairing with one minimal heartbeat,
 backs up the SYSTEM credential, copies that already-created desktop identity to
 the SYSTEM profile, and restarts the existing Convene-Agent task. It does not
 create a machine, change a backend, configure VM bindings, create variables, or
-publish gw_ or sim_ values.
+publish raw gateway or sim_ values.
 
 .EXAMPLE
 .\pi_gateway\windows\repair-convene-desktop-agent.ps1 -Mode Audit
@@ -280,7 +280,7 @@ if ($Mode -eq 'RePair') {
             # path fails. Persist the token so it is not lost and the agent can
             # recover automatically when the backend-side fault clears.
             $report.HeartbeatDegraded = $true
-            Write-Warning "Convene created desktop machine '$($newPairing.MachineId)' but heartbeat returned $($newValidation.Error). Persisting the valid pairing; gw_ autoVars remain unverified until heartbeat returns HTTP 200."
+            Write-Warning "Convene created desktop machine '$($newPairing.MachineId)' but heartbeat returned $($newValidation.Error). Persisting the valid pairing; raw gateway autoVars remain unverified until heartbeat returns HTTP 200."
         }
         else {
             [pscustomobject]$report | ConvertTo-Json -Depth 4
@@ -339,7 +339,7 @@ if (-not $validation.Accepted) {
     if ($AllowDegradedHeartbeat -and
         $validation.FailureKind -eq 'MissingFirestoreIndex') {
         $report.HeartbeatDegraded = $true
-        Write-Warning "Persisting existing desktop machine '$($userCredential.MachineId)' despite the known Convene MissingFirestoreIndex fault. It can remain visible, but gw_ autoVars cannot operate until that backend index exists."
+        Write-Warning "Persisting existing desktop machine '$($userCredential.MachineId)' despite the known Convene MissingFirestoreIndex fault. It can remain visible, but raw gateway autoVars cannot operate until that backend index exists."
     }
     else {
     [pscustomobject]$report | ConvertTo-Json -Depth 4

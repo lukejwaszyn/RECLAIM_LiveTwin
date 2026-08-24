@@ -1,7 +1,14 @@
 # CI/CD Red-Team Integration Handoff
 
-**Date:** 2026-08-16  
-**Status:** Required amendments before implementing `CI_CD_ARCHITECTURE.md`  
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
+> **Gateway platform update 2026-08-23:** Windows gateway installer/path findings
+> below are retained as historical evidence. The production edge target is now
+> the MacBook and must use the macOS release/`launchd` contract. Windows Server
+> 2025 VM findings remain current.
+
+**Date:** 2026-08-16
+**Status:** Required amendments before implementing `CI_CD_ARCHITECTURE.md`
 **Audience:** controls lead, developer, VM operator, gateway operator, and future CI maintainer.
 
 ## Purpose
@@ -172,7 +179,7 @@ CI produces a release candidate only from a protected `main` commit. The candida
 5. It restarts only the intended service/task, verifies the executable path/version, loopback health, configuration integrity, queue/state compatibility, and—for the VM—ingest readiness.
 6. It writes a deployment receipt. Failure restores the previously recorded release and verifies recovery.
 
-The VM deployment tool may run as a narrowly permissioned service account or manual operator command. It must not be a general GitHub Actions runner. The Windows gateway remains operator-triggered until a similarly narrow, approved pull agent exists.
+The VM deployment tool may run as a narrowly permissioned service account or manual operator command. It must not be a general GitHub Actions runner. The MacBook scenario host remains operator-triggered until a similarly narrow, approved pull agent exists.
 
 ### Phase 3 — Change classes for rapid bug fixes
 

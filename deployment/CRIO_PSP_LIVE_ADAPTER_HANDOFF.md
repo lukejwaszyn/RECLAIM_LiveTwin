@@ -1,7 +1,9 @@
 # cRIO NI-PSP Live Telemetry Adapter Handoff
 
-**Date:** 2026-08-20  
-**Branch:** `desktop/edge-gateway`  
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
+**Date:** 2026-08-20
+**Branch:** `desktop/edge-gateway`
 **Status:** The CWDataSocket connect-result defect is fixed and offline-tested;
 the live PSP publisher is still unavailable. Retained as a diagnostic engineering
 fallback, not the selected production seam. See
@@ -9,7 +11,12 @@ fallback, not the selected production seam. See
 
 ## Intended topology
 
-`cRIO 192.168.1.2` -> read-only Windows NI-PSP adapter on `192.168.1.1` -> local gateway TCP `192.168.1.1:9070` -> predictive-engine VM.
+`cRIO <CRIO_SOURCE_IP>` -> read-only Windows NI-PSP diagnostic relay on a separate
+Windows host -> TCP `<WINDOWS10_GATEWAY_IP>:9070` -> Windows 10 live gateway -> predictive-engine VM.
+
+The relay is not installed on the MacBook and is not the selected production
+source. If used diagnostically, its host address must be separately recorded and
+the MacBook packet-filter rule temporarily scoped to that relay under supervision.
 
 No cRIO application, shared variable, output, setpoint, command, or target control is written by the adapter. No Convene endpoint was contacted during this work.
 
@@ -62,11 +69,11 @@ false-negative defect was removed, then failed on `Mod2/TC1` with NI error
 gateway connection was opened.
 
 Command-line resource inspection of the supplied `Socket Test VI.vi` recovered
-defaults `192.168.1.2`, TCP port `9070`, and request string `GET`. Its resource
+defaults `<CRIO_SOURCE_IP>`, TCP port `9070`, and request string `GET`. Its resource
 metadata includes `address`, `remote port or service name`, `connection ID`,
 `bytes to read`, `data in`, `data out`, and `bytes written`. This is evidence of a
 desktop TCP client/test harness for the cRIO endpoint, not a publisher into the
-gateway listener at `192.168.1.1:9070`. The VI does not remove the missing wire
+gateway listener at `<WINDOWS10_GATEWAY_IP>:9070`. The VI does not remove the missing wire
 format, deployed-source, supervision, or control-impact gates for the direct-TCP
 path.
 
@@ -100,7 +107,7 @@ consumer, and its exact live exchange still has not been captured.
      -File ".\crio_psp_adapter\windows\reclaim-psp-adapter.ps1" `
      -Source Psp -Sink Tcp `
      -CrioHost NI-cRIO9024-016F1385.local `
-     -GatewayHost 192.168.1.1 -GatewayPort 9070 -MaxFrames 0
+     -GatewayHost <WINDOWS10_GATEWAY_IP> -GatewayPort 9070 -MaxFrames 0
    ```
 
 3. Confirm `http://127.0.0.1:9080/health` shows `received`, `delivered`, and `last_ack_age_s` updating at the three-second cadence. Confirm `/latest` contains only the eleven audit-only names above and a current timestamp.

@@ -11,7 +11,7 @@ deliberately does not, and the evidence standing behind each claim.
 The selected production seam is the existing source-assembled process record (the
 repeating `name: value` record `Data Stream.vi` writes to the cRIO USB volume), reused
 — after the controls gates pass — by a bounded, lower-priority RT-side TCP client that
-emits one UTF-8 JSON object + LF to the existing gateway at `192.168.1.1:9070`. This is
+emits one UTF-8 JSON object + LF to the existing gateway at `<WINDOWS10_GATEWAY_IP>:9070`. This is
 the authoritative decision from `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`. This record
 does not re-open that decision; it delivers the Gate 2 offline artifacts that make the
 seam reviewable before any cRIO window.
@@ -70,8 +70,8 @@ requires controls/onsite evidence not available offline.
 | Bench replay green end-to-end: sent 3 / received 3 / accepted 3 / rejected 0, max frame 902 B | proven | `python -m crio_source_record.bench_replay` 2026-08-23 | RECLAIM dev | §B.4 pre-flight |
 | Conformance checker binds the REAL gateway framer and REAL cloud engine (not reimplementations) | proven | `conformance.py` imports `reclaim_edge.framer`/`push_ingest_dual`; exercised 2026-08-23 | RECLAIM dev | Gate 3 §6 |
 | Quarantining `PL_bottom2` with NO bank policy yields gateway-PASS but whole-frame cloud rejection (`telemetry_invalid`) on every frame; `SUPPRESS_INCOMPLETE` on the same records yields cloud-accepted | proven | conformance runs 2026-08-23 on fixture-built frames (871 B rejected / 806 B accepted) | RECLAIM dev | Gate 3 checklist 6.3 |
-| `config.crio-live.example.yaml` Seam A values match the socket contract (bind 192.168.1.1:9070, idle 15 s, 8192 B, strict_fields false) | proven | line-by-line review vs `CRIO_TELEMETRY_SOCKET_SETUP.md` §3, 2026-08-23 | gateway | §B.2 |
-| Firewall helper is audit-default, apply-guarded (asserts OT addressing, NO default route, cRIO ping, no 9080 allow rule), scoped 9070 `192.168.1.2→192.168.1.1` Private/interface-bound, with JSON-backed rollback | proven | read-only review of `configure-crio-network-firewall.ps1`, 2026-08-23 | gateway | §B.3 |
+| `config.crio-live.example.yaml` Seam A values match the socket contract (bind <WINDOWS10_GATEWAY_IP>:9070, idle 15 s, 8192 B, strict_fields false) | proven | line-by-line review vs `CRIO_TELEMETRY_SOCKET_SETUP.md` §3, 2026-08-23 | gateway | §B.2 |
+| Windows firewall rule is scoped to `<CRIO_SOURCE_IP>→<WINDOWS10_GATEWAY_IP>:9070`, OT interface has no default route, and 9080 has no exposure | open | capture the Windows rule and rollback onsite | gateway | §B.3 |
 | Gate 3 producer review remains OPEN — VI source unavailable this session; evidence questionnaire issued | unknown | `deployment/CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md` | controls/NI + integration | Gate 3 |
 | Gates 0 and 1 remain OPEN — no deployed-source hash, rollback exercise, coherence proof, or signed maps received | unknown | signed-maps worksheet still UNSIGNED | controls/NI | Gate 0/1 |
 

@@ -1,5 +1,7 @@
 # Windows Cloud VM Predictive-Engine Session — Turnkey Brief
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Stage:** Windows VM engine, tunnel, bridge, and Convene publication
 > **Status:** CURRENT
 
@@ -10,7 +12,7 @@ Read `DEPLOYMENT_TOPOLOGY.md`, then follow `VM_ENGINE_RUNBOOK.md` and
 
 - The predictive-engine target is a cloud-hosted Windows Server 2025 VM inside
   Kubernetes-managed infrastructure.
-- The edge gateway is a Windows 10 laptop.
+- The edge gateway is a MacBook.
 - There is no Linux or Raspberry Pi runtime in the live pipeline.
 - Kubernetes owns the outer hosting lifecycle; Windows services and NTFS paths
   own the guest applications and durable identity files.
@@ -21,7 +23,7 @@ Run the reviewed dual predictive engine on `127.0.0.1:8078`, expose its required
 authenticated `/ingest` route through Cloudflare, install and pair the headless VM
 Convene agent, publish authenticated loopback `/state` through the independent
 Windows state bridge and that agent, then hand the ingest URL and ingest token to
-the Windows 10 gateway owner.
+the MacBook scenario host owner.
 
 ## Ordered session
 
@@ -45,7 +47,7 @@ the Windows 10 gateway owner.
 10. Install the separate `RECLAIMStateBridge` service with the read token only.
 11. Bind Convene first to bridge health and lease fields, determine prefix behavior,
    then bind process fields and prove fail-closed lease expiration.
-12. Privately hand the Windows 10 gateway owner only the `/ingest` URL, ingest
+12. Privately hand the MacBook scenario host owner only the `/ingest` URL, ingest
     credential, selected SHA, freshness limit, and availability window.
 
 ## Tuesday exit gate
@@ -72,5 +74,5 @@ prompt for the Codex session running on the VM.
 ## Wednesday dependency
 
 Do not start full cRIO/gateway integration until Tuesday's engine, bridge, prefix,
-single-writer, and lease gates are green. The Windows 10 gateway then completes the
-separate `gw_` audit path and three-column V&V.
+single-writer, and lease gates are green. The MacBook scenario host then completes the
+separate raw gateway audit path and three-column V&V.

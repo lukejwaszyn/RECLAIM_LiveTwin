@@ -4,7 +4,7 @@ Streams clearly identified synthetic telemetry through the running edge gateway.
 
 .DESCRIPTION
 Exercises the actual cRIO-style TCP ingress, durable VM publisher, and independent
-desktop Convene gw_ publisher for a bounded period. The script reads no credential
+desktop Convene raw-variable publisher for a bounded period. The script reads no credential
 and refuses to start when a real cRIO session is present. All frames are labeled
 COMMISSIONING-STREAM-NOT-CRIO and must not be treated as physical measurements.
 #>

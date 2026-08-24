@@ -60,7 +60,7 @@ def test_units_round_trip_through_the_real_mapper():
     engine_vars, _mw, active = normalize(channels)
 
     # The four-TC mean is the true bed temperature: the offsets are symmetric,
-    # which is what makes the gw_ audit comparison meaningful.
+    # which is what makes the raw gateway audit comparison meaningful.
     bed = [engine_vars[f"PL_T_bed_tc{i}"] for i in range(1, 5)]
     assert sum(bed) / 4 == pytest.approx(t_bed_K, abs=1e-3)
     assert engine_vars["PL_T_wall_meas"] == pytest.approx(t_wall_K, abs=1e-3)
@@ -184,7 +184,7 @@ def test_frames_traverse_the_real_gateway_receiver(tmp_path):
     # It is a real canonical frame: the cloud mapper recognises it.
     assert looks_like_labview(frame["vars"])
 
-    # The exact canonical frame that produced gw_* also advances the production
+    # The exact canonical frame that produced the raw gateway values also advances the production
     # engine; its existing state bridge is therefore what produces sim_*.
     engine = DualPushEngine(production=True, state_file=str(tmp_path / "identity.json"))
     state = engine.ingest(frame)

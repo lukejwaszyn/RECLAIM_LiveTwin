@@ -1,4 +1,4 @@
-"""Best-effort Convene audit publisher for the Windows desktop gateway.
+"""Best-effort Convene publisher for gateway/scenario machine identities.
 
 This path is deliberately independent of the durable cloud publisher. Each
 canonical cRIO frame is flattened to scalar variables and submitted to
@@ -141,15 +141,20 @@ class ConvenePublisher(threading.Thread):
         return True
 
     def run(self) -> None:
+        pending: Dict[str, Any] | None = None
+        backoff_s = 0.5
         while not self.stop.is_set():
+            if pending is None:
+                try:
+                    pending = self._pending.get(timeout=0.5)
+                except queue.Empty:
+                    continue
             try:
-                frame = self._pending.get(timeout=0.5)
-            except queue.Empty:
-                continue
-            try:
-                self._deliver(frame)
+                self._deliver(pending)
                 self.delivered += 1
                 self.last_success_at = time.time()
+                pending = None
+                backoff_s = 0.5
             except Exception as exc:
                 self.failed += 1
                 now = time.time()
@@ -157,6 +162,18 @@ class ConvenePublisher(threading.Thread):
                     log.warning("raw telemetry publish failed (%d total): %s",
                                 self.failed, exc)
                     self._last_failure_log_at = now
+                # Preserve the newest audit value across a transient Convene
+                # failure. If telemetry advanced while this request was in
+                # flight, supersede the failed older value; otherwise retry it.
+                try:
+                    newer = self._pending.get_nowait()
+                except queue.Empty:
+                    newer = None
+                if newer is not None:
+                    pending = newer
+                    self.coalesced += 1
+                self.stop.wait(backoff_s)
+                backoff_s = min(backoff_s * 2.0, 10.0)
 
     @property
     def last_success_age(self) -> float | None:

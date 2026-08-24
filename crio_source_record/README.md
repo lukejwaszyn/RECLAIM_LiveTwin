@@ -10,7 +10,7 @@ before the first supervised cRIO window.
 > changes the network, or sends to a live endpoint. It parses sanitized evidence,
 > builds candidate frames in memory, and replays fixtures into a *loopback* gateway.
 > The production direction (a bounded, lower-priority RT-side TCP client to
-> `192.168.1.1:9070`) is **NO-GO** until the controls-owned Gate 0/1 identity,
+> `<WINDOWS10_GATEWAY_IP>:9070`) is **NO-GO** until the controls-owned Gate 0/1 identity,
 > coherence, authority, and rollback gates pass. See
 > `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
 

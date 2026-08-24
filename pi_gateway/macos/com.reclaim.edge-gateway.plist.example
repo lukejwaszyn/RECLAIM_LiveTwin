@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.reclaim.edge-gateway</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-dimsu</string>
+    <string>__REPOSITORY_ROOT__/.venv-macbook/bin/python</string>
+    <string>-m</string>
+    <string>reclaim_edge.main</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPOSITORY_ROOT__/pi_gateway</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>__REPOSITORY_ROOT__/pi_gateway</string>
+    <key>RECLAIM_EDGE_CONFIG</key>
+    <string>__USER_HOME__/Library/Application Support/RECLAIM/edge-gateway/config.yaml</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>__USER_HOME__/Library/Logs/RECLAIM/edge-gateway.log</string>
+  <key>StandardErrorPath</key>
+  <string>__USER_HOME__/Library/Logs/RECLAIM/edge-gateway.error.log</string>
+</dict>
+</plist>

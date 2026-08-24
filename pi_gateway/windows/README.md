@@ -1,6 +1,12 @@
-# RECLAIM Windows Gateway Closeout
+# Historical Windows gateway closeout
 
-This directory contains the guarded desktop-side workflow for the Windows 10
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
+> **Superseded 2026-08-23:** the authoritative edge gateway is the MacBook.
+> Nothing in this directory is an operational competition procedure. Retain it
+> only as evidence of the earlier Windows commissioning and rollback design.
+
+This directory contains the retired desktop-side workflow for the former Windows
 edge gateway. `pi_gateway` is a legacy directory name; no Raspberry Pi is in the
 live path.
 
@@ -14,11 +20,11 @@ blocking issue and its copy/paste owner prompt are in
 ## Fixed topology
 
 ```text
-cRIO 192.168.1.2 / Scan Engine network-published variables
+cRIO <CRIO_SOURCE_IP> / Scan Engine network-published variables
   -> NI-PSP read over the isolated Ethernet link
-Windows 10 input-only PSP adapter
-  -> compact LF-delimited TCP to 192.168.1.1:9070 on the same desktop
-Windows 10 gateway process
+Historical Windows input-only PSP adapter
+  -> compact LF-delimited TCP to <WINDOWS10_GATEWAY_IP>:9070 on the same desktop
+MacBook scenario host process
   -> durable SQLite queue
   -> authenticated HTTPS /ingest through the VM Cloudflare hostname
 Windows Server 2025 predictive-engine VM
@@ -36,9 +42,9 @@ publisher. Neither path authorizes command actuation.
 
 Already applied on this desktop:
 
-- Ethernet: `192.168.1.1/24`, Private, no default route.
-- cRIO peer: `192.168.1.2/24`.
-- Inbound TCP 9070 is allowed only from `192.168.1.2` on Ethernet.
+- Ethernet: `<WINDOWS10_GATEWAY_IP>/24`, Private, no default route.
+- cRIO peer: `<CRIO_SOURCE_IP>/24`.
+- Inbound TCP 9070 is allowed only from `<CRIO_SOURCE_IP>` on Ethernet.
 - TCP 9080 is not exposed; status remains loopback-only.
 
 Re-audit or idempotently reapply from elevated PowerShell:
@@ -50,7 +56,7 @@ Re-audit or idempotently reapply from elevated PowerShell:
 
 Do not configure or deploy a cRIO/LabVIEW TCP sender. The selected source is the
 separate input-only Windows subscriber in `crio_psp_adapter`, which reads an
-explicit POC allowlist and is the sole TCP writer to `192.168.1.1:9070`. Replace
+explicit POC allowlist and is the sole TCP writer to `<WINDOWS10_GATEWAY_IP>:9070`. Replace
 that POC allowlist with the controls-approved production allowlist only after the
 mapping gate passes.
 The narrow inbound cRIO firewall rule remains unchanged as defensive historical

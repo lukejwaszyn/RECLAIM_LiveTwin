@@ -4,7 +4,7 @@
 producer.
 **Purpose:** give you an exact, buildable specification of the one seam we need — a
 lower-priority, outbound-only TCP producer that publishes the existing source record to
-the Windows edge gateway as JSON — so you can code precisely what the downstream system
+the Windows 10 desktop live gateway as JSON — so you can code precisely what the downstream system
 already accepts. Everything here has been validated offline against the real gateway
 receiver and cloud ingest; the only unknown left at integration should be the cRIO
 itself.
@@ -22,7 +22,7 @@ Inside the existing RT application, after the per-record snapshot is assembled (
 values that already feed `Data Stream.vi`), branch a copy of that snapshot into a small,
 lossy, latest-value handoff. A separate, **lower-priority** loop reads the latest
 snapshot, serializes it to a single JSON object, appends a line feed, and writes it over
-one long-lived TCP connection to the gateway at `192.168.1.1:9070`. That is the whole
+one long-lived TCP connection to the gateway at `<WINDOWS10_GATEWAY_IP>:9070`. That is the whole
 job. The telemetry loop must never block, delay, or backpressure control, sequencing,
 interlocks, safety, the watchdog, or the existing USB logger. If telemetry can't keep
 up or the link drops, it silently discards frames — losing telemetry is always
@@ -150,7 +150,7 @@ signed quality map (§11).
 
 | Setting | Value |
 |---|---|
-| Target | `192.168.1.1` : `9070` (TCP) |
+| Target | `<WINDOWS10_GATEWAY_IP>` : `9070` (TCP) |
 | Role | client — you connect; the gateway only listens and never sends |
 | Connections | exactly one, long-lived; do not open a socket per frame |
 | Framing | UTF-8 JSON + one `0x0A`; ≤ 8192 bytes per line incl. LF |
@@ -187,7 +187,7 @@ Telemetry loop  (lower priority; its own loop):
     backoff = 1000 ms                          # shift register, cap 10000
     loop:
         if conn == <not connected>:
-            conn, err = TCP Open Connection("192.168.1.1", 9070, timeout=2000 ms)
+            conn, err = TCP Open Connection("<WINDOWS10_GATEWAY_IP>", 9070, timeout=2000 ms)
             if err:  Wait(backoff); backoff = min(backoff*2, 10000); next
             backoff = 1000
         val, empty = RT FIFO Read(SNAP, timeout=0 ms)      # latest only; empty -> skip
