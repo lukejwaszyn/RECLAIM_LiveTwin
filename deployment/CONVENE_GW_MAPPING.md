@@ -1,5 +1,12 @@
 # Convene Raw Gateway Mapping — gateway `/latest` → Convene Variables
 
+> **Naming contract changed 2026-08-24:** the active publisher no longer emits
+> the `gw_` prefix. Every table entry below should be read with that leading
+> prefix removed: `gw_PL_surface_temp` is now `PL_surface_temp`, `gw_MW_power`
+> is now `MW_power`, and `gw_seq` is now `seq`. The gateway remains a separate
+> Convene machine and still never writes `sim_*`. This note supersedes the old
+> prefixed labels retained below for historical V&V traceability.
+
 > **Stage:** 3 — Contract gates + three-column V&V (reference artifact) ·
 > **Status:** LIVING reference. Confirm the 27 raw `vars` names against the first
 > real cRIO frame before trusting the mapping (GO_LIVE §9.5).

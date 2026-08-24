@@ -79,23 +79,21 @@ losslessness audit for the whole chain.
 
 Rules:
 
-1. **Separate machine, exact source names.** The gateway publisher does not add
-   a blanket prefix. It publishes canonical names such as
-   `seq`, `ts`, `run_id`,
-   `source_op_state`, `active_chamber`, and the raw channels
-   (`MW_power`, `PL_bottom1`, …), while preserving `gw_` on any field whose
-   approved source contract already includes it. It never writes any `sim_` variable —
+1. **Separate machine, exact source names.** The gateway machine publishes
+   `seq`, `ts`, `run_id`, `source_op_state`, `active_chamber`, and the raw
+   channels exactly as LabVIEW names them (`MW_power`, `PL_bottom1`, …), with
+   no `gw_` prefix. It never writes any `sim_` variable —
    the cloud engine's publisher remains the single writer of that set.
 2. **Best-effort tap, out of the delivery path.** Immediately after durably
    enqueuing a canonical frame for the VM, the gateway submits the same scalar
-   envelope/raw values to the MacBook machine's `/machine/publish` endpoint with
-   their exact canonical names. Its one-slot worker coalesces during a Convene outage and can
+   envelope/raw values to the desktop machine's `/machine/publish` endpoint with
+   no prefix translation. Its one-slot worker coalesces during a Convene outage and can
    never block, slow, reorder, or acknowledge the durable VM queue. `/latest`
    remains the independent local inspection surface; do not expose port 9080.
 3. **The audit view** shows three columns per signal: LabVIEW indicator,
-   exact-name gateway variables, `sim_*`. Matching `seq`/`sim_seq` and equal
+   raw source, `sim_*`. Matching `seq`/`sim_seq` and equal
    `source_op_state`/`sim_source_op_state` demonstrate the chain is
-   lossless; the `seq − sim_seq` lag together with `sim_state_age_ms` is
+   lossless; the `seq - sim_seq` lag together with `sim_state_age_ms` is
    the live transport-delay readout.
 4. This view is operator-adjacent (verification), not the operator dashboard —
    the primary view still binds `sim_op_state` and gates on freshness.

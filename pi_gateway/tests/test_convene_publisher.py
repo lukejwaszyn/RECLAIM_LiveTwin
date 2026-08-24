@@ -6,7 +6,7 @@ import time
 
 from reclaim_edge.buffer import Buffer
 from reclaim_edge.config import Config
-from reclaim_edge.convene import ConvenePublisher, frame_to_variables
+from reclaim_edge.convene import LABVIEW_RAW_FIELDS, ConvenePublisher, frame_to_variables
 from reclaim_edge.framer import Framer
 from reclaim_edge.receiver import Receiver
 
@@ -32,17 +32,33 @@ def _frame():
     }
 
 
-def test_frame_to_variables_is_scalar_and_unprefixed():
+def test_frame_to_variables_uses_exact_source_names_without_prefixes():
     variables = frame_to_variables(_frame())
 
     assert variables["seq"] == 7
     assert variables["source_op_state"] == "S_MicrowaveHeating"
     assert variables["PL_bottom1"] == 100.2
     assert variables["MW_RF"] is True
-    assert variables["gw_quality_code"] == 7
     assert "missing" not in variables
     assert "nested" not in variables
-    assert not any(name.startswith("sim_") for name in variables)
+    assert not any(name.startswith(("gw_", "sim_")) for name in variables)
+
+
+def test_all_34_live_source_fields_are_published_verbatim():
+    frame = _frame()
+    frame["vars"] = {
+        name: (False if name in {
+            "PL_process", "PL_preprocess", "PL_postprocess", "PL_chamber_pump",
+            "PL_purge_pump", "MW_water_state", "MW_flow_state", "MW_RF",
+            "MW_status",
+        } else float(index))
+        for index, name in enumerate(LABVIEW_RAW_FIELDS)
+    }
+
+    variables = frame_to_variables(frame)
+
+    assert set(LABVIEW_RAW_FIELDS) <= variables.keys()
+    assert all(variables[name] == frame["vars"][name] for name in LABVIEW_RAW_FIELDS)
 
 
 def test_frame_to_variables_rejects_cloud_owned_sim_name():
@@ -84,7 +100,11 @@ def test_direct_publish_uses_machine_token_and_does_not_emit_sim(tmp_path):
     assert url.endswith("/api/machine/publish")
     assert request["headers"] == {"X-Agent-Token": "secret"}
     assert request["json"]["variables"]["seq"] == 7
-    assert request["json"]["variables"]["gw_quality_code"] == 7
+    assert request["json"]["variables"]["PL_bottom1"] == 100.2
+    assert not any(
+        key.startswith(("gw_", "sim_"))
+        for key in request["json"]["variables"]
+    )
 
 
 def test_receiver_durably_enqueues_before_best_effort_audit_submit():

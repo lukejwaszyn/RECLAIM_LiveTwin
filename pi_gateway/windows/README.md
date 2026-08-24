@@ -13,7 +13,7 @@ live path.
 For a replacement laptop, start with
 `deployment/NEW_GATEWAY_SCENARIO_DEPLOYMENT.md`. It pins one Git SHA, stages the
 service without overwriting its protected config, installs the gateway, and
-requires correlated live exact-name gateway variables plus `sim_*` evidence. The current VM-side
+requires correlated live raw-source plus `sim_*` evidence. The current VM-side
 blocking issue and its copy/paste owner prompt are in
 `deployment/CLOUD_ENGINE_LIVE_SCENARIO_HANDOFF_PROMPT.md`.
 
@@ -32,7 +32,7 @@ Windows Server 2025 predictive-engine VM
 Independent audit tap:
 canonical gateway frame
   -> nonblocking /machine/publish using desktop machine credential
-  -> raw gateway variables only
+  -> exact PL_*/MT_*/MW_* source names (no gw_ prefix)
 ```
 
 The desktop Convene agent never writes `sim_`. The VM is the only `sim_`
@@ -63,7 +63,7 @@ The narrow inbound cRIO firewall rule remains unchanged as defensive historical
 configuration, but it is not evidence of the selected adapter path. Do not add a
 default gateway to the cRIO-facing Ethernet interface.
 
-## 2. Desktop Convene identity and raw gateway audit tap
+## 2. Desktop Convene identity and raw telemetry tap
 
 Use the desktop-only tool; it does not inspect or change VM bindings:
 
@@ -79,7 +79,7 @@ create it, but direct `/machine/publish` is independent and reaches authenticate
 request validation.
 
 The production gateway enables a nonblocking one-frame worker that publishes the
-same canonical frame as raw gateway scalars directly. Verify its delivered/failed/
+same canonical frame with exact source names directly. Verify its delivered/failed/
 coalesced counters under `/health` and compare its names with
 `deployment/CONVENE_GW_MAPPING.md`. Do not configure shell collectors.
 
@@ -112,7 +112,7 @@ Back on this desktop, from elevated PowerShell:
 
 The script prompts invisibly for the ingest token, backs up the prior config,
 updates `cloud_url`/`auth_token`, enables the credential-reference-only direct
-Convene raw gateway publisher, validates through the deployed Python loader, and
+Convene raw publisher, validates through the deployed Python loader, and
 restricts the config to SYSTEM and Administrators.
 
 If the installer reports an unexpected config ACL entry, repair the active file
@@ -149,7 +149,7 @@ a live source session is connected:
 ```
 
 This creates explicitly labeled `COMMISSIONING-NOT-CRIO-*` data in both the VM
-and desktop Convene raw gateway view. Run it once, retain the JSON evidence, and do not
+and desktop Convene raw view. Run it once, retain the JSON evidence, and do not
 confuse its values with physical measurements.
 
 To span the predictive-state bridge and multiple Convene heartbeats, run a
@@ -175,7 +175,7 @@ thermocouples plus `scan_Mod3_AI0_raw`, `scan_Mod3_AI1_raw`, and
 `scan_Mod3_AI2_raw`. It does not provide `MW_*`, `PL_purge_pump`, the remaining
 process fields, or authoritative state/chamber/cycle metadata.
 
-The gateway forwards only fields present in the current frame. A Convene raw gateway
+The gateway forwards only fields present in the current frame. A Convene raw
 value retained from an earlier synthetic or live frame must be shown unavailable
 when its source field is absent or its provenance/freshness does not match the
 current frame. In particular, do not interpret retained `MW_*` or
@@ -198,6 +198,6 @@ Do not claim cutover or full-cycle operation until all are factual:
 - The durable queue drains through authenticated TLS with no unexpected drops or
   dead letters, and the VM state reflects the same sequence.
 - `/health` reports successful direct Convene publishes with no unexplained
-  failures/coalescing, and raw gateway agrees with the independent cRIO/VM evidence.
+  failures/coalescing, and raw values agree with independent cRIO/VM evidence.
 - The VM remains the sole `sim_` publisher.
 - `/command` remains advisory and disconnected from every actuator/control path.
