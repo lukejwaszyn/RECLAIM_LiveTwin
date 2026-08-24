@@ -16,7 +16,8 @@ for path in (str(ROOT / "tools"), str(ROOT / "cloud_engine")):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from synthetic_crio import build_channels, build_raw_frame, plant_frames  # noqa: E402
+from synthetic_crio import (build_channels, build_raw_frame, emission_frames,
+                            plant_frames)  # noqa: E402
 from labview_map import looks_like_labview, normalize  # noqa: E402
 from push_ingest_dual import DualPushEngine, TELEMETRY_SCHEMA  # noqa: E402
 from reclaim_predictive_engine.config import ENVIRONMENTS  # noqa: E402
@@ -133,6 +134,35 @@ def test_priority_scenarios_finish_below_five_minutes_by_default(
     wall_seconds = scenario.duration / DEFAULT_MACBOOK_SCENARIO_SPEED
     assert wall_seconds == pytest.approx(expected_wall_seconds)
     assert wall_seconds < 300.0
+
+
+def test_power_outage_emits_one_frame_per_wall_second_at_four_x():
+    selected = list(emission_frames(
+        plant_frames("power_outage", "earth_lab", active_chamber="MT"),
+        speed=4.0,
+        emit_hz=1.0,
+    ))
+    times = [t for t, _frame, _dt in selected]
+    states = [frame["source_op_state"] for _t, frame, _dt in selected]
+    assert times[0] == 0.0
+    assert times[-1] == 900.0
+    assert len(selected) == 226
+    assert all((later - earlier) == pytest.approx(4.0)
+               for earlier, later in zip(times, times[1:]))
+    assert "S_PowerInterrupted" in states
+    assert "S_Restart" in states
+
+
+def test_lunar_emits_one_frame_per_wall_second_at_four_x():
+    selected = list(emission_frames(
+        plant_frames("nominal", "lunar_surface", active_chamber="PL"),
+        speed=4.0,
+        emit_hz=1.0,
+    ))
+    times = [t for t, _frame, _dt in selected]
+    assert times[0] == 0.0
+    assert times[-1] == 400.0
+    assert len(selected) == 101
 
 
 def test_mt_frames_stream_from_the_real_harness():

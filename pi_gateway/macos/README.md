@@ -50,8 +50,9 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 The same command starts, reports, and stops the one allowed scenario process.
 `start` runs in the background. Every start requires an explicit `PL` or `MT`;
 all four profiles support either chamber. The default is one bounded cycle at 4×
-speed. Power outage therefore finishes in about 3 minutes 45 seconds, while
-nominal, lunar surface, and loss of data finish in about 1 minute 40 seconds.
+speed with a fixed 1 Hz output cadence. Power outage therefore finishes in about
+3 minutes 46 seconds, while
+nominal, lunar surface, and loss of data finish in about 1 minute 41 seconds.
 The generated sensor bank,
 `active_chamber`, cycle identity, PL process flag, and shared microwave-power
 attribution all follow that selection. The launcher refuses unless health
@@ -59,7 +60,7 @@ reports `harness` or `replay`. For bounded checks, set
 `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
 or slow playback. Set `RECLAIM_SCENARIO_CYCLES=0` only when deliberate repetition
 until `stop` is required. Use `run` in place of `start` only when a foreground
-process is useful.
+process is useful. Leave `RECLAIM_SCENARIO_EMIT_HZ=1` for the Convene route.
 
 Examples:
 
@@ -73,8 +74,9 @@ RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
 ```
 
 Convene polling is targeted at approximately one second. At the 4× default the
-file updates roughly four times per second, so power-outage and lunar-surface
-runs remain well sampled while both finish below five minutes. `loss-of-data`
+plant advances four simulated seconds between emitted frames, while the complete
+File Watch frame is replaced exactly once per wall-clock second. Power-outage
+and lunar-surface runs therefore remain well sampled while both finish below five minutes. `loss-of-data`
 stops updating the watched file after its one cycle.
 
 ## Convene File Watch setup

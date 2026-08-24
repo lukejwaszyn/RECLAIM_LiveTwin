@@ -83,20 +83,22 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 Every profile supports either `PL` or `MT`; the examples above deliberately
 exercise both. `start` runs in the background, `status` reports the active
 sender, and `stop` ends it. By default every command runs one cycle at 4× speed
-and exits automatically. Power outage completes in about 3 minutes 45 seconds;
-nominal, lunar surface, and loss of data complete in about 1 minute 40 seconds.
+while emitting exactly one complete frame per wall-clock second, then exits
+automatically. Power outage completes in about 3 minutes 46 seconds;
+nominal, lunar surface, and loss of data complete in about 1 minute 41 seconds.
 These are all below the five-minute wall-time limit. Set
 `RECLAIM_SCENARIO_SPEED` to override playback speed or
-`RECLAIM_SCENARIO_CYCLES=0` to deliberately repeat until stopped.
+`RECLAIM_SCENARIO_CYCLES=0` to deliberately repeat until stopped. Leave
+`RECLAIM_SCENARIO_EMIT_HZ` at its default of `1` for Convene.
 
 The MacBook never connects to the real cRIO. Obsolete Windows/Mac direct scenario
 publishers are archived and cannot be invoked from the active tree.
 
 | Profile | Scenario/environment | Behavior |
 |---|---|---|
-| `nominal` | `nominal` / `earth_lab` | Stable heat-and-hold; one 4× cycle, about 1:40 |
-| `power-outage` | `power_outage` / `earth_lab` | Outage, coast, and `S_Restart`; one 4× cycle, about 3:45 |
-| `lunar` | `nominal` / `lunar_surface` | Lunar physics; one 4× cycle, about 1:40 |
+| `nominal` | `nominal` / `earth_lab` | Stable heat-and-hold; one 4× cycle, about 1:41 |
+| `power-outage` | `power_outage` / `earth_lab` | Outage, coast, and `S_Restart`; one 4× cycle, about 3:46 |
+| `lunar` | `nominal` / `lunar_surface` | Lunar physics; one 4× cycle, about 1:41 |
 | `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
 
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its
@@ -119,8 +121,8 @@ time to reject stale output rather than treating a last-good value as fresh.
 
 **Verification.** While a scenario runs, the watched value in Convene should
 change on each Convene poll (target approximately one second). At the 4× default,
-the file updates roughly four times per second, so each Convene poll receives a
-recent complete frame. Local verification is:
+the scenario advances four simulated seconds between frames but replaces the
+File Watch file exactly once per wall-clock second. Local verification is:
 
 ```bash
 curl --fail http://127.0.0.1:9080/health

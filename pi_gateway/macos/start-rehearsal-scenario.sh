@@ -24,6 +24,7 @@ gateway_host=${RECLAIM_GATEWAY_HOST:-127.0.0.1}
 gateway_port=${RECLAIM_GATEWAY_PORT:-9070}
 status_base=${RECLAIM_STATUS_BASE:-http://127.0.0.1:9080}
 speed=${RECLAIM_SCENARIO_SPEED:-4}
+emit_hz=${RECLAIM_SCENARIO_EMIT_HZ:-1}
 max_frames=${RECLAIM_SCENARIO_MAX_FRAMES:-0}
 cycles=${RECLAIM_SCENARIO_CYCLES:-1}
 state_dir=${RECLAIM_SCENARIO_STATE_DIR:-"$HOME/Library/Application Support/RECLAIM/scenarios"}
@@ -150,6 +151,7 @@ args=(
   --host "$gateway_host"
   --port "$gateway_port"
   --speed "$speed"
+  --emit-hz "$emit_hz"
 )
 if [[ "$cycles" -gt 0 ]]; then
   args+=(--cycles "$cycles")
@@ -161,9 +163,9 @@ fi
 echo "RECLAIM MacBook scenario: $profile, active chamber $active_chamber"
 echo "Path: synthetic source -> $gateway_host:$gateway_port -> atomic Convene File Watch text"
 if [[ "$cycles" -gt 0 ]]; then
-  echo "Playback: ${speed}x, cycles: $cycles"
+  echo "Playback: ${speed}x, telemetry: ${emit_hz}Hz, cycles: $cycles"
 else
-  echo "Playback: ${speed}x, cycles: repeat until stopped"
+  echo "Playback: ${speed}x, telemetry: ${emit_hz}Hz, cycles: repeat until stopped"
 fi
 
 if [[ "$action" == "run" ]]; then

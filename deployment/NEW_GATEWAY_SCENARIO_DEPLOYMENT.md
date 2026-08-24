@@ -29,9 +29,10 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 Only one generated scenario may run at a time. Every start requires an explicit
 active chamber (`PL` or `MT`), and the generated LabVIEW-shaped sensor bank and
 shared microwave-power attribution follow that selection. The default is one
-cycle at 4× speed. Power outage completes in about 3 minutes 45 seconds; lunar
-surface completes in about 1 minute 40 seconds. Convene polling is targeted at
-approximately one second, so both profiles remain well sampled.
+cycle at 4× speed. Power outage completes in about 3 minutes 46 seconds; lunar
+surface completes in about 1 minute 41 seconds. Convene polling is targeted at
+approximately one second, and the scenario source emits exactly one complete
+frame per wall-clock second, so both profiles remain well sampled.
 
 Use the existing single whole-frame Convene File Watch variable with this path:
 `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.
