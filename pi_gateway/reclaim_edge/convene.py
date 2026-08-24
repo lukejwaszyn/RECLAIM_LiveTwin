@@ -1,7 +1,7 @@
 """Best-effort Convene audit publisher for the Windows desktop gateway.
 
 This path is deliberately independent of the durable cloud publisher. Each
-canonical cRIO frame is flattened to ``gw_`` scalar variables and submitted to
+canonical cRIO frame is flattened to scalar variables and submitted to
 Convene's connected-machine ``/machine/publish`` endpoint. A one-frame queue
 coalesces during outages so Convene can never block cRIO receipt or VM delivery.
 """
@@ -32,6 +32,23 @@ _ENVELOPE_FIELDS = (
     "active_chamber",
 )
 
+# Exact, case-sensitive names emitted by the cRIO/LabVIEW source record.  Keep
+# this boundary explicit: Convene is a raw telemetry consumer, not another
+# naming/translation layer.  The cloud engine has the same contract in
+# cloud_engine/labview_map.py.
+LABVIEW_RAW_FIELDS = (
+    "PL_surface_temp", "PL_output_pressure", "PL_chamber_pressure",
+    "PL_top_condenser_temp", "PL_bottom_condenser_temp", "PL_wall1",
+    "PL_wall2", "PL_bottom1", "PL_bottom2", "PL_bottom3", "PL_bottom4",
+    "PL_flow_meter", "PL_process", "PL_preprocess", "MW_reverse_coupler",
+    "PL_postprocess", "PL_chamber_pump", "PL_purge_pump",
+    "MT_crucible_temperature", "MT_top", "MT_bottom", "MW_water_state",
+    "MW_flow_state", "MW_RF", "MW_status", "MW_power", "MW_reverse",
+    "MW_period", "MW_width", "MW_freq", "MW_water_temp", "MW_flow_rate",
+    "PL_Probe1", "PL_Probe2",
+)
+_LABVIEW_RAW_FIELD_SET = frozenset(LABVIEW_RAW_FIELDS)
+
 
 def _scalar(value: Any) -> bool:
     if value is None or not isinstance(value, (str, int, float, bool)):
@@ -40,21 +57,21 @@ def _scalar(value: Any) -> bool:
 
 
 def frame_to_variables(frame: Dict[str, Any]) -> Dict[str, Any]:
-    """Flatten one canonical frame to the desktop-only ``gw_`` namespace."""
+    """Flatten a canonical frame using the source's exact variable names."""
     variables: Dict[str, Any] = {}
     for name in _ENVELOPE_FIELDS:
         value = frame.get(name)
         if _scalar(value):
-            variables[f"gw_{name}"] = value
+            variables[name] = value
 
     raw = frame.get("vars")
     if isinstance(raw, dict):
         for name, value in raw.items():
-            if isinstance(name, str) and name and _scalar(value):
-                variables[f"gw_{name}"] = value
+            if name in _LABVIEW_RAW_FIELD_SET and _scalar(value):
+                variables[name] = value
 
-    if any(name.startswith("sim_") for name in variables):  # defense in depth
-        raise ValueError("desktop Convene publisher must never produce sim_ variables")
+    if any(name.startswith(("gw_", "sim_")) for name in variables):
+        raise ValueError("desktop Convene publisher produced a reserved prefix")
     return variables
 
 
@@ -110,7 +127,7 @@ class ConvenePublisher(threading.Thread):
             self._load_credential()
         variables = frame_to_variables(frame)
         if not variables:
-            raise ValueError("canonical frame produced no scalar gw_ variables")
+            raise ValueError("canonical frame produced no publishable scalar variables")
         response = self._requests.post(
             f"{self.cfg.convene_api.rstrip('/')}/machine/publish",
             json={"variables": variables},
@@ -137,7 +154,7 @@ class ConvenePublisher(threading.Thread):
                 self.failed += 1
                 now = time.time()
                 if now - self._last_failure_log_at >= 30.0:
-                    log.warning("gw_ audit publish failed (%d total): %s",
+                    log.warning("raw telemetry publish failed (%d total): %s",
                                 self.failed, exc)
                     self._last_failure_log_at = now
 

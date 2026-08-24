@@ -58,7 +58,7 @@ class Config:
     tls_ca: str = ""                    # path to CA bundle (optional)
     verify_tls: bool = True
 
-    # Independent best-effort gateway audit tap -> Convene (gw_ variables only).
+    # Independent best-effort raw telemetry tap -> Convene (exact source names).
     # This never participates in the durable VM queue or its acknowledgements.
     convene_enabled: bool = False
     convene_api: str = "https://reservation-backend-25386666460.us-central1.run.app/api"

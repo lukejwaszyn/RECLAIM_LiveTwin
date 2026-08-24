@@ -516,19 +516,9 @@ class DualPushEngine:
             raise FrameRejected("telemetry_invalid", "vars must be an object")
 
         if labview_map.looks_like_labview(raw):
-            numeric = {
-                *labview_map._PL_BED, *labview_map._MT_BED,
-                "PL_surface_temp", "PL_top_condenser_temp",
-                "PL_bottom_condenser_temp", "PL_chamber_pressure",
-                "PL_output_pressure", "MT_top", "MW_power", "MW_reverse",
-                "MW_freq", "MW_width", "MW_period", "MW_water_temp",
-                "MW_flow_rate",
-            }
-            boolean = {*labview_map._PL_FLAGS, "MW_water_state", "MW_flow_state",
-                       "MW_RF", "MW_status"}
-            for key in numeric & raw.keys():
+            for key in labview_map.LABVIEW_NUMERIC_FIELDS & raw.keys():
                 self._require_finite_number(raw[key], key)
-            for key in boolean & raw.keys():
+            for key in labview_map.LABVIEW_BOOLEAN_FIELDS & raw.keys():
                 if not isinstance(raw[key], bool):
                     raise FrameRejected("telemetry_invalid", f"{key} must be boolean")
             return

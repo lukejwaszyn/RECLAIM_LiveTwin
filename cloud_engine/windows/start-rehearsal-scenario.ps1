@@ -65,7 +65,7 @@ $Profiles = @{
         Environment = "earth_lab"
         Speed = 1
         NoLoop = $true
-        Expected = "Freshness/staleness rehearsal. Runs one 400 s cycle at 1 Hz (about 6 min 40 s), then disconnects. gw_* stops advancing and the cloud bridge must make sim_data_live false."
+        Expected = "Freshness/staleness rehearsal. Runs one 400 s cycle at 1 Hz (about 6 min 40 s), then disconnects. Raw gateway telemetry stops advancing and the cloud bridge must make sim_data_live false."
     }
 }
 
@@ -90,7 +90,7 @@ if ($GatewayHealth.transport -ne "https") {
     throw "Gateway transport is '$($GatewayHealth.transport)', not https; frames would not reach the cloud engine."
 }
 if (-not $GatewayHealth.convene.enabled) {
-    throw "Gateway Convene fan-out is disabled; frames would not produce gw_* output."
+    throw "Gateway Convene fan-out is disabled; frames would not produce raw Convene output."
 }
 if (-not ($GatewayHealth.PSObject.Properties.Name -contains "mode")) {
     throw "Gateway status does not expose mode. Redeploy/restart the gateway from this revision before running a scenario."
@@ -102,7 +102,7 @@ if ($GatewayHealth.mode -ne "live") {
 Write-Host "RECLAIM synthetic rehearsal - advisory-only, no actuator authority"
 Write-Host "Profile: $Scenario | scenario=$($Selected.EngineScenario) | environment=$($Selected.Environment) | speed=$($Selected.Speed)x"
 Write-Host "Expected: $($Selected.Expected)"
-Write-Host "ONE PATH: scenario -> gateway ${GatewayAddress}:$GatewayPort -> gw_* Convene + cloud engine -> sim_* Convene"
+Write-Host "ONE PATH: scenario -> gateway ${GatewayAddress}:$GatewayPort -> raw Convene names + cloud engine -> sim_* Convene"
 Write-Host "Monitor gateway: Invoke-RestMethod $StatusBase/health"
 Write-Host "Inspect canonical frame: Invoke-RestMethod $StatusBase/latest"
 Write-Host "Stop with Ctrl+C."

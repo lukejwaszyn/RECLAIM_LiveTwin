@@ -67,6 +67,34 @@ def test_production_frame_publishes_system_and_chamber_state():
             "gap_count", "PL_sensor_valid", "MT_sensor_valid"} <= names
 
 
+def test_cloud_accepts_and_type_checks_complete_34_field_source_record():
+    import labview_map
+
+    frame = _frame()
+    frame["vars"] = {
+        name: (False if name in labview_map.LABVIEW_BOOLEAN_FIELDS else float(index))
+        for index, name in enumerate(labview_map.LABVIEW_RAW_FIELDS)
+    }
+    frame["vars"]["PL_process"] = True
+    frame["vars"]["MW_RF"] = True
+
+    out = DualPushEngine(production=True).ingest(frame)
+
+    assert out["ingest_status"] == "accepted"
+
+
+@pytest.mark.parametrize("field", [
+    "PL_wall1", "PL_wall2", "PL_flow_meter", "MW_reverse_coupler",
+    "MT_crucible_temperature", "PL_Probe1", "PL_Probe2",
+])
+def test_cloud_rejects_non_numeric_values_in_auxiliary_source_channels(field):
+    frame = _frame()
+    frame["vars"][field] = "not-a-number"
+
+    with pytest.raises(FrameRejected, match=f"{field} must be a numeric scalar"):
+        DualPushEngine(production=True).ingest(frame)
+
+
 def test_duplicate_frame_does_not_step_the_estimator_twice():
     engine = DualPushEngine(production=True)
     frame = _frame()
