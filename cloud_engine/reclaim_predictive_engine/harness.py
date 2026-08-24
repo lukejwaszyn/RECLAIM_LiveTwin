@@ -29,7 +29,8 @@ class Scenario:
     op_state_fn: Optional[Callable[[float], str]] = None  # phase -> operational state
     event_fn: Optional[Callable[[float], list]] = None    # phase -> discrete events
     beta_drift: float = 0.0   # true feedback drift per second (ageing / coupling change)
-    pressure_fn: Optional[Callable[[float], float]] = None  # chamber pressure (Pa) vs t
+    pressure_fn: Optional[Callable[[float], float]] = None  # chamber pressure (kPa) vs t
+    downstream_pressure_fn: Optional[Callable[[float], float]] = None  # PL output (kPa)
 
 
 class TruthPlant:
@@ -120,9 +121,9 @@ def seal_leak_scenario(env: EnvironmentBlock = EARTH_LAB, leak_start: float = 20
     The seal-integrity residual should detect the deviation from the pump-down
     curve shortly after onset."""
     def pressure_fn(t):
-        base = 80.0 + (101325.0 - 80.0) * np.exp(-t / 60.0)   # expected pump-down
-        leak = max(0.0, t - leak_start) * leak_rate
-        return base + leak
+        base_pa = 80.0 + (101325.0 - 80.0) * np.exp(-t / 60.0)
+        leak_pa = max(0.0, t - leak_start) * leak_rate
+        return (base_pa + leak_pa) / 1000.0  # scenario pressure contract is kPa
     # The seal monitor is phase-gated to evacuation/seal-check (fix C5), so the
     # scenario must report the state in which pump-down physically happens.
     def op_state_fn(t):
@@ -197,21 +198,37 @@ def lunar_surface_process_scenario(
 ) -> Scenario:
     """45-minute PL pyrolysis heat followed by 30-minute lunar cooldown.
 
-    The 6 kW heat phase drives the modeled PL bed to approximately 450 C. The
-    sealed process pressure is 700 Torr (93.32568 kPa). The extended power-off
-    tail exercises radiation-limited cooldown and leaves a safe terminal frame.
-    The MacBook compresses this 75-minute physical timeline to 5:00 wall.
+    A 45-minute ramp to 6 kW drives the modeled PL bed to approximately 450 C
+    near the end of the heat phase instead of reaching an early plateau. The
+    pressure traces reproduce the operating-vacuum bands in the supplied cRIO
+    capture: roughly 50.8 Torr in the chamber and 61.6 Torr downstream. Small,
+    smooth oscillations keep the synthetic sensors realistic without exceeding
+    the observed ranges. The extended power-off tail exercises radiation-limited
+    cooldown and leaves a safe terminal frame. The MacBook compresses this
+    75-minute physical timeline to 5:00 wall.
     """
     heat_end = 2700.0
     duration = 4500.0
-    pressure_kpa = 700.0 * 0.1333224
+
+    def chamber_pressure_kpa(t: float) -> float:
+        # Capture range: 48.660-53.420 Torr; median 50.794 Torr.
+        torr = 50.794 + 0.85 * np.sin(2 * np.pi * t / 181.0) \
+            + 0.30 * np.sin(2 * np.pi * t / 47.0)
+        return torr * 0.1333224
+
+    def downstream_pressure_kpa(t: float) -> float:
+        # Capture range: 58.181-64.978 Torr; median 61.596 Torr.
+        torr = 61.596 + 1.55 * np.sin(2 * np.pi * t / 223.0 + 0.6) \
+            + 0.55 * np.sin(2 * np.pi * t / 59.0)
+        return torr * 0.1333224
 
     return Scenario(
         name="lunar_pyrolysis_cooldown",
         beta_true=1.0e-3,
-        p_fwd=lambda t: 6000.0 if t < heat_end else 0.0,
+        p_fwd=lambda t: 6000.0 * t / heat_end if t < heat_end else 0.0,
         env=env,
         duration=duration,
-        pressure_fn=lambda _t: pressure_kpa,
+        pressure_fn=chamber_pressure_kpa,
+        downstream_pressure_fn=downstream_pressure_kpa,
         op_state_fn=lambda t: "S_MicrowaveHeating" if t < heat_end else "S_Cooldown",
     )

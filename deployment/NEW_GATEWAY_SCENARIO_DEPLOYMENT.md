@@ -32,9 +32,12 @@ shared microwave-power attribution follow that selection. The default is one
 compressed cycle with profile-specific pacing. Power outage emits 211 frames
 over about 3 minutes 30 seconds, crosses the 660°C aluminum melt threshold, and
 ends powered off in cooldown. Lunar surface emits 301 frames over about 5
-minutes, reaches approximately 450°C at 700 Torr, and ends powered off after an
+minutes, reaches approximately 450°C under the captured operating vacuum
+(~50.8 Torr chamber / ~61.6 Torr output), and ends powered off after an
 extended cooldown. Convene polling is targeted at approximately one second, and the
 scenario source emits exactly one complete frame per wall-clock second.
+The lunar pressure channels describe the sealed PL process path. External lunar
+ambient remains `3e-10 Pa`; convection is disabled and cooling is radiative.
 
 Use the existing single whole-frame Convene File Watch variable with this path:
 `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.

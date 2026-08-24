@@ -103,8 +103,12 @@ publishers are archived and cannot be invoked from the active tree.
 |---|---|---|
 | `nominal` | `nominal` / `earth_lab` | Stable heat-and-hold; one compressed cycle, about 1:40 |
 | `power-outage` | `power_outage` / `earth_lab` | MT reaches ~680°C, crosses the 660°C Al melt gate, exercises outage/restart, then ends powered off in cooldown; 211 frames over about 3:30 |
-| `lunar` | `lunar_surface_process` / `lunar_surface` | PL reaches ~450°C at 700 Torr, then performs an extended radiation-limited powered-off cooldown; 301 frames over about 5:00 |
+| `lunar` | `lunar_surface_process` / `lunar_surface` | PL reaches ~450°C under the captured operating vacuum (~50.8 Torr chamber / ~61.6 Torr output), then performs an extended radiation-limited powered-off cooldown; 301 frames over about 5:00 |
 | `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
+
+For `lunar`, those two pressure channels are inside the sealed PL process path.
+The external lunar ambient remains `3e-10 Pa`; convection is disabled and heat
+leaves the chamber by radiation only.
 
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its
 atomic File Watch writer. They do not enter the Windows 10 live gateway or

@@ -73,6 +73,7 @@ def _now_iso() -> str:
 def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                    p_refl_W: float, p_chamber_kPa: float | None = None,
                    active_chamber: str = "PL",
+                   p_output_kPa: float | None = None,
                    ) -> Dict[str, Any]:
     """The raw LabVIEW channel block, in the cRIO's own names and units.
 
@@ -107,6 +108,9 @@ def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
     if (active_chamber == "PL" and p_chamber_kPa is not None
             and math.isfinite(p_chamber_kPa)):
         channels["PL_chamber_pressure"] = round(_kpa_to_torr(p_chamber_kPa), 4)
+    if (active_chamber == "PL" and p_output_kPa is not None
+            and math.isfinite(p_output_kPa)):
+        channels["PL_output_pressure"] = round(_kpa_to_torr(p_output_kPa), 4)
     return channels
 
 
@@ -115,7 +119,8 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                     p_chamber_kPa: float | None = None,
                     cycle_id: str = "synthetic-scenario",
                     source_id: str = "reclaim-synthetic-scenario",
-                    active_chamber: str = "PL") -> Dict[str, Any]:
+                    active_chamber: str = "PL",
+                    p_output_kPa: float | None = None) -> Dict[str, Any]:
     """One line on the wire, in the shape the gateway's receiver requires.
 
     Network input is stricter than the framer's direct-caller API: `parse_line`
@@ -131,7 +136,7 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
         "cycle_id": cycle_id,
         "vars": build_channels(
             t_bed_K, t_wall_K, p_fwd_W, p_refl_W, p_chamber_kPa,
-            active_chamber,
+            active_chamber, p_output_kPa,
         ),
     }
 
@@ -148,9 +153,12 @@ def plant_frames(scenario_name: str, env_name: str, cycle: int = 1,
     for t, z, p_fwd, p_refl, _x in truth.stream():
         op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
         p_chamber = scenario.pressure_fn(t) if scenario.pressure_fn else None
+        p_output = (scenario.downstream_pressure_fn(t)
+                    if scenario.downstream_pressure_fn else None)
         yield t, build_raw_frame(float(z[0]), float(z[1]), float(p_fwd),
                                  float(p_refl), op_state, p_chamber,
-                                 cycle_id, source_id, active_chamber), scenario.dt
+                                 cycle_id, source_id, active_chamber,
+                                 p_output), scenario.dt
 
 
 def emission_frames(

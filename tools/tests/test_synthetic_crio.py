@@ -160,6 +160,10 @@ def test_power_outage_emits_one_frame_per_second_for_three_and_half_minutes():
 
 
 def test_lunar_emits_one_frame_per_second_for_five_minutes():
+    lunar_env = ENVIRONMENTS["lunar_surface"]
+    assert lunar_env.convection is False
+    assert lunar_env.p_atm == pytest.approx(3.0e-10)
+    assert lunar_env.h_conv(500.0) == 0.0
     selected = list(emission_frames(
         plant_frames("lunar_surface_process", "lunar_surface", active_chamber="PL"),
         speed=MACBOOK_PROFILE_SPEEDS["lunar"],
@@ -172,10 +176,21 @@ def test_lunar_emits_one_frame_per_second_for_five_minutes():
     assert (len(selected) - 1) == 300
     temperatures_c = [frame["vars"]["PL_bottom1"] for _t, frame, _dt in selected]
     assert max(temperatures_c) == pytest.approx(450.0, abs=15.0)
+    # The 45-minute heat is a continuous ramp, not an early plateau that looks
+    # like a frozen File Watch value for most of the five-minute rehearsal.
+    assert temperatures_c[120] > temperatures_c[60] + 100.0
+    assert temperatures_c[179] > temperatures_c[120] + 100.0
     assert selected[-1][1]["vars"]["MW_power"] == 0.0
     pressures_torr = [frame["vars"]["PL_chamber_pressure"]
                       for _t, frame, _dt in selected]
-    assert set(pressures_torr) == {700.0}
+    output_pressures_torr = [frame["vars"]["PL_output_pressure"]
+                             for _t, frame, _dt in selected]
+    assert min(pressures_torr) >= 48.66
+    assert max(pressures_torr) <= 53.42
+    assert len(set(pressures_torr)) > 250
+    assert min(output_pressures_torr) >= 58.181
+    assert max(output_pressures_torr) <= 64.978
+    assert len(set(output_pressures_torr)) > 250
 
 
 def test_mt_frames_stream_from_the_real_harness():

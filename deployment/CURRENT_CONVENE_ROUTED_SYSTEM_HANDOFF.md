@@ -150,7 +150,8 @@ cannot repeat it after completion. Each command defaults to one compressed cycle
 profile-specific pacing: power outage emits 211 frames over about 3 minutes 30
 seconds, reaches approximately 680°C (above the 660°C aluminum melt threshold),
 and ends powered off in cooldown. Lunar surface emits 301 frames over about 5
-minutes, reaches approximately 450°C at 700 Torr, and ends powered off after an
+minutes, reaches approximately 450°C under the captured operating vacuum
+(~50.8 Torr chamber / ~61.6 Torr output), and ends powered off after an
 extended radiation-limited cooldown. Output is fixed
 at one complete frame per wall-clock second to match Convene's approximately
 one-second poll. The MacBook receiver remains on `127.0.0.1:9070`, its status
@@ -160,6 +161,9 @@ disabled. Its File Watch path is
 Keep the existing single whole-frame Convene variable name. Leave JSON path and
 capture regex blank. Do not rename the working variable or split the frame into
 35 individual bindings; the file name and Convene variable name need not match.
+The lunar pressure channels describe the sealed PL process path, not the outside
+environment. External lunar ambient is `3e-10 Pa`; convection is disabled and
+the cooldown model uses radiation only.
 
 ## Repository state and verified evidence
 

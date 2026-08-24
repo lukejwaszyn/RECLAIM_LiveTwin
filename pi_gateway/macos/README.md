@@ -83,9 +83,13 @@ profile-specific, while the complete File Watch frame is replaced exactly once
 per wall-clock second on monotonic start-to-start deadlines. Power outage therefore produces 211 frames over about
 3:30, reaches approximately 680°C (above the 660°C aluminum melt threshold),
 then ends powered off in cooldown. Lunar surface produces 301 frames over about
-5:00, reaches approximately 450°C at 700 Torr, and performs an extended
+5:00, reaches approximately 450°C under the captured operating vacuum
+(~50.8 Torr chamber / ~61.6 Torr output), and performs an extended
 radiation-limited powered-off cooldown. `loss-of-data`
 stops updating the watched file after its one cycle.
+The two pressure values are internal to the sealed PL process path. The external
+lunar ambient remains `3e-10 Pa`, with convection disabled and only radiative
+heat loss active.
 
 ## Convene File Watch setup
 
