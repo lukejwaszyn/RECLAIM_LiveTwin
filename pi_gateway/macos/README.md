@@ -49,28 +49,33 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 
 The same command starts, reports, and stops the one allowed scenario process.
 `start` runs in the background. Every start requires an explicit `PL` or `MT`;
-all four profiles support either chamber. The generated sensor bank,
+all four profiles support either chamber. The default is one bounded cycle at 4×
+speed. Power outage therefore finishes in about 3 minutes 45 seconds, while
+nominal, lunar surface, and loss of data finish in about 1 minute 40 seconds.
+The generated sensor bank,
 `active_chamber`, cycle identity, PL process flag, and shared microwave-power
 attribution all follow that selection. The launcher refuses unless health
 reports `harness` or `replay`. For bounded checks, set
 `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
-playback. Use `run` in place of `start` only when a foreground process is useful.
+or slow playback. Set `RECLAIM_SCENARIO_CYCLES=0` only when deliberate repetition
+until `stop` is required. Use `run` in place of `start` only when a foreground
+process is useful.
 
 Examples:
 
 ```bash
-# One complete nominal PL processing cycle, then stop automatically
-RECLAIM_SCENARIO_CYCLES=1 \
-  pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
+# Default: one complete nominal PL cycle at 4x, then stop automatically
+pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
 
 # Short accelerated local plumbing check
 RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
   pi_gateway/macos/start-rehearsal-scenario.sh start nominal MT
 ```
 
-Use real-time speed for a Convene demonstration so its approximately 30-second
-heartbeat can sample multiple changing frames. `loss-of-data` defaults to one
-cycle and then deliberately stops updating the watched file.
+Convene polling is targeted at approximately one second. At the 4× default the
+file updates roughly four times per second, so power-outage and lunar-surface
+runs remain well sampled while both finish below five minutes. `loss-of-data`
+stops updating the watched file after its one cycle.
 
 ## Convene File Watch setup
 

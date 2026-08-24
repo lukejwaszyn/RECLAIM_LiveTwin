@@ -136,19 +136,23 @@ scenario process. Every start explicitly chooses the active chamber:
 pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
 pi_gateway/macos/start-rehearsal-scenario.sh start power-outage MT
 pi_gateway/macos/start-rehearsal-scenario.sh start lunar PL
+pi_gateway/macos/start-rehearsal-scenario.sh start loss-of-data MT
 pi_gateway/macos/start-rehearsal-scenario.sh status
 pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
 `PL` drives the plastics sensor bank and `MT` drives the metals sensor bank. The
 selected value is also published as `active_chamber`. Only one scenario sender
-may run at a time. The MacBook receiver remains on `127.0.0.1:9070`, its status
+may run at a time. Each command defaults to one cycle at 4× speed: power outage
+finishes in about 3 minutes 45 seconds and lunar surface in about 1 minute 40
+seconds, both below the five-minute wall-time limit. Convene polling is targeted
+at approximately one second. The MacBook receiver remains on `127.0.0.1:9070`, its status
 surface remains on `127.0.0.1:9080`, and its direct cloud transport remains
 disabled. Its File Watch path is
 `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.
-For every File Watch binding, leave JSON path blank and use capture regex
-`(?:^|, )FIELD_NAME: ([^,\r\n]+)`, replacing `FIELD_NAME` with the exact,
-case-sensitive variable name.
+Keep the existing single whole-frame Convene variable name. Leave JSON path and
+capture regex blank. Do not rename the working variable or split the frame into
+35 individual bindings; the file name and Convene variable name need not match.
 
 ## Repository state and verified evidence
 

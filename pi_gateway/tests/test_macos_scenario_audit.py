@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "pi_gateway" / "macos" / "audit-scenario-host.sh"
+RUNNER = ROOT / "pi_gateway" / "macos" / "start-rehearsal-scenario.sh"
 
 
 def test_scenario_audit_checks_route_ownership_and_complete_text_frame():
@@ -20,3 +21,11 @@ def test_scenario_audit_rejects_competing_engine_ports_but_not_screen_share():
     for port in ("8078", "8177", "8178", "8179", "8180", "8181"):
         assert port in text
     assert "6080" not in text
+
+
+def test_scenario_runner_defaults_to_one_fast_bounded_cycle():
+    text = RUNNER.read_text(encoding="utf-8")
+    assert 'speed=${RECLAIM_SCENARIO_SPEED:-4}' in text
+    assert 'cycles=${RECLAIM_SCENARIO_CYCLES:-1}' in text
+    assert 'scenario=power_outage' in text
+    assert 'environment=lunar_surface' in text

@@ -19,8 +19,11 @@ for path in (str(ROOT / "tools"), str(ROOT / "cloud_engine")):
 from synthetic_crio import build_channels, build_raw_frame, plant_frames  # noqa: E402
 from labview_map import looks_like_labview, normalize  # noqa: E402
 from push_ingest_dual import DualPushEngine, TELEMETRY_SCHEMA  # noqa: E402
+from reclaim_predictive_engine.config import ENVIRONMENTS  # noqa: E402
+from reclaim_predictive_engine.service import SCENARIOS  # noqa: E402
 
 C_TO_K = 273.15
+DEFAULT_MACBOOK_SCENARIO_SPEED = 4.0
 
 
 def _envelope(raw, mode="harness", seq=1):
@@ -114,6 +117,22 @@ def test_frames_stream_from_the_real_harness():
                for f in frames)
     # Temperatures advance rather than repeating a constant.
     assert len({f["vars"]["PL_bottom1"] for f in frames}) > 1
+
+
+@pytest.mark.parametrize(
+    ("scenario_name", "environment_name", "expected_wall_seconds"),
+    [
+        ("power_outage", "earth_lab", 225.0),
+        ("nominal", "lunar_surface", 100.0),
+    ],
+)
+def test_priority_scenarios_finish_below_five_minutes_by_default(
+    scenario_name, environment_name, expected_wall_seconds
+):
+    scenario = SCENARIOS[scenario_name](ENVIRONMENTS[environment_name])
+    wall_seconds = scenario.duration / DEFAULT_MACBOOK_SCENARIO_SPEED
+    assert wall_seconds == pytest.approx(expected_wall_seconds)
+    assert wall_seconds < 300.0
 
 
 def test_mt_frames_stream_from_the_real_harness():

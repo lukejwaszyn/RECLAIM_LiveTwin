@@ -20,13 +20,23 @@ ports 9070 and 9080 listen only on loopback.
 ```bash
 pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
 pi_gateway/macos/start-rehearsal-scenario.sh start power-outage MT
+pi_gateway/macos/start-rehearsal-scenario.sh start lunar PL
+pi_gateway/macos/start-rehearsal-scenario.sh start loss-of-data MT
 pi_gateway/macos/start-rehearsal-scenario.sh status
 pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
 Only one generated scenario may run at a time. Every start requires an explicit
 active chamber (`PL` or `MT`), and the generated LabVIEW-shaped sensor bank and
-shared microwave-power attribution follow that selection.
+shared microwave-power attribution follow that selection. The default is one
+cycle at 4× speed. Power outage completes in about 3 minutes 45 seconds; lunar
+surface completes in about 1 minute 40 seconds. Convene polling is targeted at
+approximately one second, so both profiles remain well sampled.
+
+Use the existing single whole-frame Convene File Watch variable with this path:
+`/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.
+Leave JSON path and capture regex blank. Do not rename the working Convene
+variable or split the frame into individual field bindings.
 
 ## Replay a capture
 
