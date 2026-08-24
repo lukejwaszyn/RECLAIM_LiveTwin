@@ -28,7 +28,7 @@ verify_tls: true
 # gateway does not call the Convene API directly.
 convene_enabled: false
 file_watch_enabled: true
-file_watch_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json
+file_watch_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt
 
 buffer_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/edge-gateway/queue.db
 buffer_max_frames: 500000

@@ -65,10 +65,10 @@ class Config:
     convene_credentials_path: str = "~/.convene_agent.json"
     convene_timeout_s: float = 10.0
 
-    # Local flat JSON output for Convene File Watch. This is the preferred
+    # Local LabVIEW-style text output for Convene File Watch. This is the preferred
     # MacBook scenario seam and requires no Convene API credential.
     file_watch_enabled: bool = False
-    file_watch_path: str = "~/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json"
+    file_watch_path: str = "~/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt"
 
     # buffer (store-and-forward)
     buffer_path: str = "/var/lib/reclaim-edge/queue.db"

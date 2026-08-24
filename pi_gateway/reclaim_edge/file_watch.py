@@ -1,9 +1,9 @@
-"""Atomic local JSON publisher for Convene File Watch variables."""
+"""Atomic LabVIEW-style text publisher for Convene File Watch variables."""
 
 from __future__ import annotations
 
-import json
 import logging
+import math
 import os
 from pathlib import Path
 import queue
@@ -13,13 +13,53 @@ import time
 from typing import Any, Dict
 
 from .config import Config
-from .convene import frame_to_variables
+from .convene import LABVIEW_RAW_FIELDS
 
 log = logging.getLogger("reclaim_edge.file_watch")
 
 
+ENVELOPE_FIELDS = (
+    "schema_version", "mode", "run_id", "source_id", "cycle_id", "seq", "ts",
+    "source_op_state", "active_chamber",
+)
+
+
+def _text_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if value is None:
+        return "NaN"
+    if isinstance(value, float):
+        return f"{value:.6f}" if math.isfinite(value) else "NaN"
+    rendered = str(value)
+    if "\n" in rendered or "\r" in rendered or "," in rendered:
+        raise ValueError("File Watch scalar values cannot contain commas or newlines")
+    return rendered
+
+
+def frame_to_text(frame: Dict[str, Any]) -> str:
+    """Render the canonical envelope plus raw fields in live LabVIEW order."""
+    items = []
+    for name in ENVELOPE_FIELDS:
+        if name in frame:
+            items.append(f"{name}: {_text_value(frame[name])}")
+    raw = frame.get("vars")
+    if not isinstance(raw, dict):
+        raise ValueError("canonical frame must contain a vars object")
+    if any(isinstance(name, str) and name.startswith("sim_") for name in raw):
+        raise ValueError("raw telemetry must not contain cloud-owned sim_ names")
+    # A File Watch heartbeat always sees the complete signed 34-field layout.
+    # A scenario that does not model a channel marks it unavailable as NaN;
+    # it never substitutes a measurement or silently removes the field.
+    for name in LABVIEW_RAW_FIELDS:
+        items.append(f"{name}: {_text_value(raw.get(name))}")
+    if not items:
+        raise ValueError("canonical frame produced no File Watch fields")
+    return ", ".join(items) + "\n"
+
+
 class FileWatchPublisher(threading.Thread):
-    """Coalesce frames and atomically replace one flat, owner-private JSON file."""
+    """Coalesce frames and atomically replace one owner-private text file."""
 
     def __init__(self, cfg: Config, stop: threading.Event):
         super().__init__(name="file-watch", daemon=True)
@@ -52,7 +92,7 @@ class FileWatchPublisher(threading.Thread):
             self.coalesced += 1
 
     def _write(self, frame: Dict[str, Any]) -> None:
-        variables = frame_to_variables(frame)
+        record = frame_to_text(frame)
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             dir=self.path.parent,
@@ -63,8 +103,7 @@ class FileWatchPublisher(threading.Thread):
         try:
             os.fchmod(descriptor, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                json.dump(variables, handle, allow_nan=False, sort_keys=True)
-                handle.write("\n")
+                handle.write(record)
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, self.path)

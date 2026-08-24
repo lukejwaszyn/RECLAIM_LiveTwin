@@ -164,6 +164,28 @@ def test_flat_convene_snapshot_rejects_sim_feedback_loop():
     assert disposition["code"] == "feedback_rejected"
 
 
+def test_flat_text_extractions_restore_labview_scalar_types():
+    nested = _frame(mode="harness", active_chamber="MT")
+    flat = {key: str(value) for key, value in nested.items() if key != "vars"}
+    flat.update({
+        "MT_bottom": "313.418000",
+        "MT_top": "300.000000",
+        "MT_crucible_temperature": "NaN",
+        "MW_power": "2200.000000",
+        "MW_RF": "TRUE",
+        "PL_process": "FALSE",
+    })
+
+    out = DualPushEngine(production=True).ingest(flat)
+
+    assert out["mode"] == "harness"
+    assert out["seq"] == nested["seq"]
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 2200.0
+    assert out["MW_RF"] is True
+
+
 def test_convene_result_variables_prefixes_only_finite_scalars():
     variables = convene_result_variables({
         "mode": "harness",

@@ -38,4 +38,4 @@ def test_configure_locks_macbook_to_scenario_only(tmp_path: Path):
     assert value["convene_enabled"] is False
     assert "convene_credentials_path" not in value
     assert value["file_watch_enabled"] is True
-    assert value["file_watch_path"].endswith("/RECLAIM/scenarios/convene_file_watch.json")
+    assert value["file_watch_path"].endswith("/RECLAIM/scenarios/convene_file_watch.txt")

@@ -26,7 +26,7 @@ cRIO / LabVIEW -> Windows 10 live gateway -> Convene live machine
 
 SCENARIO
 synthetic generator or approved replay -> MacBook scenario gateway
-  -> atomic local scenario JSON -> Convene File Watch -> Convene scenario machine
+  -> atomic one-frame scenario text -> Convene File Watch -> Convene scenario machine
 
 BOTH
 Convene internal route -> cloud engine POST /ingest -> stochastic dual engine
@@ -38,7 +38,7 @@ Convene internal route -> cloud engine POST /ingest -> stochastic dual engine
 | Responsibility | Owner | Required behavior |
 |---|---|---|
 | Real cRIO acquisition | Windows 10 desktop | Sole live-data gateway; publishes exact source variables to its Convene machine |
-| Fabricated/replayed telemetry | MacBook | Scenario-only, loopback receiver, `mode=harness` or `mode=replay`; atomically writes the Convene File Watch JSON |
+| Fabricated/replayed telemetry | MacBook | Scenario-only, loopback receiver, `mode=harness` or `mode=replay`; atomically writes one current Convene File Watch text frame |
 | Telemetry routing | Convene | Routes either machine's source variables to the cloud engine using the canonical envelope |
 | Computation | Cloud-engine VM | Sole stochastic estimator and sole producer of computed state |
 | Result routing and display | Convene | Receives processed state and binds the `sim_*` variables to the visualization |
@@ -51,8 +51,9 @@ output remains advisory and has no actuator authority.
 
 The Windows live gateway flattens each accepted source frame into scalar Convene
 variables and publishes them to its machine API. The MacBook scenario gateway
-flattens the same contract into one owner-private JSON file which Convene File
-Watch reads each heartbeat. Direct MacBook Convene API publishing is disabled.
+flattens the same contract into one owner-private text file which Convene File
+Watch reads each heartbeat. The file is replaced, not appended. Direct MacBook
+Convene API publishing is disabled.
 Envelope variables are:
 
 `schema_version`, `mode`, `run_id`, `source_id`, `cycle_id`, `seq`, `ts`,
@@ -74,10 +75,10 @@ If an independently defined source field already contains `gw_`, preserve that
 name, but do not manufacture new gateway aliases. The cloud result path is the
 only `sim_*` writer.
 
-LabVIEW `NaN` means the sensor value is unavailable. The source-to-Convene
-publisher omits non-finite values because strict JSON cannot carry them. The
-cloud adapter accepts LabVIEW-shaped frames containing unavailable sensor values,
-removes those values before inference, and preserves the rest of the frame. It
+LabVIEW `NaN` means the sensor value is unavailable. The MacBook text frame keeps
+the complete 34-field source layout and writes `NaN` for an unmodeled/unavailable
+channel. Convene extracts those values by regex; the cloud adapter converts them
+to unavailable values before inference and preserves the rest of the frame. It
 must not invent replacement measurements.
 
 ## Convene-to-engine contract
@@ -138,9 +139,10 @@ selected value is also published as `active_chamber`. Only one scenario sender
 may run at a time. The MacBook receiver remains on `127.0.0.1:9070`, its status
 surface remains on `127.0.0.1:9080`, and its direct cloud transport remains
 disabled. Its File Watch path is
-`/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`.
-For every File Watch binding, use the exact variable name as the JSON path and
-leave capture regex blank.
+`/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`.
+For every File Watch binding, leave JSON path blank and use capture regex
+`(?:^|, )FIELD_NAME: ([^,\r\n]+)`, replacing `FIELD_NAME` with the exact,
+case-sensitive variable name.
 
 ## Repository state and verified evidence
 

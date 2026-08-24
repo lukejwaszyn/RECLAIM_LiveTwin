@@ -159,7 +159,7 @@ if [[ "$max_frames" -gt 0 ]]; then
 fi
 
 echo "RECLAIM MacBook scenario: $profile, active chamber $active_chamber"
-echo "Path: synthetic source -> $gateway_host:$gateway_port -> atomic Convene File Watch JSON"
+echo "Path: synthetic source -> $gateway_host:$gateway_port -> atomic Convene File Watch text"
 
 if [[ "$action" == "run" ]]; then
   echo "Foreground run; stop with Ctrl+C."

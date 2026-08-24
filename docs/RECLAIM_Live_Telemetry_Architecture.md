@@ -25,7 +25,7 @@ separate gateway-to-cloud HTTPS/cloudflared telemetry seam is not part of this
 architecture.
 
 The MacBook also makes no direct Convene API call for scenario telemetry. Its
-only egress artifact is the owner-private File Watch JSON; Convene reads it.
+only egress artifact is the owner-private, one-frame File Watch text; Convene reads it.
 
 ## Naming
 

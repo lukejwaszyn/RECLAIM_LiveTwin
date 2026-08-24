@@ -37,17 +37,17 @@ shared microwave-power attribution follow that selection.
 
 The capture is input data only. Exact field names and values are preserved;
 unknown sequencer state is labeled `S_Unknown`. The gateway atomically writes the
-flat scenario variables to the owner-private File Watch JSON. Convene's internal routing owns
+flat scenario variables to the owner-private, one-frame File Watch text file. Convene's internal routing owns
 the engine request and computed-state return. In automatic mode, a record-level `active_chamber`
 is promoted into the envelope; an explicit command option overrides it. `NaN`
-sensor readings are omitted as unavailable because strict JSON cannot carry
-them.
+sensor readings are represented as `NaN` and treated as unavailable, never as
+fabricated measurements.
 
 ## Accept
 
 Require matching receive/deliver counts, zero queue depth, drops, dead letters,
 and File Watch failures, plus a scenario-labeled `/latest` frame. Confirm the
-JSON file advances with `seq` and `ts`. This is source-to-Convene acceptance only
+text file advances with `seq` and `ts`. This is source-to-Convene acceptance only
 after Convene heartbeat evidence. The common engine accepts the preserved
 `harness`/`replay` mode, but one engine process must receive only one active
 source stream at a time.

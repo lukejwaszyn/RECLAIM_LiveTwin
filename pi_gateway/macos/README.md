@@ -6,7 +6,7 @@
 > Convene API.
 
 The MacBook serves synthetic and approved capture-replay scenarios through one
-owner-private local JSON file. Convene File Watch reads that file each heartbeat;
+owner-private local text file. Convene File Watch reads that file each heartbeat;
 Convene's internal routing owns the downstream engine path and computed-state
 return.
 
@@ -29,7 +29,7 @@ Required health/config state:
 - empty cloud ingest token
 - direct Convene API publishing disabled
 - File Watch enabled at
-  `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`
+  `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
 
 `configure_production_interfaces.py` is a retired guard and always refuses.
 
@@ -52,13 +52,16 @@ playback. Use `run` in place of `start` only when a foreground process is useful
 
 ## Convene File Watch setup
 
-Create one File Watch variable for each required source field. Every variable
-uses the same settings except its name/JSON path:
+The file contains exactly one current frame and is replaced on every source
+update. It uses the live LabVIEW style from the supplied data stream:
+`name: value, name: value`. Create one File Watch variable for each required
+source field. Every variable uses the same settings except its name/regex:
 
-- **File path:** `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`
+- **File path:** `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
 - **Variable name:** the exact field name
-- **JSON path:** the exact same field name
-- **Capture regex:** leave blank
+- **JSON path:** leave blank
+- **Capture regex:** `(?:^|, )FIELD_NAME: ([^,\r\n]+)` with `FIELD_NAME`
+  replaced by the exact variable name
 
 Required envelope bindings are `schema_version`, `mode`, `run_id`, `source_id`,
 `cycle_id`, `seq`, `ts`, `source_op_state`, and `active_chamber`.
@@ -74,8 +77,10 @@ Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
 `PL_Probe2`.
 
 The file is atomically replaced with mode `0600`, so a heartbeat sees either the
-previous complete frame or the next complete frame, never partial JSON. Missing
-or `NaN` sensors are omitted rather than fabricated.
+previous complete frame or the next complete frame, never partial text. It
+contains the nine canonical envelope fields followed by all 34 raw fields in
+the live-record order. Booleans are `TRUE`/`FALSE`, finite floats use six decimal
+places, and unavailable fields are `NaN` rather than fabricated measurements.
 
 ## Windows capture replay
 
@@ -90,8 +95,8 @@ The replayer preserves exact channel names and scalar values. It labels unknown
 sequencer state `S_Unknown`; it never claims the file is current physical data.
 With the default `--active-chamber auto`, a record-level `active_chamber: PL`
 or `active_chamber: MT` is promoted into the scenario envelope. Explicit command
-selection overrides it. LabVIEW `NaN` sensor readings are omitted because they
-are unavailable values and are invalid in the strict JSON/Convene contract.
+selection overrides it. LabVIEW `NaN` sensor readings remain unavailable through
+the text/regex boundary and are removed before cloud inference.
 
 ## Acceptance
 

@@ -113,7 +113,7 @@ data.
 ```text
 cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 
-MacBook local scenarios -> loopback service -> atomic JSON -> Convene File Watch
+MacBook local scenarios -> loopback service -> atomic one-frame text -> Convene File Watch
 
 Either Convene machine -> Convene internal route -> cloud dual engine
                         -> computed state -> Convene sim_* / .stp visualization

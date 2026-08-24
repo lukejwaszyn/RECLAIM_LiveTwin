@@ -25,7 +25,7 @@ from reclaim_edge.config import Config  # noqa: E402
 DEFAULT_CONFIG = Path.home() / "Library/Application Support/RECLAIM/edge-gateway/config.yaml"
 DEFAULT_FILE_WATCH = (
     Path.home()
-    / "Library/Application Support/RECLAIM/scenarios/convene_file_watch.json"
+    / "Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt"
 )
 
 
@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     print("MacBook configured as a loopback-only scenario host.")
     print(f"Previous protected configuration: {backup}")
     print("Direct cloud/API publishing is disabled; Convene File Watch is enabled.")
-    print(f"File Watch JSON: {DEFAULT_FILE_WATCH}")
+    print(f"File Watch text file: {DEFAULT_FILE_WATCH}")
     return 0
 
 

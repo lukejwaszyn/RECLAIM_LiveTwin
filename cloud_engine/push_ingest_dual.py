@@ -150,14 +150,49 @@ def normalize_convene_frame(frame: dict) -> dict:
                 + ", ".join(mixed),
             )
         return frame
-    raw = {
-        key: value
-        for key, value in frame.items()
-        if key in labview_map.LABVIEW_RAW_FIELDS
+    raw = {}
+    for key, value in frame.items():
+        if key not in labview_map.LABVIEW_RAW_FIELDS:
+            continue
+        coerced = _coerce_file_watch_value(key, value)
+        if coerced is not None:
+            raw[key] = coerced
+    normalized = {
+        key: _coerce_file_watch_value(key, frame[key])
+        for key in _ENVELOPE_FIELDS
+        if key in frame
     }
-    normalized = {key: frame[key] for key in _ENVELOPE_FIELDS if key in frame}
     normalized["vars"] = raw
     return normalized
+
+
+def _coerce_file_watch_value(name: str, value):
+    """Restore scalar types extracted from LabVIEW-style File Watch text."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    upper = stripped.upper()
+    if name in labview_map.LABVIEW_BOOLEAN_FIELDS:
+        if upper == "TRUE":
+            return True
+        if upper == "FALSE":
+            return False
+        if upper == "NAN":
+            return None
+        return value
+    if name in labview_map.LABVIEW_NUMERIC_FIELDS:
+        if upper == "NAN":
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return value
+    if name == "seq":
+        try:
+            return int(stripped)
+        except ValueError:
+            return value
+    return stripped
 
 
 def convene_result_variables(state: dict) -> dict:

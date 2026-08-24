@@ -15,8 +15,10 @@
 The MacBook must not connect to, listen for, impersonate, or forward the real
 cRIO live stream. Its scenario receiver binds only `127.0.0.1`, runs in
 `harness` or `replay` mode, and has no direct cloud transport or ingest token.
-Convene publishing remains enabled for scenario data. Convene's internal routing
-is the only approved source-to-engine and engine-to-display path.
+Direct Convene API publishing is disabled on the MacBook. Its scenario data is
+exposed as one owner-private, atomically replaced text frame for Convene File
+Watch. Convene's internal routing is the only approved source-to-engine and
+engine-to-display path.
 
 Production cloud ingest accepts `live`, `harness`, and `replay` through the same
 exact-name adapter and preserves the mode in computed state. One engine process
