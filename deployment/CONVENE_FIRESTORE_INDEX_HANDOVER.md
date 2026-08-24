@@ -21,6 +21,10 @@ index for that combination and none exists.
 
 Captured 2026-08-23 against machine `BcryPSMP2iLbSRns5uhm`. The desktop agent has
 logged this **2622 consecutive times**; the log line is
+Captured 2026-08-23 against machine `BcryPSMP2iLbSRns5uhm`. As of that date the
+desktop agent had logged this **2841 consecutive times** — one per 30 s heartbeat,
+and still accumulating for as long as the index is missing, so treat the figure as
+a floor rather than a current total. The log line is
 `[Heartbeat] HTTP 500; collectors were not returned`.
 
 ## 2. The fix — exact index required
@@ -118,9 +122,9 @@ paste the `agentToken`.
 ## 5. Secondary observations (RECLAIM-side, not blocking)
 
 - **The agent discards the response body on failure.** `convene_agent.py:463`
-  prints only the status code, which is why 2622 log lines contain no diagnostic
-  detail and the index URL above went unseen for weeks. Logging the body on the
-  *first* failure only would have surfaced this immediately.
+  prints only the status code, which is why thousands of log lines contain no
+  diagnostic detail and the index URL above went unseen for weeks. Logging the
+  body on the *first* failure only would have surfaced this immediately.
 - **`agent.log` grows unbounded** — 475 KB and climbing, one useless line every
   30 s. Worth rotating or truncating.
 
