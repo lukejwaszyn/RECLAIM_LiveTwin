@@ -97,8 +97,8 @@ publishers are archived and cannot be invoked from the active tree.
 | Profile | Scenario/environment | Behavior |
 |---|---|---|
 | `nominal` | `nominal` / `earth_lab` | Stable heat-and-hold; one compressed cycle, about 1:40 |
-| `power-outage` | `power_outage` / `earth_lab` | Outage, coast, and `S_Restart`; 211 frames over about 3:30 |
-| `lunar` | `nominal` / `lunar_surface` | Extended lunar rehearsal; 301 frames over about 5:00 |
+| `power-outage` | `power_outage` / `earth_lab` | MT reaches ~680°C, crosses the 660°C Al melt gate, exercises outage/restart, then ends powered off in cooldown; 211 frames over about 3:30 |
+| `lunar` | `lunar_surface_process` / `lunar_surface` | PL reaches ~450°C at 700 Torr, then performs an extended radiation-limited powered-off cooldown; 301 frames over about 5:00 |
 | `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
 
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its

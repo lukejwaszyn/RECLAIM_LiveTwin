@@ -131,6 +131,7 @@ case "$profile" in
     scenario=power_outage
     ;;
   lunar)
+    scenario=lunar_surface_process
     environment=lunar_surface
     ;;
   loss-of-data)
@@ -146,10 +147,10 @@ esac
 if [[ -z "$speed" ]]; then
   case "$profile" in
     power-outage)
-      speed=4.285714285714286  # 900 simulated seconds -> about 210 wall seconds
+      speed=12.857142857142858 # 2700 simulated seconds -> about 210 wall seconds
       ;;
     lunar)
-      speed=1.3333333333333333 # 400 simulated seconds -> about 300 wall seconds
+      speed=15                 # 4500 simulated seconds -> about 300 wall seconds
       ;;
     *)
       speed=4

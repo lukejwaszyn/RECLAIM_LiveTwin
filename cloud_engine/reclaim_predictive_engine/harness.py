@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 import numpy as np
 
-from .config import PhysicalParams, EnvironmentBlock, EARTH_LAB
+from .config import PhysicalParams, EnvironmentBlock, EARTH_LAB, LUNAR_SURFACE
 from .plant import ForwardModel, Inputs
 
 
@@ -149,20 +149,29 @@ def power_outage_scenario(env: EnvironmentBlock = EARTH_LAB) -> Scenario:
     the free thermal decay (whose rate measures the true loss coefficient) and the
     recovery on restart. Stable feedback -> no runaway; the value is state tracking
     through the interruption."""
-    duration = 900.0
-    out_start = 0.5 * duration          # 450 s
+    # A credible MT rehearsal must actually cross the aluminium melt threshold
+    # (933 K / ~660 C). The former 3.5 kW, 900 s profile ended near 114 C and was
+    # only a plumbing demonstration. This 45-minute physical timeline reaches
+    # melt despite a five-minute outage, then provides a five-minute powered-off
+    # cooldown so the retained terminal frame is safe. The MacBook compresses it
+    # to 3:30 wall.
+    duration = 2700.0
+    heat_end = 2400.0
+    out_start = 1200.0
     out_end = out_start + 300.0         # +5 min
     restart_window = 20.0
-    p_heat = 3500.0
+    p_heat = 6000.0
 
     def p_fwd(t):
-        return 0.0 if out_start <= t < out_end else p_heat
+        return 0.0 if out_start <= t < out_end or t >= heat_end else p_heat
 
     def op_state_fn(t):
         if out_start <= t < out_end:
             return "S_PowerInterrupted"
         if out_end <= t < out_end + restart_window:
             return "S_Restart"
+        if t >= heat_end:
+            return "S_Cooldown"
         return "S_MicrowaveHeating"
 
     def event_fn(t):
@@ -180,4 +189,29 @@ def power_outage_scenario(env: EnvironmentBlock = EARTH_LAB) -> Scenario:
         duration=duration,
         op_state_fn=op_state_fn,
         event_fn=event_fn,
+    )
+
+
+def lunar_surface_process_scenario(
+    env: EnvironmentBlock = LUNAR_SURFACE,
+) -> Scenario:
+    """45-minute PL pyrolysis heat followed by 30-minute lunar cooldown.
+
+    The 6 kW heat phase drives the modeled PL bed to approximately 450 C. The
+    sealed process pressure is 700 Torr (93.32568 kPa). The extended power-off
+    tail exercises radiation-limited cooldown and leaves a safe terminal frame.
+    The MacBook compresses this 75-minute physical timeline to 5:00 wall.
+    """
+    heat_end = 2700.0
+    duration = 4500.0
+    pressure_kpa = 700.0 * 0.1333224
+
+    return Scenario(
+        name="lunar_pyrolysis_cooldown",
+        beta_true=1.0e-3,
+        p_fwd=lambda t: 6000.0 if t < heat_end else 0.0,
+        env=env,
+        duration=duration,
+        pressure_fn=lambda _t: pressure_kpa,
+        op_state_fn=lambda t: "S_MicrowaveHeating" if t < heat_end else "S_Cooldown",
     )

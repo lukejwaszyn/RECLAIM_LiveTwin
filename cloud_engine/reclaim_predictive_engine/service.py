@@ -51,11 +51,13 @@ from .config import EngineConfig, ENVIRONMENTS, chamber_params
 from .engine import PredictiveEngine
 from .thread import StateStreamPublisher, default_manifest
 from .harness import (TruthPlant, runaway_scenario, nominal_scenario,
-                      power_outage_scenario, ramp_scenario, seal_leak_scenario, Scenario)
+                      power_outage_scenario, lunar_surface_process_scenario,
+                      ramp_scenario, seal_leak_scenario, Scenario)
 
 SCENARIOS = {"runaway": runaway_scenario, "nominal": nominal_scenario,
              "power_outage": power_outage_scenario, "ramp": ramp_scenario,
-             "seal_leak": seal_leak_scenario}
+             "seal_leak": seal_leak_scenario,
+             "lunar_surface_process": lunar_surface_process_scenario}
 
 
 class TwinStateService:

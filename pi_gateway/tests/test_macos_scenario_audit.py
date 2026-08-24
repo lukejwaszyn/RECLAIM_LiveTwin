@@ -31,5 +31,6 @@ def test_scenario_runner_defaults_to_one_fast_bounded_cycle():
     assert '--emit-hz "$emit_hz"' in text
     assert 'scenario=power_outage' in text
     assert 'environment=lunar_surface' in text
-    assert 'speed=4.285714285714286' in text
-    assert 'speed=1.3333333333333333' in text
+    assert 'scenario=lunar_surface_process' in text
+    assert 'speed=12.857142857142858' in text
+    assert 'speed=15' in text

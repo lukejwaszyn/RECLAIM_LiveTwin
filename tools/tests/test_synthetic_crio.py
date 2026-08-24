@@ -25,8 +25,8 @@ from reclaim_predictive_engine.service import SCENARIOS  # noqa: E402
 
 C_TO_K = 273.15
 MACBOOK_PROFILE_SPEEDS = {
-    "power_outage": 900.0 / 210.0,
-    "lunar": 400.0 / 300.0,
+    "power_outage": 2700.0 / 210.0,
+    "lunar": 4500.0 / 300.0,
 }
 
 
@@ -127,7 +127,7 @@ def test_frames_stream_from_the_real_harness():
     ("scenario_name", "environment_name", "speed", "expected_wall_seconds"),
     [
         ("power_outage", "earth_lab", MACBOOK_PROFILE_SPEEDS["power_outage"], 210.0),
-        ("nominal", "lunar_surface", MACBOOK_PROFILE_SPEEDS["lunar"], 300.0),
+        ("lunar_surface_process", "lunar_surface", MACBOOK_PROFILE_SPEEDS["lunar"], 300.0),
     ],
 )
 def test_priority_scenarios_finish_below_five_minutes_by_default(
@@ -148,24 +148,34 @@ def test_power_outage_emits_one_frame_per_second_for_three_and_half_minutes():
     times = [t for t, _frame, _dt in selected]
     states = [frame["source_op_state"] for _t, frame, _dt in selected]
     assert times[0] == 0.0
-    assert times[-1] == 900.0
+    assert times[-1] == 2700.0
     assert len(selected) == 211
     assert (len(selected) - 1) == 210
     assert "S_PowerInterrupted" in states
     assert "S_Restart" in states
+    assert states[-1] == "S_Cooldown"
+    temperatures_c = [frame["vars"]["MT_bottom"] for _t, frame, _dt in selected]
+    assert max(temperatures_c) >= 660.0
+    assert selected[-1][1]["vars"]["MW_power"] == 0.0
 
 
 def test_lunar_emits_one_frame_per_second_for_five_minutes():
     selected = list(emission_frames(
-        plant_frames("nominal", "lunar_surface", active_chamber="PL"),
+        plant_frames("lunar_surface_process", "lunar_surface", active_chamber="PL"),
         speed=MACBOOK_PROFILE_SPEEDS["lunar"],
         emit_hz=1.0,
     ))
     times = [t for t, _frame, _dt in selected]
     assert times[0] == 0.0
-    assert times[-1] == 400.0
+    assert times[-1] == 4500.0
     assert len(selected) == 301
     assert (len(selected) - 1) == 300
+    temperatures_c = [frame["vars"]["PL_bottom1"] for _t, frame, _dt in selected]
+    assert max(temperatures_c) == pytest.approx(450.0, abs=15.0)
+    assert selected[-1][1]["vars"]["MW_power"] == 0.0
+    pressures_torr = [frame["vars"]["PL_chamber_pressure"]
+                      for _t, frame, _dt in selected]
+    assert set(pressures_torr) == {700.0}
 
 
 def test_mt_frames_stream_from_the_real_harness():

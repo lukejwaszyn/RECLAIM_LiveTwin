@@ -76,7 +76,10 @@ RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
 Convene polling is targeted at approximately one second. Playback speed is
 profile-specific, while the complete File Watch frame is replaced exactly once
 per wall-clock second. Power outage therefore produces 211 frames over about
-3:30, and lunar surface produces 301 frames over about 5:00. `loss-of-data`
+3:30, reaches approximately 680°C (above the 660°C aluminum melt threshold),
+then ends powered off in cooldown. Lunar surface produces 301 frames over about
+5:00, reaches approximately 450°C at 700 Torr, and performs an extended
+radiation-limited powered-off cooldown. `loss-of-data`
 stops updating the watched file after its one cycle.
 
 ## Convene File Watch setup

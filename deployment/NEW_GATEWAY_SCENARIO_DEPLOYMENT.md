@@ -30,8 +30,10 @@ Only one generated scenario may run at a time. Every start requires an explicit
 active chamber (`PL` or `MT`), and the generated LabVIEW-shaped sensor bank and
 shared microwave-power attribution follow that selection. The default is one
 compressed cycle with profile-specific pacing. Power outage emits 211 frames
-over about 3 minutes 30 seconds; lunar surface emits 301 frames over about 5
-minutes. Convene polling is targeted at approximately one second, and the
+over about 3 minutes 30 seconds, crosses the 660°C aluminum melt threshold, and
+ends powered off in cooldown. Lunar surface emits 301 frames over about 5
+minutes, reaches approximately 450°C at 700 Torr, and ends powered off after an
+extended cooldown. Convene polling is targeted at approximately one second, and the
 scenario source emits exactly one complete frame per wall-clock second.
 
 Use the existing single whole-frame Convene File Watch variable with this path:
