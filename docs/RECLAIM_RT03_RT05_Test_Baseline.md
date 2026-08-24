@@ -74,7 +74,7 @@ Required documents read in full:
 3. `PREDICTIVE_ENGINE_RED_TEAM_ASSESSMENT.md`
 4. `docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md`
 5. `docs/RECLAIM_Live_Telemetry_Architecture.md`
-6. `deployment/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md`
+6. `Past_Deprecated/deployment/retired-2026-08-24-convene-routing/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md` (historical evidence only)
 
 Required runtime and state-owning sources inspected:
 

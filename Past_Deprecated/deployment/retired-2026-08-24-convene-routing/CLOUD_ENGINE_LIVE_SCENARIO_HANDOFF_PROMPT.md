@@ -38,7 +38,12 @@ The gateway already publishes the same canonical frame directly as exact-name ga
 - The isolated frame took 27.8 s before dead-letter. The 1 Hz run accumulated
   15.5-85.9 s of source-to-dead-letter delay.
 - The corrected raw scenario contract includes non-empty `source_id`,
-  `source_op_state`, `active_chamber=PL`, `cycle_id`, current `ts`, and `vars`.
+  `source_op_state`, explicit `active_chamber=PL|MT`, `cycle_id`, current `ts`,
+  and exact-name `vars`.
+- Raw LabVIEW numeric `NaN` denotes an unavailable channel. The reviewed engine
+  omits that observation, emits `SENSOR_NAN` and (when required)
+  `SENSOR_MISSING`, and continues accepting later sequence numbers. It must
+  still reject infinities, malformed values, and non-finite canonical inputs.
 - Local real-component tests prove the exact gateway canonical frame is accepted
   by a production `DualPushEngine`; this is a deployment/runtime failure.
 

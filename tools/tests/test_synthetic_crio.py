@@ -132,13 +132,14 @@ def test_non_production_engine_accepts_a_harness_frame():
     assert out is not None
 
 
-def test_production_engine_refuses_a_harness_frame():
-    """The guarantee that synthetic data cannot reach the live sim_ namespace."""
+def test_production_engine_accepts_and_labels_a_harness_frame():
+    """Convene may route scenarios, but their harness identity must survive."""
     engine = DualPushEngine(production=True)
     raw = build_raw_frame(600.0, 500.0, 2200.0, 110.0, "S_MicrowaveHeating")
-    with pytest.raises(Exception) as excinfo:
-        engine.ingest(_envelope(raw, mode="harness"))
-    assert "mode" in str(excinfo.value).lower()
+    out = engine.ingest(_envelope(raw, mode="harness"))
+    assert out["mode"] == "harness"
+    assert out["source_id"] == "reclaim-synthetic-scenario"
+    assert out["PL_sensor_valid"] is True
 
 
 def test_gateway_stamped_scenario_advances_the_production_engine(tmp_path):
@@ -213,8 +214,8 @@ def test_frames_traverse_the_real_gateway_receiver(tmp_path):
     # It is a real canonical frame: the cloud mapper recognises it.
     assert looks_like_labview(frame["vars"])
 
-    # The exact canonical frame that produced the raw gateway values also advances the production
-    # engine; its existing state bridge is therefore what produces sim_*.
+    # The exact canonical frame that produced the source values also advances
+    # the production engine; the HTTP response itself carries Convene's sim_* map.
     engine = DualPushEngine(production=True, state_file=str(tmp_path / "identity.json"))
     state = engine.ingest(frame)
     assert state["mode"] == "live"

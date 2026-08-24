@@ -9,8 +9,13 @@ measurements (C6), sequencer chamber authority (C7), and real-dt integration
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
+import math
 from pathlib import Path
 import sys
+import threading
+from http.server import ThreadingHTTPServer
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -18,7 +23,15 @@ ENGINE_ROOT = Path(__file__).resolve().parents[1]
 if str(ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(ENGINE_ROOT))
 
-from push_ingest_dual import DualPushEngine, FrameRejected, STATE_SCHEMA, TELEMETRY_SCHEMA
+from push_ingest_dual import (
+    DualPushEngine,
+    FrameRejected,
+    STATE_SCHEMA,
+    TELEMETRY_SCHEMA,
+    _make_handler,
+    convene_result_variables,
+    parse_labview_text_frame,
+)
 
 
 def _now():
@@ -108,7 +121,7 @@ def test_duplicate_frame_does_not_step_the_estimator_twice():
 
 
 @pytest.mark.parametrize("field,value,code", [
-    ("mode", "harness", "mode_rejected"),
+    ("mode", "simulated", "mode_invalid"),
     ("source_op_state", "not-a-state", "state_invalid"),
     ("active_chamber", "both", "chamber_invalid"),
 ])
@@ -117,6 +130,299 @@ def test_production_rejects_invalid_provenance(field, value, code):
     with pytest.raises(FrameRejected) as error:
         engine.ingest(_frame(**{field: value}))
     assert error.value.code == code
+
+
+@pytest.mark.parametrize("mode", ["live", "harness", "replay"])
+def test_production_accepts_flat_convene_snapshot_in_all_labeled_modes(mode):
+    nested = _frame(
+        mode=mode,
+        source_id=f"convene-{mode}-machine",
+        active_chamber="MT",
+    )
+    nested["vars"]["PL_process"] = False
+    flat = {key: value for key, value in nested.items() if key != "vars"}
+    flat.update(nested["vars"])
+
+    out = DualPushEngine(production=True).ingest(flat)
+
+    assert out["mode"] == mode
+    assert out["source_id"] == f"convene-{mode}-machine"
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 3000.0
+    assert out["PL_P_fwd"] == 0.0
+
+
+def test_flat_convene_snapshot_rejects_sim_feedback_loop():
+    frame = _frame()
+    flat = {key: value for key, value in frame.items() if key != "vars"}
+    flat.update(frame["vars"])
+    flat["sim_PL_T_bed_est"] = 500.0
+
+    disposition = DualPushEngine(production=True).ingest_line(flat)
+
+    assert disposition["status"] == "rejected"
+    assert disposition["code"] == "feedback_rejected"
+
+
+def test_flat_text_extractions_restore_labview_scalar_types():
+    nested = _frame(mode="harness", active_chamber="MT")
+    flat = {key: str(value) for key, value in nested.items() if key != "vars"}
+    flat.update({
+        "MT_bottom": "313.418000",
+        "MT_top": "300.000000",
+        "MT_crucible_temperature": "NaN",
+        "MW_power": "2200.000000",
+        "MW_RF": "TRUE",
+        "PL_process": "FALSE",
+    })
+
+    out = DualPushEngine(production=True).ingest(flat)
+
+    assert out["mode"] == "harness"
+    assert out["seq"] == nested["seq"]
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 2200.0
+    assert out["MW_RF"] is True
+
+
+def _text_frame(active_chamber="MT"):
+    frame = _frame(mode="harness", active_chamber=active_chamber)
+    values = {key: value for key, value in frame.items() if key != "vars"}
+    values.update(frame["vars"])
+    values["MT_crucible_temperature"] = "NaN"
+
+    def render(value):
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, float):
+            return f"{value:.6f}"
+        return str(value)
+
+    return ", ".join(f"{name}: {render(value)}" for name, value in values.items())
+
+
+def test_one_frame_labview_text_parses_through_the_same_flat_adapter():
+    parsed = parse_labview_text_frame(_text_frame())
+    out = DualPushEngine(production=True).ingest(parsed)
+
+    assert out["mode"] == "harness"
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 3000.0
+
+
+def test_ingest_http_accepts_one_frame_text_plain_and_returns_sim_variables():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(_text_frame() + "\n").encode("utf-8"),
+            headers={"Authorization": "Bearer token", "Content-Type": "text/plain"},
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "harness"
+    assert payload["variables"]["sim_active_chamber"] == "MT"
+    assert all(name.startswith("sim_") for name in payload["variables"])
+
+
+def _raw_live_text_frame():
+    import labview_map
+
+    raw = {
+        name: (False if name in labview_map.LABVIEW_BOOLEAN_FIELDS else math.nan)
+        for name in labview_map.LABVIEW_RAW_FIELDS
+    }
+    raw.update(_frame()["vars"])
+
+    def render(value):
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, float):
+            return f"{value:.6f}"
+        return str(value)
+
+    return ", ".join(f"{name}: {render(value)}" for name, value in raw.items())
+
+
+def test_unclassified_ingest_generates_missing_transport_metadata():
+    engine = DualPushEngine(production=True)
+    parsed = parse_labview_text_frame(_raw_live_text_frame())
+    assert len(parsed) == 34
+    first = engine.ingest_line(
+        parsed,
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+    second = engine.ingest_line(
+        parse_labview_text_frame(_raw_live_text_frame()),
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert first["status"] == second["status"] == "accepted"
+    assert first["state"]["mode"] == "telemetry"
+    assert first["state"]["source_id"] == "convene-routed-frame"
+    assert first["state"]["run_id"].startswith("engine-received-")
+    assert second["state"]["run_id"] == first["state"]["run_id"]
+    assert second["state"]["seq"] == first["state"]["seq"] + 1
+    assert first["state"]["active_chamber"] == "PL"
+    assert first["state"]["source_op_state"] == "S_MicrowaveHeating"
+
+
+def test_raw_record_requires_receipt_defaults_when_bypassing_http_endpoint():
+    disposition = DualPushEngine(production=True).ingest_line(
+        parse_labview_text_frame(_raw_live_text_frame())
+    )
+
+    assert disposition["status"] == "rejected"
+    assert disposition["code"] == "schema_required"
+
+
+def test_current_active_chamber_is_authoritative():
+    parsed = parse_labview_text_frame(
+        "active_chamber: MT, " + _raw_live_text_frame()
+    )
+    disposition = DualPushEngine(production=True).ingest_line(
+        parsed,
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert disposition["status"] == "accepted"
+    assert disposition["state"]["active_chamber"] == "MT"
+    assert disposition["state"]["MT_P_fwd"] == 3000.0
+    assert disposition["state"]["PL_P_fwd"] == 0.0
+
+
+def test_generic_receipt_defaults_preserve_an_explicit_legacy_mode():
+    disposition = DualPushEngine(production=True).ingest_line(
+        _frame(mode="harness"),
+        mode_hint="telemetry",
+        source_hint="convene-routed-frame",
+    )
+
+    assert disposition["status"] == "accepted"
+    assert disposition["state"]["mode"] == "harness"
+
+
+def test_http_ingest_accepts_an_older_raw_34_field_text_record():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(_raw_live_text_frame() + "\n").encode("utf-8"),
+            headers={
+                "Authorization": "Bearer token",
+                "Content-Type": "text/plain",
+                "X-RECLAIM-Source-ID": "convene-routed-frame",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "telemetry"
+    assert payload["state"]["source_id"] == "convene-routed-frame"
+    assert payload["state"]["seq"] == 1
+    assert payload["state"]["run_id"].startswith("engine-received-")
+    assert payload["variables"]["sim_active_chamber"] == "PL"
+
+
+def test_http_ingest_accepts_the_current_35_field_text_record_without_source_classification():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=("active_chamber: MT, " + _raw_live_text_frame() + "\n").encode("utf-8"),
+            headers={"Authorization": "Bearer token", "Content-Type": "text/plain"},
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "telemetry"
+    assert payload["state"]["source_id"] == "convene-routed-frame"
+    assert payload["state"]["active_chamber"] == "MT"
+    assert payload["state"]["MT_P_fwd"] == 3000.0
+    assert payload["variables"]["sim_active_chamber"] == "MT"
+
+
+def test_convene_result_variables_prefixes_only_finite_scalars():
+    variables = convene_result_variables({
+        "mode": "harness",
+        "active_chamber": "PL",
+        "PL_T_bed_est": 500.0,
+        "missing": None,
+        "bad": math.nan,
+        "nested": {"unsafe": True},
+    })
+
+    assert variables == {
+        "sim_mode": "harness",
+        "sim_active_chamber": "PL",
+        "sim_PL_T_bed_est": 500.0,
+    }
+
+
+def test_ingest_http_returns_computed_sim_variables_for_convene():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        nested = _frame(mode="harness", source_id="convene-scenario-machine")
+        flat = {key: value for key, value in nested.items() if key != "vars"}
+        flat.update(nested["vars"])
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(json.dumps(flat) + "\n").encode("utf-8"),
+            headers={
+                "Authorization": "Bearer token",
+                "Content-Type": "application/x-ndjson",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "harness"
+    assert payload["variables"]["sim_mode"] == "harness"
+    assert payload["variables"]["sim_active_chamber"] == "PL"
+    assert payload["variables"]["sim_PL_sensor_valid"] is True
 
 
 # ----------------------------------------------------- C3: monotone sequencing
@@ -222,6 +528,81 @@ def test_active_chamber_with_no_sensors_raises_sensor_missing_event():
     del f["vars"]["MT_bottom"]
     out = engine.ingest(f)
     assert "MT:SENSOR_MISSING" in out["last_event"]
+
+
+def test_raw_labview_nan_is_missing_observation_not_whole_frame_failure():
+    engine = DualPushEngine(production=True)
+    frame = _frame()
+    frame["vars"]["PL_bottom2"] = math.nan
+
+    out = engine.ingest(frame)
+
+    assert out["ingest_status"] == "accepted"
+    assert out["PL_sensor_valid"] is True  # remaining three bed TCs are usable
+    assert "SYS:SENSOR_NAN:PL_bottom2" in out["last_event"]
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+
+def test_mt_nan_scan_is_accepted_and_next_valid_scan_recovers():
+    import labview_map
+
+    engine = DualPushEngine(production=True)
+    first = _frame(active_chamber="MT")
+    first["vars"].update({
+        "PL_process": True,  # contradictory legacy flag; envelope stays authoritative
+        "MT_crucible_temperature": 313.418,
+        "MT_top": math.nan,
+        "MT_bottom": math.nan,
+        "MW_power": 0.0,
+    })
+
+    unavailable = engine.ingest(first)
+
+    assert unavailable["ingest_status"] == "accepted"
+    assert unavailable["active_chamber"] == "MT"
+    assert unavailable["MT_sensor_valid"] is False
+    assert "SENSOR_NAN:MT_bottom,MT_top" in unavailable["last_event"]
+    assert "MT:SENSOR_MISSING" in unavailable["last_event"]
+    assert "CHAMBER_MISMATCH" in unavailable["last_event"]
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+    second = _frame(
+        seq=2,
+        ts=(_now() + timedelta(seconds=1)).isoformat(),
+        active_chamber="MT",
+    )
+    second["vars"].update({
+        "PL_process": False,
+        "MT_crucible_temperature": 313.418,
+        "MT_top": 237.1,
+        "MT_bottom": 313.418,
+        "MW_power": 2200.0,
+    })
+    recovered = engine.ingest(second)
+
+    assert recovered["MT_sensor_valid"] is True
+    assert recovered["MT_T_bed_meas"] == pytest.approx(586.568, abs=1e-3)
+    assert recovered["MT_P_fwd"] == 2200.0
+    assert engine.count == 2
+    json.dumps(engine.svc.state(), allow_nan=False)
+
+    mapped, _mw, active = labview_map.normalize({
+        "active": "MT",
+        "MT_crucible_temperature": 313.418,
+        "MT_top": 237.1,
+        "MT_bottom": math.nan,
+        "MW_power": 2200.0,
+    })
+    assert active == "MT"
+    assert "MT_T_bed_tc1" not in mapped
+
+
+def test_raw_labview_infinity_remains_a_contract_rejection():
+    frame = _frame()
+    frame["vars"]["MT_top"] = math.inf
+
+    with pytest.raises(FrameRejected, match="MT_top must be finite"):
+        DualPushEngine(production=True).ingest(frame)
 
 
 # --------------------------------------------------- C7: sequencer authority

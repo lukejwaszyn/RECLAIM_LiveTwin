@@ -47,7 +47,8 @@ class Config:
     listen_host: str = "0.0.0.0"       # bind to LAN interface
     listen_port: int = 9070
 
-    # Seam B — live gateway -> cloud (disabled on the MacBook scenario host)
+    # Legacy direct cloud transport. Current deployments keep this on console;
+    # Convene internal routing owns cloud-engine delivery.
     transport: str = "console"          # console | https | mqtts
     cloud_url: str = "https://vm.example/ingest"   # https mode
     mqtt_host: str = "vm.example"       # mqtts mode
@@ -63,6 +64,11 @@ class Config:
     convene_api: str = "https://reservation-backend-25386666460.us-central1.run.app/api"
     convene_credentials_path: str = "~/.convene_agent.json"
     convene_timeout_s: float = 10.0
+
+    # Local LabVIEW-style text output for Convene File Watch. This is the preferred
+    # MacBook scenario seam and requires no Convene API credential.
+    file_watch_enabled: bool = False
+    file_watch_path: str = "~/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt"
 
     # buffer (store-and-forward)
     buffer_path: str = "/var/lib/reclaim-edge/queue.db"
@@ -178,4 +184,18 @@ class Config:
                 raise ValueError("convene_enabled requires convene_credentials_path")
             if cfg.convene_timeout_s <= 0:
                 raise ValueError("convene_timeout_s must be positive")
+        if cfg.file_watch_enabled:
+            if cfg.convene_enabled:
+                raise ValueError("file_watch_enabled and convene_enabled are mutually exclusive")
+            if cfg.transport != "console":
+                raise ValueError("File Watch scenario host requires transport=console")
+            if cfg.mode not in ("harness", "replay"):
+                raise ValueError("File Watch scenario host requires harness or replay mode")
+            if cfg.listen_host not in ("127.0.0.1", "::1", "localhost"):
+                raise ValueError("File Watch scenario host requires a loopback listen_host")
+            expanded_path = os.path.expandvars(os.path.expanduser(cfg.file_watch_path))
+            if not expanded_path or not os.path.isabs(expanded_path):
+                raise ValueError("file_watch_enabled requires an absolute file_watch_path")
+            if os.path.isdir(expanded_path):
+                raise ValueError("file_watch_path must name a file, not a directory")
         return cfg

@@ -23,6 +23,10 @@ from reclaim_edge.config import Config  # noqa: E402
 
 
 DEFAULT_CONFIG = Path.home() / "Library/Application Support/RECLAIM/edge-gateway/config.yaml"
+DEFAULT_FILE_WATCH = (
+    Path.home()
+    / "Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt"
+)
 
 
 def configure(config_path: Path) -> Path:
@@ -34,6 +38,13 @@ def configure(config_path: Path) -> Path:
     if not isinstance(raw, dict):
         raise ValueError("gateway configuration must be a YAML mapping")
 
+    for unused_convene_key in (
+        "convene_api",
+        "convene_credentials_path",
+        "convene_timeout_s",
+    ):
+        raw.pop(unused_convene_key, None)
+
     raw.update(
         {
             "src": "reclaim-macbook-scenario-01",
@@ -42,8 +53,12 @@ def configure(config_path: Path) -> Path:
             "listen_host": "127.0.0.1",
             "transport": "console",
             "cloud_url": "https://disabled.invalid/ingest",
+            "mqtt_host": "disabled.invalid",
             "auth_token": "",
             "verify_tls": True,
+            "convene_enabled": False,
+            "file_watch_enabled": True,
+            "file_watch_path": str(DEFAULT_FILE_WATCH),
         }
     )
 
@@ -60,6 +75,8 @@ def configure(config_path: Path) -> Path:
             raise ValueError("scenario configuration did not fail closed")
         if cfg.transport != "console" or cfg.auth_token:
             raise ValueError("scenario host must not have direct cloud transport")
+        if cfg.convene_enabled or not cfg.file_watch_enabled:
+            raise ValueError("scenario host must use local File Watch only")
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         backup = config_path.with_name(f"{config_path.name}.bak.before-scenario.{stamp}")
@@ -79,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     backup = configure(args.config.expanduser().resolve())
     print("MacBook configured as a loopback-only scenario host.")
     print(f"Previous protected configuration: {backup}")
-    print("Direct cloud transport is disabled; Convene settings are unchanged.")
+    print("Direct cloud/API publishing is disabled; Convene File Watch is enabled.")
+    print(f"File Watch text file: {DEFAULT_FILE_WATCH}")
     return 0
 
 

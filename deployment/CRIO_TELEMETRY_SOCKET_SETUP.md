@@ -2,6 +2,11 @@
 
 > **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
 
+> **Contract boundary:** The enriched JSON producer below is a future controls-gated
+> socket design, not the current Convene live-input requirement. Today's Windows
+> Convene machine exposes authoritative `active_chamber` plus the 34-field
+> LabVIEW record; `/ingest` assigns the remaining receipt-owned metadata.
+
 **Scope.** How to set up and configure the single TCP socket that carries the RECLAIM
 telemetry shadow stream from the cRIO to the Windows 10 desktop live gateway. This is the
 offline→live interface: it specifies both ends of the wire so that a cRIO producer
@@ -9,9 +14,10 @@ built to this document mates with the existing gateway receiver without surprise
 
 **Boundary (unchanged).** Building or deploying the cRIO producer is gated (Gate 3+)
 and controls-authorized; this document is the spec you build to, not permission to
-deploy. The link is plaintext by design — it lives entirely on the isolated OT LAN, and
-TLS is applied only on the gateway's WAN side by the publisher. Do not add TLS,
-authentication, or any return/command channel to this socket.
+deploy. The link is plaintext by design because it lives entirely on the isolated OT
+LAN. The Windows desktop publishes the received source variables to its Convene
+machine. Do not add TLS, authentication, or any return/command channel to the isolated
+cRIO-to-Windows socket.
 
 ## 1. Endpoints and roles
 
@@ -56,7 +62,7 @@ its byte output is exactly what the receiver accepts.
 ## 3. Gateway (server) socket configuration
 
 The receiver is already built; these are the knobs on `reclaim_edge.config.Config`
-(set via the YAML selected by `RECLAIM_EDGE_CONFIG` on the MacBook scenario host). It sets
+(set via the YAML selected by `RECLAIM_EDGE_CONFIG` on the Windows live gateway). It sets
 `SO_REUSEADDR`, enables `SO_KEEPALIVE`, and on Linux tunes `TCP_KEEPIDLE/INTVL/CNT`;
 the Windows host applies its own keepalive defaults.
 
@@ -97,8 +103,9 @@ egress only.
   and writes it. If the socket write can't keep up, the unsent frame is discarded — the
   telemetry loop never waits, and never applies backpressure to control.
 - **No replay.** After a disconnect, discard any unsent frame. Do not queue history on
-  the cRIO; the gateway's durable buffer owns store-and-forward, and the cloud dedupes
-  by `run_id`+`seq` and rejects stale timestamps.
+  the cRIO; the Windows gateway owns source publication. The current bare live record
+  has no source `run_id`, `seq`, or per-frame timestamp, so the cloud's `/ingest`
+  route assigns receipt identity and freshness after Convene forwards it.
 - **Reconnect with bounded backoff.** On connect/write failure, close, wait a bounded
   backoff (e.g. 1 s, capped at 5–10 s), and retry. Expect a delay after an *ungraceful*
   cRIO drop: because the gateway serves one connection and holds the half-open one until
@@ -180,14 +187,14 @@ Notes on the primitives:
 1. Confirm static addressing on the isolated segment: cRIO `<CRIO_SOURCE_IP>/24`, gateway
    `<WINDOWS10_GATEWAY_IP>/24`, same subnet, direct cable or a dedicated switch with no other
    traffic.
-2. On the MacBook, allow **inbound TCP 9070 only from `<CRIO_SOURCE_IP>`** and only on the
-   OT interface. Use the site's approved macOS packet-filter policy and retain
-   the exact rule plus rollback; the macOS application firewall alone is not
-   evidence of source/interface scoping.
+2. On the Windows 10 desktop, allow **inbound TCP 9070 only from
+   `<CRIO_SOURCE_IP>`** and only on the OT interface. Use Windows Defender
+   Firewall and retain the exact rule plus rollback; a broad port exception is
+   not evidence of source/interface scoping.
 3. Bind the gateway listener to `<WINDOWS10_GATEWAY_IP>` (§3) so the port is never exposed on the
    WAN NIC, and keep the loopback status port (`9080`) off any tunnel.
-4. Do not open any path from this segment to the cloud; the gateway's WAN NIC and the
-   TLS publisher handle egress separately.
+4. Do not open any path from this segment directly to the cloud; the Windows
+   desktop's Convene machine connection owns external source publication.
 
 ## 8. Validation ladder
 

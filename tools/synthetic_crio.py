@@ -219,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     log.info("synthetic cRIO: chamber=%s scenario=%s env=%s speed=%sx -> %s:%d%s",
              args.active_chamber, args.scenario, args.env, args.speed, args.host, args.port,
              "  [DRY RUN, no socket]" if args.dry_run else "")
-    log.info("scenario path: local source -> MacBook -> Convene exact-name variables")
+    log.info("scenario path: local source -> MacBook -> atomic Convene File Watch text")
 
     crio = None if args.dry_run else SyntheticCrio(args.host, args.port)
     if crio is not None:

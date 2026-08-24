@@ -10,8 +10,8 @@ model artifacts, and previous Convene bridges. Those remain preserved in the
 source workspace but are not part of this release.
 
 > **Standing status: labeled engineering shadow — NO-GO for any production
-> claim.** All engine output is advisory. No command, return, or actuation path
-> exists anywhere in this repository.
+> claim.** All engine output is advisory. Computed state returns to Convene for
+> visualization only; no command or actuation path exists in this repository.
 
 ---
 
@@ -27,21 +27,15 @@ uv sync --locked --all-extras --dev --python 3.13
 python3 scripts/check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **55 / 76 / 70**
+### 2. Tests — expect **264 passed**
 
-Each suite needs its own package root on `PYTHONPATH`. Green across all three is
-the pre-flight go-signal; **any red means stop, do not deploy.**
-
-```powershell
-$env:PYTHONPATH="pi_gateway";         python -m pytest pi_gateway -q          # 55
-$env:PYTHONPATH="cloud_engine";       python -m pytest cloud_engine -q        # 76
-$env:PYTHONPATH="crio_source_record"; python -m pytest crio_source_record -q  # 70
-```
+Green across the combined gateway, tooling, cloud-engine, and source-record suite
+is the pre-flight go-signal; **any red means stop, do not deploy.**
 
 ```bash
-PYTHONPATH=pi_gateway         python -m pytest pi_gateway -q          # 55
-PYTHONPATH=cloud_engine       python -m pytest cloud_engine -q        # 76
-PYTHONPATH=crio_source_record python -m pytest crio_source_record -q  # 70
+PYTHONPATH=pi_gateway:tools:cloud_engine:crio_source_record \
+  python -m pytest -q pi_gateway/tests tools/tests cloud_engine/tests \
+  crio_source_record/tests
 ```
 
 Bench replay must end `{'accepted': 3, ..., 'rejected': 0, 'sent': 3}`:
@@ -57,19 +51,21 @@ command — there is no setup step, and nothing above it needs to be run first. 
 the locked environment does not exist yet, the runner builds it once on first use,
 so these work from a fresh checkout.
 
-On the MacBook, scenarios enter the loopback-only scenario listener. Run exactly
-one sender at a time:
+On the MacBook, scenarios enter the loopback-only scenario listener. The same
+controller starts, reports, and stops the one allowed sender; every start chooses
+the active chamber:
 
 ```bash
-.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env earth_lab --host 127.0.0.1 --port 9070 --speed 1
-.venv-macbook/bin/python tools/synthetic_crio.py --scenario power_outage --env earth_lab --host 127.0.0.1 --port 9070 --speed 1
-.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env lunar_surface --host 127.0.0.1 --port 9070 --speed 1
-.venv-macbook/bin/python tools/synthetic_crio.py --scenario nominal --env earth_lab --host 127.0.0.1 --port 9070 --speed 1 --cycles 1
+pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
+pi_gateway/macos/start-rehearsal-scenario.sh start power-outage MT
+pi_gateway/macos/start-rehearsal-scenario.sh start lunar PL
+pi_gateway/macos/start-rehearsal-scenario.sh start loss-of-data MT
+pi_gateway/macos/start-rehearsal-scenario.sh status
+pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
-Stop looping scenarios with `Ctrl+C`. The MacBook never connects to the real
-cRIO. The retained PowerShell launcher is for Windows/live-gateway rehearsal
-work and is not the MacBook scenario host entry point.
+The MacBook never connects to the real cRIO. Obsolete Windows/Mac direct scenario
+publishers are archived and cannot be invoked from the active tree.
 
 | Profile | Scenario/environment | Behavior |
 |---|---|---|
@@ -78,9 +74,12 @@ work and is not the MacBook scenario host entry point.
 | `lunar` | `nominal` / `lunar_surface` | Same source sequence under lunar physics |
 | `loss-of-data` | `nominal` / `earth_lab`, one cycle | Disconnects after one cycle so freshness must expire |
 
-These profiles traverse only the MacBook's loopback `9070` scenario ingress and
-Convene scenario publisher. They do not enter the Windows 10 live gateway or
-directly target the production VM. Inspect the scenario host on loopback `9080`.
+These profiles traverse the MacBook's loopback `9070` scenario ingress and its
+atomic File Watch writer. They do not enter the Windows 10 live gateway or
+directly target the VM. Convene owns the downstream route. The engine accepts the
+the identical 35-field text input through `/ingest` regardless of origin, then
+returns computed `sim_*` variables in the
+POST response. Inspect the scenario host on loopback `9080`.
 
 **`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
 keep answering and the last values stay readable, but the data stops advancing:
@@ -88,12 +87,10 @@ keep answering and the last values stay readable, but the data stops advancing:
 condition the check exists to rehearse — a consumer must detect staleness rather
 than trust a last-good value.
 
-Note what the engine does **not** give you: `/state` carries no wall-clock
-timestamp and no age field, so "how stale" cannot be answered from the engine
-alone — only "not advancing". Real freshness gating lives downstream in the
-bridge, which requires `state_age_ms` and `mode: live` and therefore only accepts
-the production dual-ingest path. Rehearsal on 8177–8181 exercises the engine and
-its HTTP surface, **not** the bridge's freshness/identity gating.
+The watched frame intentionally has no source `ts` or `seq`, matching current live
+telemetry. The engine creates unclassified receipt `ts_source`, monotone `seq`,
+`ts_engine`, and `ingest_age_ms`. Convene must use advancing engine receipt/state
+time to reject stale output rather than treating a last-good value as fresh.
 
 **Where to run them.** The scenarios are self-contained — they need only this
 checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
@@ -104,7 +101,7 @@ predictive-engine VM while it serves production: the script's port guard is only
 port-level protection, and `8177`–`8181` must never be routed to production or
 bound as live mission state.
 
-For every run retain: commit SHA, run ID, timestamps, expected vs observed,
+For every run retain: commit SHA, engine receipt run ID/timestamps, expected vs observed,
 screenshots, and deviations. Keep synthetic services clearly labeled as rehearsal
 data.
 
@@ -113,27 +110,22 @@ data.
 ## Runtime topology
 
 ```text
-cRIO / LabVIEW -> Windows 10 desktop live gateway -> production live-data path
+cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 
-MacBook local scenarios -> loopback scenario service -> Convene scenario machine
-                                                   -> separately owned Convene-to-VM pipe
+MacBook local scenarios -> loopback service -> atomic one-frame text -> Convene File Watch
 
-Windows Server 2025 VM -> dual engine -> state bridge -> VM Convene agent
-                                          -> Convene-native .stp visualization
+Either Convene machine -> Convene internal route -> cloud dual engine
+                        -> computed state -> Convene sim_* / .stp visualization
 ```
 
-The VM is cloud-hosted in Kubernetes-managed infrastructure and its guest
-procedures are Windows. Live-gateway procedures are Windows 10; MacBook
-procedures are scenario-only. There is no Linux host or
-Raspberry Pi in the live path. The cloud engine owns state processing. The
-headless VM Convene agent consumes the bridge's validated copy of the cloud
-`/state` record; its native visualization binds the incoming variables to
-elements of a `.stp` (STEP) model, animating the system's geometry as data
-changes. The visualization is a read-only view of the same `/state` record — it
-does not talk to the cRIO and is not a second predictive engine.
+The VM guest procedures are Windows. Live-gateway procedures are Windows 10;
+MacBook procedures are scenario-only. There is no Linux host or Raspberry Pi in
+the live path. Convene is the common routing plane, the cloud engine owns state
+processing, and the `.stp` visualization is a read-only view of returned state.
 
-The VM is the sole publisher of the `sim_` namespace; the gateway publishes only
-the read-only raw gateway audit namespace, and never writes a `sim_` variable.
+The cloud result path is the sole publisher of the `sim_` namespace. Source
+machines preserve exact raw names without manufacturing `gw_` aliases and never
+write a `sim_` variable.
 
 ## Contents
 
@@ -147,10 +139,10 @@ the read-only raw gateway audit namespace, and never writes a `sim_` variable.
   checker, and bench replay.
 - `convene/` — binding specification (publisher `sim_` set plus the Convene-native
   `.stp` visualization bindings); no legacy binding is carried forward.
-- `docs/` — live telemetry architecture, remote deployment preflight, and the
+- `docs/` — live telemetry architecture, implementation baselines, and the
   predictive-engine fault/lifecycle memo.
-- `deployment/` — handoffs, go/no-go punch list, and stage-labeled runbooks (see
-  `deployment/README.md`; start at `VM_ENGINE_HANDOFF.md` for the VM session).
+- `deployment/` — current architecture, go/no-go records, and runbooks. Start at
+  `deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`.
 
 ## What starts fresh
 
@@ -177,20 +169,15 @@ evidence for the exact committed SHA. See
 
 ## Before deployment
 
-Run the contract tests on a supported Python environment, complete the remote
-preflight, and deploy side-by-side. **Do not use this folder to overwrite a live
-gateway or cloud installation in place.**
-
-See `docs/RECLAIM_Remote_Gateway_Preflight.md` for the remote deployment sequence,
-and `deployment/LIFECYCLE_RESTART_AUDIT_RECORD.md` for the current
-graceful-closure/restart audit state and open items.
+Run the contract tests on a supported Python environment, follow the pickup and
+acceptance matrix in
+`deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`, and deploy side-by-side.
+**Do not use this folder to overwrite a live gateway or cloud installation in
+place.**
 
 ## Bringing the cRIO online
 
-When the cRIO is connected and something is not arriving, validating, or reaching
-the VM or Convene, start at
-**`deployment/CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md`**. It carries the
-known-good baseline (what has already been proven end to end, so you do not
-re-debug it), the first-frame checklist, and a fault ladder that isolates which
-side of the seam a problem is on — plus the failures that look like bugs and are
-not.
+When the cRIO is connected and something is not arriving, validating, or
+returning through Convene, start at
+**`deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`**. It defines the current
+seams, exact naming contract, known gaps, and competition acceptance matrix.

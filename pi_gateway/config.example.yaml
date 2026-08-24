@@ -15,20 +15,19 @@ schema_version: reclaim.telemetry.v1
 listen_host: 127.0.0.1
 listen_port: 9070
 
-# Seam B — Windows 10 desktop live gateway -> cloud
-# transport: console | https | mqtts
-transport: console            # start here for E0 (no cloud needed)
-cloud_url: https://vm.example/ingest
-mqtt_host: vm.example
+# Direct gateway-to-cloud transport is disabled; Convene owns downstream routing.
+transport: console
+cloud_url: https://disabled.invalid/ingest
+mqtt_host: disabled.invalid
 mqtt_port: 8883
 mqtt_topic: reclaim/telemetry
 auth_token: ""                # bearer token (https) / password (mqtts)
 tls_ca: ""                    # path to CA bundle, or empty for system store
 verify_tls: true
 
-# Independent desktop telemetry tap. Publishes exact raw LabVIEW variable names
-# directly to Convene; failures never block or acknowledge the durable VM queue.
-convene_enabled: false
+# Required live source publisher. Publishes exact raw LabVIEW variable names to
+# Convene with no manufactured prefix and never emits sim_*.
+convene_enabled: true
 convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
 convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
 convene_timeout_s: 10.0

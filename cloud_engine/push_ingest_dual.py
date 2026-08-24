@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-push_ingest_dual.py — dual-chamber predictive engine with a LIVE push seam (POST /ingest).
+push_ingest_dual.py — dual-chamber predictive engine with Convene-routed push seams.
 
 RECLAIM is a two-path recycler: a Plastics (pyrolysis) chamber and a Metals (smelt)
 chamber, time-shared on one SSMG but with PHYSICALLY SEPARATE sensor suites. This
@@ -12,8 +12,8 @@ two configs, two streams in, two states out. The streams never collide:
         PL_*  ->  plastics engine (chamber_params 'PL')  ->  PL_* published state
         MT_*  ->  metals   engine (chamber_params 'MT')  ->  MT_* published state
 
-Endpoints (identical surface to push_ingest_service.py):
-    POST /ingest   newline-delimited JSON frames whose `vars` carry PL_*/MT_* channels
+Endpoints:
+    POST /ingest   current 35-field text/flat records or canonical envelopes
     GET  /state    combined latest state: PL_* and MT_* estimates/forecasts/residuals
     GET  /manifest self-describing catalog (both chambers)
     GET  /history  last N combined frames
@@ -48,6 +48,13 @@ LIVE INGEST CONTRACT (v1.1, fixes C1-C4/H1/H3 of the 2026-08 review):
     NOT stepped; it publishes <CH>_sensor_valid=false (and SENSOR_MISSING when
     it is the active chamber) instead of a made-up 300 K.
 
+Convene compatibility: a flat File Watch snapshot or complete LabVIEW-style text
+record is normalized by exact source names into the same internal `vars` block.
+The endpoint adds unclassified receipt-owned provenance when the source has no
+envelope. It does not guess whether an identical source record was live or scenario.
+The POST response includes a flat `variables` object with one `sim_*` key per
+computed scalar so Convene can route results back without a second bridge.
+
 Backward compatibility: if a frame carries UN-prefixed vars (legacy single-chamber
 feed), they are routed to the plastics engine and published under PL_* — so old
 emitters still work, just tagged. Gateways that predate `results` may treat any
@@ -69,6 +76,7 @@ import os
 import tempfile
 import threading
 import traceback
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
@@ -90,6 +98,11 @@ _PASSTHROUGH = ("O2_pct", "mass_in_g", "mass_out_g", "T_bed_surf",
 _BOOLEAN_PASSTHROUGH = {
     "process", "preprocess", "postprocess", "chamber_pump", "purge_pump",
 }
+
+_ENVELOPE_FIELDS = frozenset({
+    "schema_version", "mode", "run_id", "source_id", "cycle_id", "seq",
+    "ts", "source_op_state", "active_chamber",
+})
 
 
 def _passthrough_value(name: str, value):
@@ -116,6 +129,178 @@ class FrameRejected(ValueError):
         super().__init__(message)
         self.code = code
         self.final = final
+
+
+def normalize_convene_frame(frame: dict) -> dict:
+    """Normalize one flat Convene File Watch snapshot to the canonical envelope.
+
+    Nested gateway frames remain unchanged. A flat snapshot may contain routing
+    metadata, but only exact, case-sensitive LabVIEW source names enter `vars`.
+    Computed `sim_*` values are rejected so a Convene feedback loop cannot feed
+    engine output back into its own input.
+    """
+    if not isinstance(frame, dict):
+        return frame
+    if any(isinstance(key, str) and key.startswith("sim_") for key in frame):
+        raise FrameRejected("feedback_rejected", "flat source frame contained sim_* output")
+    if "vars" in frame:
+        mixed = sorted(set(labview_map.LABVIEW_RAW_FIELDS).intersection(frame))
+        if mixed:
+            raise FrameRejected(
+                "frame_ambiguous",
+                "source fields must be nested under vars or flat, not both: "
+                + ", ".join(mixed),
+            )
+        return frame
+    raw = {}
+    for key, value in frame.items():
+        if key not in labview_map.LABVIEW_RAW_FIELDS:
+            continue
+        coerced = _coerce_file_watch_value(key, value)
+        if coerced is not None:
+            raw[key] = coerced
+    normalized = {
+        key: _coerce_file_watch_value(key, frame[key])
+        for key in _ENVELOPE_FIELDS
+        if key in frame
+    }
+    normalized["vars"] = raw
+    return normalized
+
+
+def _coerce_file_watch_value(name: str, value):
+    """Restore scalar types extracted from LabVIEW-style File Watch text."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    upper = stripped.upper()
+    if name in labview_map.LABVIEW_BOOLEAN_FIELDS:
+        if upper == "TRUE":
+            return True
+        if upper == "FALSE":
+            return False
+        if upper == "NAN":
+            return None
+        return value
+    if name in labview_map.LABVIEW_NUMERIC_FIELDS:
+        if upper == "NAN":
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return value
+    if name == "seq":
+        try:
+            return int(stripped)
+        except ValueError:
+            return value
+    return stripped
+
+
+def parse_labview_text_frame(line: str) -> dict:
+    """Parse one exact-name ``name: value, ...`` File Watch frame.
+
+    Values intentionally remain strings here and pass through the same flat
+    Convene coercion/validation seam as individually extracted variables.
+    """
+    allowed = _ENVELOPE_FIELDS | frozenset(labview_map.LABVIEW_RAW_FIELDS)
+    frame = {}
+    for item in line.strip().split(", "):
+        if ": " not in item:
+            raise FrameRejected("text_invalid", f"text field has no ': ': {item!r}")
+        name, value = item.split(": ", 1)
+        if name not in allowed:
+            raise FrameRejected("text_field_unknown", f"unknown text field: {name}")
+        if name in frame:
+            raise FrameRejected("text_field_duplicate", f"duplicate text field: {name}")
+        if not value:
+            raise FrameRejected("text_value_empty", f"empty text value: {name}")
+        frame[name] = value
+    if not frame:
+        raise FrameRejected("text_invalid", "empty text frame")
+    return frame
+
+
+class RawIngressMetadata:
+    """Generate transport provenance when the physical source has none.
+
+    These values describe engine receipt, not LabVIEW production. Exact raw sensor
+    values are never changed or invented, and an indistinguishable raw record is
+    labeled ``telemetry`` rather than guessed to be live or scenario.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._runs = {}
+        self._seqs = {}
+        self._cycles = {}
+        self._was_active = {}
+
+    @staticmethod
+    def _active_chamber(raw: dict) -> str:
+        if any(raw.get(name) is True for name in (
+            "PL_preprocess", "PL_process", "PL_postprocess"
+        )):
+            return "PL"
+        if raw.get("MW_RF") is True:
+            return "MT"
+        return "NONE"
+
+    @staticmethod
+    def _op_state(raw: dict) -> str:
+        return "S_MicrowaveHeating" if raw.get("MW_RF") is True else "S_Unknown"
+
+    def enrich(self, frame: dict, *, mode_hint: str | None,
+               source_hint: str | None) -> dict:
+        if not mode_hint:
+            return frame
+        existing_mode = frame.get("mode")
+        effective_mode = str(existing_mode or mode_hint)
+        raw = frame.get("vars")
+        if not isinstance(raw, dict):
+            raise FrameRejected("telemetry_invalid", "vars must be an object")
+        source_id = str(frame.get("source_id") or source_hint or f"convene-{mode_hint}-raw")
+        key = (effective_mode, source_id)
+        now = _utc_now()
+        active_now = any(raw.get(name) is True for name in (
+            "PL_preprocess", "PL_process", "PL_postprocess", "MW_RF"
+        ))
+        with self._lock:
+            run_id = self._runs.setdefault(key, f"engine-received-{uuid.uuid4()}")
+            if "seq" in frame:
+                seq = frame["seq"]
+            else:
+                seq = self._seqs.get(key, 0) + 1
+                self._seqs[key] = seq
+            if active_now and not self._was_active.get(key, False):
+                self._cycles[key] = self._cycles.get(key, 0) + 1
+            self._was_active[key] = active_now
+            cycle_number = self._cycles.get(key, 0)
+
+        enriched = dict(frame)
+        enriched.setdefault("schema_version", TELEMETRY_SCHEMA)
+        enriched.setdefault("mode", effective_mode)
+        enriched.setdefault("run_id", run_id)
+        enriched.setdefault("source_id", source_id)
+        enriched.setdefault("seq", seq)
+        enriched.setdefault("ts", now.isoformat())
+        enriched.setdefault("cycle_id", f"engine-received-{effective_mode}-{cycle_number:06d}")
+        enriched.setdefault("source_op_state", self._op_state(raw))
+        enriched.setdefault("active_chamber", self._active_chamber(raw))
+        return enriched
+
+
+def convene_result_variables(state: dict) -> dict:
+    """Return finite scalar engine state under the cloud-owned `sim_*` namespace."""
+    variables = {}
+    for key, value in state.items():
+        if value is None or not isinstance(value, (str, bool, int, float)):
+            continue
+        if isinstance(value, float) and not math.isfinite(value):
+            continue
+        target = key if key.startswith("sim_") else f"sim_{key}"
+        variables[target] = value
+    return variables
 
 
 def _utc_now() -> datetime:
@@ -333,6 +518,7 @@ class DualPushEngine:
         self.production = production
         self.max_frame_age_s = max_frame_age_s
         self.ident = IngestIdentityStore(state_file)
+        self.raw_ingress = RawIngressMetadata()
         self._last_ts: datetime | None = None
         self.last_ingest = {"accepted": False, "duplicate": False,
                             "reason": "no frame received"}
@@ -440,8 +626,8 @@ class DualPushEngine:
         """Validate the envelope and return its normalized provenance values.
 
         Development accepts legacy frames so existing synthetic tools continue to
-        work. Production requires the complete v1 contract and only accepts live
-        telemetry; no invalid frame ever advances an estimator.
+        work. HTTP receipt enriches the current raw contract before production
+        validation. Legacy complete live/harness/replay envelopes remain accepted.
         """
         if not isinstance(frame, dict):
             raise FrameRejected("frame_invalid", "frame must be a JSON object")
@@ -452,10 +638,14 @@ class DualPushEngine:
             raise FrameRejected("schema_unsupported", "unsupported schema_version")
 
         mode = frame.get("mode", "legacy")
-        if self.production and mode != "live":
-            raise FrameRejected("mode_rejected", "production accepts mode=live only")
-        if mode not in ("live", "harness", "replay", "legacy"):
-            raise FrameRejected("mode_invalid", "mode must be live, harness, replay, or legacy")
+        if mode not in ("telemetry", "live", "harness", "replay", "legacy"):
+            raise FrameRejected(
+                "mode_invalid", "mode must be telemetry, live, harness, replay, or legacy"
+            )
+        if self.production and mode == "legacy":
+            raise FrameRejected(
+                "mode_rejected", "production requires telemetry, live, harness, or replay mode"
+            )
 
         required = ("run_id", "source_id", "seq", "ts", "cycle_id", "source_op_state",
                     "active_chamber", "vars")
@@ -511,7 +701,9 @@ class DualPushEngine:
             raise FrameRejected("telemetry_invalid", f"{field} must be finite")
         return number
 
-    def _validate_raw_telemetry(self, raw: dict) -> None:
+    def _validate_raw_telemetry(
+        self, raw: dict, *, allow_partial_banks: bool = False
+    ) -> None:
         if not isinstance(raw, dict):
             raise FrameRejected("telemetry_invalid", "vars must be an object")
 
@@ -530,7 +722,8 @@ class DualPushEngine:
         for chamber, expected in (("PL", 4), ("MT", 1)):
             prefix = f"{chamber}_T_bed_tc"
             bank = sorted(k for k in raw if k.startswith(prefix))
-            if bank and bank != [f"{prefix}{i}" for i in range(1, expected + 1)]:
+            if (not allow_partial_banks and bank
+                    and bank != [f"{prefix}{i}" for i in range(1, expected + 1)]):
                 raise FrameRejected(
                     "telemetry_invalid",
                     f"{chamber} bed sensor bank must contain {expected} channels",
@@ -569,19 +762,33 @@ class DualPushEngine:
         if not isinstance(raw_value, dict):
             raise FrameRejected("telemetry_invalid", "vars must be an object")
         raw = dict(raw_value)
+        is_lv = labview_map.looks_like_labview(raw)
+        nan_fields: list[str] = []
+        if is_lv:
+            # LabVIEW uses NaN as an unavailable-channel marker. Treat it as a
+            # missing raw observation instead of rejecting the whole scan. This
+            # policy is intentionally limited to exact raw source names: canonical
+            # model inputs, infinities, booleans, strings and malformed values
+            # remain strict contract violations.
+            for key in sorted(labview_map.LABVIEW_NUMERIC_FIELDS & raw.keys()):
+                value = raw[key]
+                if (not isinstance(value, bool) and isinstance(value, numbers.Real)
+                        and math.isnan(float(value))):
+                    nan_fields.append(key)
+                    raw.pop(key)
         raw["active"] = meta["active_chamber"]
         self._validate_raw_telemetry(raw)
-        is_lv = labview_map.looks_like_labview(raw)
         values, mw_globals, active = labview_map.normalize(raw)
         # Validate normalized values as a second boundary. This protects future
         # adapter changes from introducing a prohibited model input.
-        self._validate_raw_telemetry(values)
+        self._validate_raw_telemetry(values, allow_partial_banks=bool(nan_fields))
         for key, value in mw_globals.items():
             if isinstance(value, bool):
                 continue
             self._require_finite_number(value, key)
         return {"raw": raw, "values": values, "mw_globals": mw_globals,
-                "active": active, "is_labview": is_lv}
+                "active": active, "is_labview": is_lv,
+                "nan_fields": nan_fields}
 
     @staticmethod
     def _clone_service(service: TwinStateService) -> TwinStateService:
@@ -616,7 +823,8 @@ class DualPushEngine:
         self.command = candidate.command
 
     # ------------------------------------------------------------------ ingest
-    def ingest_line(self, frame: dict) -> dict:
+    def ingest_line(self, frame: dict, *, mode_hint: str | None = None,
+                    source_hint: str | None = None) -> dict:
         """Process one frame; return its disposition (never raises FrameRejected).
 
         Disposition: {"status": accepted|duplicate|rejected, "code", "message",
@@ -625,6 +833,10 @@ class DualPushEngine:
         decisions and estimator stepping happen under ONE lock (fix M2).
         """
         try:
+            frame = normalize_convene_frame(frame)
+            frame = self.raw_ingress.enrich(
+                frame, mode_hint=mode_hint, source_hint=source_hint
+            )
             meta = self._validate_frame(frame)
             prepared = self._prepare_telemetry(frame, meta)
         except FrameRejected as exc:
@@ -732,6 +944,7 @@ class DualPushEngine:
         mw_globals = prepared["mw_globals"]
         active = prepared["active"]
         is_lv = prepared["is_labview"]
+        nan_fields = prepared["nan_fields"]
 
         # real dt from source timestamps (fix H1); clamped so a first frame or a
         # timestamp hiccup cannot inject a huge or non-positive integration step.
@@ -746,6 +959,8 @@ class DualPushEngine:
         self.count += 1
         self.t += dt
         combined, events = {}, []
+        if nan_fields:
+            events.append(("SYS", "SENSOR_NAN:" + ",".join(nan_fields)))
         cid = meta["cycle_id"]
         # Always publish an explicit availability gate for both chambers. A
         # partially mapped live source must clear retained downstream displays
@@ -841,6 +1056,8 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
             path = self.path.split("?")[0].rstrip("/")
             if path != "/ingest":
                 return self._send({"error": "not found", "post": ["/ingest"]}, 404)
+            mode_hint, default_source_hint = "telemetry", "convene-routed-frame"
+            source_hint = self.headers.get("X-RECLAIM-Source-ID") or default_source_hint
             if not _bearer_ok(self.headers, ingest_token):
                 return self._send({"error": "unauthorized"}, 401)
             n = int(self.headers.get("Content-Length", 0))
@@ -854,7 +1071,10 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
                     continue
                 i += 1
                 try:
-                    obj = json.loads(line)
+                    obj = json.loads(line) if line.startswith("{") else parse_labview_text_frame(line)
+                except FrameRejected as exc:
+                    d = {"status": "rejected", "code": exc.code,
+                         "message": str(exc), "final": exc.final}
                 except ValueError as exc:
                     d = {"status": "rejected", "code": "json_invalid",
                          "message": str(exc), "final": True}
@@ -863,7 +1083,9 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
                          "message": str(exc), "final": True}
                 else:
                     try:
-                        d = pe.ingest_line(obj)
+                        d = pe.ingest_line(
+                            obj, mode_hint=mode_hint, source_hint=source_hint
+                        )
                     except Exception as exc:  # pragma: no cover - defensive
                         log.error("unhandled ingest error: %s\n%s", exc,
                                   traceback.format_exc())
@@ -881,10 +1103,13 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
             # v1.1 contract: the request was processed -> 200, with per-frame
             # results. A bad frame never fails its batch-mates (fix C1/H3).
             # `bad`/`errors` retained for pre-1.1 clients.
+            state = pe.svc.state() if ingested or duplicate else {}
             self._send({"ingested": ingested, "duplicate": duplicate,
                         "rejected": rejected, "bad": rejected,
                         "results": results, "errors": errors[:5],
-                        "total": pe.count, "command": pe.command}, 200)
+                        "total": pe.count, "command": pe.command,
+                        "state": state,
+                        "variables": convene_result_variables(state)}, 200)
 
         def do_GET(self):
             path = self.path.split("?")[0].rstrip("/")
@@ -928,14 +1153,16 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
 def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    ap = argparse.ArgumentParser(description="RECLAIM dual-chamber engine — POST /ingest")
+    ap = argparse.ArgumentParser(
+        description="RECLAIM dual-chamber engine — Convene-routed POST ingest"
+    )
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8078)
     ap.add_argument("--env", default="earth_lab")
     ap.add_argument("--production", action="store_true",
-                    help="require authenticated, complete mode=live telemetry envelopes")
+                    help="enforce authenticated telemetry input")
     ap.add_argument("--ingest-token", default=os.environ.get("RECLAIM_INGEST_TOKEN", ""),
-                    help="Bearer token for POST /ingest (prefer RECLAIM_INGEST_TOKEN env; "
+                    help="Bearer token for POST ingest routes (prefer RECLAIM_INGEST_TOKEN env; "
                          "a CLI value is visible in the process list)")
     ap.add_argument("--read-token", default=os.environ.get("RECLAIM_READ_TOKEN", ""),
                     help="optional Bearer token for GET /state,/manifest,/history,/command "

@@ -12,7 +12,7 @@ The selected production seam is the existing source-assembled process record (th
 repeating `name: value` record `Data Stream.vi` writes to the cRIO USB volume), reused
 — after the controls gates pass — by a bounded, lower-priority RT-side TCP client that
 emits one UTF-8 JSON object + LF to the existing gateway at `<WINDOWS10_GATEWAY_IP>:9070`. This is
-the authoritative decision from `CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`. This record
+the source decision now governed by `CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`. This record
 does not re-open that decision; it delivers the Gate 2 offline artifacts that make the
 seam reviewable before any cRIO window.
 

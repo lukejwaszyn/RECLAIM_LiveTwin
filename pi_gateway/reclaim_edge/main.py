@@ -21,6 +21,7 @@ from .buffer import Buffer
 from .config import Config
 from .convene import ConvenePublisher
 from .framer import Framer
+from .file_watch import FileWatchPublisher
 from .publisher import Publisher
 from .receiver import Receiver
 from .status import StatusServer
@@ -32,6 +33,15 @@ logging.basicConfig(
 log = logging.getLogger("reclaim_edge")
 
 
+class _PublisherFanout:
+    def __init__(self, publishers):
+        self.publishers = tuple(publishers)
+
+    def submit(self, frame):
+        for publisher in self.publishers:
+            publisher.submit(frame)
+
+
 def main() -> None:
     cfg = Config.load()
     stop = threading.Event()
@@ -39,7 +49,10 @@ def main() -> None:
     buffer = Buffer(cfg.buffer_path, cfg.buffer_max_frames)
     framer = Framer(cfg, seq_store=buffer)   # seq high-water persists across restarts
     convene = ConvenePublisher(cfg, stop) if cfg.convene_enabled else None
-    receiver = Receiver(cfg, framer, buffer, stop, audit_publisher=convene)
+    file_watch = FileWatchPublisher(cfg, stop) if cfg.file_watch_enabled else None
+    source_publishers = [publisher for publisher in (convene, file_watch) if publisher]
+    source_fanout = _PublisherFanout(source_publishers) if source_publishers else None
+    receiver = Receiver(cfg, framer, buffer, stop, audit_publisher=source_fanout)
     publisher = Publisher(cfg, buffer, stop)
 
     def _sig(*_):
@@ -52,13 +65,15 @@ def main() -> None:
     status = None
     if cfg.status_port:
         status = StatusServer(cfg.status_port, receiver, publisher, buffer, cfg.src,
-                              convene=convene)
+                              convene=convene, file_watch=file_watch)
 
     log.info("RECLAIM edge gateway starting — transport=%s src=%s", cfg.transport, cfg.src)
     receiver.start()
     publisher.start()
     if convene:
         convene.start()
+    if file_watch:
+        file_watch.start()
     if status:
         status.start()
 
@@ -93,6 +108,8 @@ def main() -> None:
     publisher.join(timeout=3)
     if convene:
         convene.join(timeout=3)
+    if file_watch:
+        file_watch.join(timeout=3)
     buffer.close()
     log.info("stopped")
     if died:

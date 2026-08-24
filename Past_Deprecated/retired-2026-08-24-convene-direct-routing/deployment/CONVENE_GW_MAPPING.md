@@ -257,6 +257,22 @@ MT normalization until the approved profile exists. Any retained
 `MT_bottom`, or `PL_bottom1..4` value is therefore historical when this
 profile is the active source.
 
+### 4.5 Raw `NaN` means unavailable, not a dead stream
+
+The exact 34-field LabVIEW record may carry IEEE `NaN` for an unavailable
+numeric channel. At the cloud ingest boundary, each raw `NaN` field is omitted
+from that scan before normalization and recorded in a `SYS:SENSOR_NAN:<fields>`
+event. The rest of the frame is accepted and sequence/time identity continues.
+If the active chamber no longer has a complete usable measurement vector, the
+engine publishes `<CH>_sensor_valid=false` and `SENSOR_MISSING`; it does not
+reuse an old reading or fabricate one. A later valid scan recovers normally.
+
+This exception applies only to exact raw LabVIEW numeric names. `Infinity`,
+`-Infinity`, malformed values, and non-finite canonical model inputs remain
+contract rejections. `active_chamber` in the envelope remains authoritative;
+`PL_process` is only a mismatch diagnostic. `MT_crucible_temperature` remains a
+raw/display field until its estimator mapping is controls-approved.
+
 ---
 
 ## 5. Security note

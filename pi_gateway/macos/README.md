@@ -2,11 +2,13 @@
 
 > The Windows 10 desktop is the sole live-data client/gateway. The MacBook is
 > loopback-only and scenario-only. It must never connect to the real cRIO,
-> expose its receiver on a LAN, or publish directly to the cloud engine.
+> expose its receiver on a LAN, or publish directly to the cloud engine or
+> Convene API.
 
-The MacBook serves synthetic and approved capture-replay scenarios through its
-own Convene machine. The downstream Convene-to-VM scenario pipe is configured
-elsewhere.
+The MacBook serves synthetic and approved capture-replay scenarios through one
+owner-private local text file. Convene File Watch reads that file each heartbeat;
+Convene's internal routing owns the downstream engine path and computed-state
+return.
 
 ## Required installed configuration
 
@@ -25,7 +27,9 @@ Required health/config state:
 - `listen_host: 127.0.0.1`
 - `transport: console`
 - empty cloud ingest token
-- Convene enabled with the MacBook machine credential
+- direct Convene API publishing disabled
+- File Watch enabled at
+  `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
 
 `configure_production_interfaces.py` is a retired guard and always refuses.
 
@@ -46,6 +50,40 @@ reports `harness` or `replay`. For bounded checks, set
 `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
 playback. Use `run` in place of `start` only when a foreground process is useful.
 
+## Convene File Watch setup
+
+The file contains exactly one current frame and is replaced on every source
+update. It uses the live LabVIEW style from the supplied data stream:
+`name: value, name: value`. Create one File Watch variable for each required
+source field. Every variable uses the same settings except its name/regex:
+
+- **File path:** `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
+- **Variable name:** the exact field name
+- **JSON path:** leave blank
+- **Capture regex:** `(?:^|, )FIELD_NAME: ([^,\r\n]+)` with `FIELD_NAME`
+  replaced by the exact variable name
+
+Required routing binding is `active_chamber`. Do not add `schema_version`, `mode`,
+`run_id`, `source_id`, `cycle_id`, `seq`, `ts`, or `source_op_state` to the watched
+file. The common `/ingest` endpoint owns unclassified receipt provenance.
+
+Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
+`PL_chamber_pressure`, `PL_top_condenser_temp`, `PL_bottom_condenser_temp`,
+`PL_wall1`, `PL_wall2`, `PL_bottom1`, `PL_bottom2`, `PL_bottom3`, `PL_bottom4`,
+`PL_flow_meter`, `PL_process`, `PL_preprocess`, `MW_reverse_coupler`,
+`PL_postprocess`, `PL_chamber_pump`, `PL_purge_pump`,
+`MT_crucible_temperature`, `MT_top`, `MT_bottom`, `MW_water_state`,
+`MW_flow_state`, `MW_RF`, `MW_status`, `MW_power`, `MW_reverse`, `MW_period`,
+`MW_width`, `MW_freq`, `MW_water_temp`, `MW_flow_rate`, `PL_Probe1`, and
+`PL_Probe2`.
+
+The file is atomically replaced with mode `0600`, so a heartbeat sees either the
+previous complete frame or the next complete frame, never partial text. It
+contains `active_chamber` followed by all 34 raw fields in the live-record order,
+matching the current one-frame convention. Booleans are `TRUE`/`FALSE`, finite
+floats use six decimal places, and unavailable fields are `NaN` rather than
+fabricated measurements.
+
 ## Windows capture replay
 
 The supplied comma-separated `name: value` capture format is replayed with:
@@ -58,16 +96,37 @@ The supplied comma-separated `name: value` capture format is replayed with:
 The replayer preserves exact channel names and scalar values. It labels unknown
 sequencer state `S_Unknown`; it never claims the file is current physical data.
 With the default `--active-chamber auto`, a record-level `active_chamber: PL`
-or `active_chamber: MT` is promoted into the scenario envelope. Explicit command
-selection overrides it. LabVIEW `NaN` sensor readings are omitted because they
-are unavailable values and are invalid in the strict JSON/Convene contract.
+or `active_chamber: MT` is preserved into the watched 35-field record. Explicit
+command selection overrides it. LabVIEW `NaN` sensor readings remain unavailable through
+the text/regex boundary and are removed before cloud inference.
 
 ## Acceptance
 
+Run the read-only local interference gate:
+
+```bash
+pi_gateway/macos/audit-scenario-host.sh
+```
+
+It requires one owner-only, one-line, 35-field text frame; only loopback 9070/9080;
+no local engine/rehearsal ports; File Watch enabled; and both direct cloud and
+direct Convene API publication disabled. Port 6080 and its Cloudflare process
+belong to the separately authorized screen-sharing session and are deliberately
+outside this telemetry audit.
+
+Configuration validation also refuses to start if File Watch is combined with
+direct Convene publishing, a non-console cloud transport, `mode=live`, or a
+non-loopback listener. A stale config therefore cannot silently recreate a
+competing scenario route.
+
 During a bounded run, `/health` must show received equals delivered, queue depth
-zero, no drops/dead letters, and zero Convene failures. `/latest` must show
-`mode: harness` or `replay` and a scenario-labeled `source_id`.
+zero, no drops/dead letters, and `file_watch.failed: 0`. `/latest` must show
+`mode: harness` or `replay` and a scenario-labeled `source_id`. This proves
+source-to-file delivery; confirm Convene heartbeat timestamps separately. The
+cloud ingest accepts honestly labeled `harness` and `replay` frames through the
+same naming adapter as live data. Only one source stream may drive one engine
+process at a time.
 
 Ports `9070` and `9080` must both listen only on `127.0.0.1`. The MacBook must
-hold no VM ingest token. Preserve the configuration backup, logs, evidence, and
-exact Git SHA.
+hold no VM ingest token and needs no Convene API token for scenario telemetry.
+Preserve the configuration backup, logs, evidence, and exact Git SHA.

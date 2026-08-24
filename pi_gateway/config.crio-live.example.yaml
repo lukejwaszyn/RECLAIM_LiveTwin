@@ -1,9 +1,8 @@
 # RECLAIM Windows 10 live gateway — cRIO LIVE LINK example.
 # Secrets live in a mode-0600 file, never in code.
 #
-# This example pins the Seam A (cRIO -> gateway) socket to the values in
-# deployment/CRIO_TELEMETRY_SOCKET_SETUP.md. Seam B (gateway -> cloud) is
-# site-specific; configure it per deployment/GATEWAY_GO_LIVE.md before go-live.
+# The Windows gateway sends source variables to its Convene machine. Convene's
+# internal route is the only approved path to and from the cloud engine.
 
 src: reclaim-crio-rt-01
 # Leave run_id blank to generate a new UUID at gateway start; a gateway restart
@@ -30,21 +29,21 @@ max_line_bytes: 8192
 # true until `fields` here holds the complete raw cRIO schema.
 strict_fields: false
 
-# --- Seam B: gateway -> cloud (TLS on the WAN side; set per site) ---
-# transport: console | https | mqtts. Start with console to validate Seam A with no
-# cloud, then switch to https/mqtts with the VM URL + token for go-live.
+# Direct gateway-to-cloud transport is deliberately disabled. `console` drains
+# the legacy durable queue locally while the independent Convene publisher owns
+# production egress.
 transport: console
-cloud_url: https://vm.example/ingest
-mqtt_host: vm.example
+cloud_url: https://disabled.invalid/ingest
+mqtt_host: disabled.invalid
 mqtt_port: 8883
 mqtt_topic: reclaim/telemetry
 auth_token: ""                # bearer token (https) / password (mqtts)
 tls_ca: ""                    # path to CA bundle, or empty for system store
 verify_tls: true
 
-# Independent desktop telemetry tap. Publishes exact raw LabVIEW names (PL_*,
-# MT_*, MW_*) with no gw_ prefix; never blocks the VM queue.
-convene_enabled: false
+# Required production source route. Publishes exact raw LabVIEW names (PL_*,
+# MT_*, MW_*) with no manufactured gw_ prefix; never emits sim_*.
+convene_enabled: true
 convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
 convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
 convene_timeout_s: 10.0

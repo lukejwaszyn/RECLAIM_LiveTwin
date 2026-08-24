@@ -31,7 +31,7 @@ For a telemetry-only, supervised demonstration this can be managed with network 
 
 The deployment document says the Convene agent runs as `SYSTEM` at boot and polls its backend for commands that it executes using a shell:
 
-- [`deployment/GATEWAY_GO_LIVE.md`](deployment/GATEWAY_GO_LIVE.md#L367-L392).
+- [Archived `GATEWAY_GO_LIVE.md`](Past_Deprecated/deployment/retired-2026-08-24-convene-routing/GATEWAY_GO_LIVE.md#L367-L392).
 
 That host stores the cloud ingest token, receives cRIO telemetry, maintains the durable queue, and exposes the local command relay. Compromise of the third-party control plane, its credentials, or an authorized operator account becomes full administrator compromise of the control gateway.
 
@@ -53,7 +53,7 @@ The local status server then returns that object verbatim, only adding an inform
 
 The gateway does not enforce a command schema, command ID, source-frame/run/sequence correlation, maximum power, allowed mode transition, local sensor health, timestamp expiry, or signature. The documented design delegates stale-command invalidation to the HMI:
 
-- [`RECLAIM_Remote_Gateway_Preflight.md`](docs/RECLAIM_Remote_Gateway_Preflight.md#L212-L217).
+- [Archived `RECLAIM_Remote_Gateway_Preflight.md`](Past_Deprecated/docs/retired-2026-08-24-convene-routing/RECLAIM_Remote_Gateway_Preflight.md#L212-L217).
 
 **Impact:** A malformed, stale, replayed, or compromised cloud response becomes a locally available control command. Safety rests on every HMI/control-hub client correctly implementing an undocumented fail-closed policy.
 
@@ -145,7 +145,7 @@ This also accepts a malformed JSON response, an HTML/body rewriting proxy respon
 
 `strict_fields` is deliberately false in the live deployment configuration so raw LabVIEW fields survive to cloud-side normalization:
 
-- [`RECLAIM_Remote_Gateway_Preflight.md`](docs/RECLAIM_Remote_Gateway_Preflight.md#L162-L185).
+- [Archived `RECLAIM_Remote_Gateway_Preflight.md`](Past_Deprecated/docs/retired-2026-08-24-convene-routing/RECLAIM_Remote_Gateway_Preflight.md#L162-L185).
 
 In this mode unknown fields are retained and only warned once:
 
@@ -167,7 +167,7 @@ Every endpoint on port 9080, including raw `/latest` telemetry and `/command`, i
 
 The service binds loopback, which is a sound default. However, the deployment plan separately routes this port through a Cloudflare Tunnel and relies on an external Access policy:
 
-- [`RECLAIM_Remote_Gateway_Preflight.md`](docs/RECLAIM_Remote_Gateway_Preflight.md#L42-L68).
+- [Archived `RECLAIM_Remote_Gateway_Preflight.md`](Past_Deprecated/docs/retired-2026-08-24-convene-routing/RECLAIM_Remote_Gateway_Preflight.md#L42-L68).
 
 **Impact:** A tunnel misconfiguration, local malicious process, or future binding change exposes process telemetry and control advice without defense in depth.
 
