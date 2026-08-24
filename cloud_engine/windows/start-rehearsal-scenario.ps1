@@ -5,7 +5,10 @@ param(
     [string]$Scenario,
 
     [string]$PythonExe = "",
-    [string]$BindHost = "127.0.0.1"
+    [string]$GatewayAddress = "192.168.1.1",
+    [ValidateRange(1, 65535)]
+    [int]$GatewayPort = 9070,
+    [string]$StatusBase = "http://127.0.0.1:9080"
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,64 +42,82 @@ $Profiles = @{
     "nominal" = @{
         EngineScenario = "nominal"
         Environment = "earth_lab"
-        Port = 8177
-        Speed = 2
+        Speed = 1
         NoLoop = $false
-        Expected = "Stable 2200 W Earth-lab heat-and-hold. One cycle is about 3 min 20 s wall time (400 s simulated at 2x), then it repeats until you stop it."
+        Expected = "Stable 2200 W Earth-lab heat-and-hold at the shared engine's 1 Hz acceptance cadence. One 400 s simulated cycle takes about 6 min 40 s, then repeats."
     }
     "power-outage" = @{
         EngineScenario = "power_outage"
         Environment = "earth_lab"
-        Port = 8178
-        Speed = 4
+        Speed = 1
         NoLoop = $false
-        Expected = "3500 W heating; S_PowerInterrupted/P_fwd=0 near 1 min 53 s, S_Restart near 3 min 8 s, cycle about 3 min 45 s wall time (900 s simulated at 4x), then it repeats until you stop it."
+        Expected = "3500 W heating; S_PowerInterrupted/P_fwd=0 near 7 min 30 s, S_Restart near 12 min 30 s, and one 900 s cycle takes about 15 min at 1 Hz."
     }
     "lunar" = @{
         EngineScenario = "nominal"
         Environment = "lunar_surface"
-        Port = 8179
-        Speed = 2
+        Speed = 1
         NoLoop = $false
-        Expected = "Stable 2200 W heat-and-hold using lunar_surface physics. One cycle is about 3 min 20 s wall time (400 s simulated at 2x), then it repeats until you stop it."
+        Expected = "Stable 2200 W heat-and-hold using lunar_surface physics at 1 Hz. One 400 s simulated cycle takes about 6 min 40 s, then repeats."
     }
     "loss-of-data" = @{
         EngineScenario = "nominal"
         Environment = "earth_lab"
-        Port = 8181
-        Speed = 2
+        Speed = 1
         NoLoop = $true
-        Expected = "Freshness/staleness rehearsal. Runs ONE cycle (about 3 min 20 s wall time) then STOPS UPDATING while the endpoints stay served: /health and /state keep answering with the last values readable, but status flips to stopped and t_sim freezes. The stack must report staleness, not hold or fabricate a last-good value."
+        Expected = "Freshness/staleness rehearsal. Runs one 400 s cycle at 1 Hz (about 6 min 40 s), then disconnects. gw_* stops advancing and the cloud bridge must make sim_data_live false."
     }
 }
 
 $Selected = $Profiles[$Scenario]
-$ExistingListener = Get-NetTCPConnection -State Listen -LocalPort $Selected.Port `
-    -ErrorAction SilentlyContinue
-if ($ExistingListener) {
-    throw "Port $($Selected.Port) already has a listener; stop it or verify ownership before continuing."
+$GatewayListener = @(Get-NetTCPConnection -State Listen -LocalPort $GatewayPort `
+    -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -eq $GatewayAddress })
+if ($GatewayListener.Count -ne 1) {
+    throw "The edge gateway is not listening at ${GatewayAddress}:$GatewayPort. Start/restart the RECLAIM-Edge-Gateway task first."
+}
+$RealCrioSession = @(Get-NetTCPConnection -LocalPort $GatewayPort -RemoteAddress "192.168.1.2" `
+    -ErrorAction SilentlyContinue | Where-Object { $_.State -in @("Established", "SynReceived") })
+if ($RealCrioSession.Count -gt 0) {
+    throw "The real cRIO is connected or waiting; refusing to mix scenario telemetry into its stream."
+}
+try {
+    $GatewayHealth = Invoke-RestMethod -Uri "$StatusBase/health" -TimeoutSec 10
+}
+catch {
+    throw "Gateway status is unavailable at $StatusBase/health. Restart the gateway from this repo before running a scenario. $($_.Exception.Message)"
+}
+if ($GatewayHealth.transport -ne "https") {
+    throw "Gateway transport is '$($GatewayHealth.transport)', not https; frames would not reach the cloud engine."
+}
+if (-not $GatewayHealth.convene.enabled) {
+    throw "Gateway Convene fan-out is disabled; frames would not produce gw_* output."
+}
+if (-not ($GatewayHealth.PSObject.Properties.Name -contains "mode")) {
+    throw "Gateway status does not expose mode. Redeploy/restart the gateway from this revision before running a scenario."
+}
+if ($GatewayHealth.mode -ne "live") {
+    throw "Gateway mode is '$($GatewayHealth.mode)'. The deployed cloud engine and sim_ bridge require mode=live."
 }
 
 Write-Host "RECLAIM synthetic rehearsal - advisory-only, no actuator authority"
-Write-Host "Profile: $Scenario | scenario=$($Selected.EngineScenario) | environment=$($Selected.Environment) | port=$($Selected.Port) | speed=$($Selected.Speed)x"
+Write-Host "Profile: $Scenario | scenario=$($Selected.EngineScenario) | environment=$($Selected.Environment) | speed=$($Selected.Speed)x"
 Write-Host "Expected: $($Selected.Expected)"
-Write-Host "Verify: Invoke-RestMethod http://127.0.0.1:$($Selected.Port)/health"
-Write-Host "Inspect: Invoke-RestMethod http://127.0.0.1:$($Selected.Port)/state"
-Write-Host "History: Invoke-RestMethod http://127.0.0.1:$($Selected.Port)/history"
-Write-Host "Stop with Ctrl+C. This command never uses production port 8078."
+Write-Host "ONE PATH: scenario -> gateway ${GatewayAddress}:$GatewayPort -> gw_* Convene + cloud engine -> sim_* Convene"
+Write-Host "Monitor gateway: Invoke-RestMethod $StatusBase/health"
+Write-Host "Inspect canonical frame: Invoke-RestMethod $StatusBase/latest"
+Write-Host "Stop with Ctrl+C."
 
 $EngineArgs = @(
-    "-m", "reclaim_predictive_engine.service",
+    (Join-Path $RepositoryRoot "tools\synthetic_crio.py"),
     "--scenario", $Selected.EngineScenario,
     "--env", $Selected.Environment,
-    "--host", $BindHost,
-    "--port", $Selected.Port,
-    "--speed", $Selected.Speed,
-    "--feed", "harness"
+    "--host", $GatewayAddress,
+    "--port", $GatewayPort,
+    "--speed", $Selected.Speed
 )
-if ($Selected.NoLoop) { $EngineArgs += "--no-loop" }
+if ($Selected.NoLoop) { $EngineArgs += @("--cycles", 1) }
 
-Push-Location $CloudEngineDir
+Push-Location $RepositoryRoot
 $ProcessExitCode = 1
 try {
     & $PythonExe @EngineArgs
