@@ -18,10 +18,10 @@ cRIO live stream. Its scenario receiver binds only `127.0.0.1`, runs in
 Convene publishing remains enabled for scenario data. Convene's internal routing
 is the only approved source-to-engine and engine-to-display path.
 
-Production cloud ingest and the return bridge currently enforce `mode=live`.
-Scenario round-trip support therefore remains an explicit integration gap and
-must use an isolated, honestly labeled scenario policy; scenario data must never
-be relabeled as live.
+Production cloud ingest accepts `live`, `harness`, and `replay` through the same
+exact-name adapter and preserves the mode in computed state. One engine process
+accepts only one active source stream at a time; scenario data must never be
+relabeled as live.
 
 ## Scenario naming
 

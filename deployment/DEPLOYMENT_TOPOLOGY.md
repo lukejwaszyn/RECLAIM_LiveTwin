@@ -14,7 +14,7 @@ engine. The predictive-engine VM remains Windows Server 2025.
 |---|---|---|
 | RECLAIM hardware | cRIO + LabVIEW | Authoritative telemetry and process sequencing |
 | Live gateway | Windows 10 desktop | Receives the real cRIO/LabVIEW stream and publishes source variables to Convene |
-| Scenario host | MacBook running macOS | Serves local synthetic/capture scenarios to its Convene machine; loopback input only |
+| Scenario host | MacBook running macOS | Serves local synthetic/capture scenarios through one owner-private Convene File Watch JSON; loopback input only |
 | Predictive-engine VM | Cloud-hosted Windows Server 2025 guest | Runs the stochastic dual engine and returns computed state to Convene |
 | Convene | External service | Common source ingress, internal route to/from the engine, and `sim_*` visualization |
 
@@ -30,7 +30,8 @@ cRIO / LabVIEW authoritative source
 
 MacBook local synthetic/file-replay scenario
   -> 127.0.0.1:9070 (harness/replay mode only)
-  -> nonblocking /api/machine/publish
+  -> atomic flat scenario JSON
+  -> Convene File Watch heartbeat
   -> Convene scenario machine
 
 Either Convene source machine
@@ -54,7 +55,7 @@ Sharing, Tailscale, Cloudflare, or a firewall opening.
 
 - Live-gateway operator: Windows 10 cRIO interface and production forwarding.
 - Scenario operator: MacBook loopback runtime, scenario files/generators,
-  `launchd`, and Convene scenario publisher.
+  `launchd`, owner-private File Watch JSON, and Convene heartbeat bindings.
 - VM operator: Windows service, release, ACLs, engine authentication, durable
   ingest identity, result return, and single-writer `sim_*` enforcement.
 - Controls operator: cRIO build, telemetry producer, channel/quality maps,

@@ -26,7 +26,7 @@ cRIO / LabVIEW -> Windows 10 live gateway -> Convene live machine
 
 SCENARIO
 synthetic generator or approved replay -> MacBook scenario gateway
-                                      -> Convene scenario machine
+  -> atomic local scenario JSON -> Convene File Watch -> Convene scenario machine
 
 BOTH
 Convene internal route -> cloud engine POST /ingest -> stochastic dual engine
@@ -38,7 +38,7 @@ Convene internal route -> cloud engine POST /ingest -> stochastic dual engine
 | Responsibility | Owner | Required behavior |
 |---|---|---|
 | Real cRIO acquisition | Windows 10 desktop | Sole live-data gateway; publishes exact source variables to its Convene machine |
-| Fabricated/replayed telemetry | MacBook | Scenario-only, loopback receiver, `mode=harness` or `mode=replay`; publishes to its Convene machine |
+| Fabricated/replayed telemetry | MacBook | Scenario-only, loopback receiver, `mode=harness` or `mode=replay`; atomically writes the Convene File Watch JSON |
 | Telemetry routing | Convene | Routes either machine's source variables to the cloud engine using the canonical envelope |
 | Computation | Cloud-engine VM | Sole stochastic estimator and sole producer of computed state |
 | Result routing and display | Convene | Receives processed state and binds the `sim_*` variables to the visualization |
@@ -49,7 +49,10 @@ output remains advisory and has no actuator authority.
 
 ## Source-to-Convene contract
 
-The gateway flattens each accepted source frame into scalar Convene variables.
+The Windows live gateway flattens each accepted source frame into scalar Convene
+variables and publishes them to its machine API. The MacBook scenario gateway
+flattens the same contract into one owner-private JSON file which Convene File
+Watch reads each heartbeat. Direct MacBook Convene API publishing is disabled.
 Envelope variables are:
 
 `schema_version`, `mode`, `run_id`, `source_id`, `cycle_id`, `seq`, `ts`,
@@ -79,8 +82,10 @@ must not invent replacement measurements.
 
 ## Convene-to-engine contract
 
-Convene's internal route must reconstruct one newline-delimited JSON object per
-source update. The cloud endpoint is `POST /ingest` and expects:
+Convene's internal route sends one newline-delimited JSON object per source
+update to `POST /ingest`. The engine accepts either the flat File Watch snapshot
+or the equivalent canonical envelope with raw fields nested under `vars`. The
+flat form is preferred because Convene can forward the file without renaming:
 
 ```json
 {
@@ -93,19 +98,25 @@ source update. The cloud endpoint is `POST /ingest` and expects:
   "ts": "2026-08-24T12:00:00.000Z",
   "source_op_state": "S_Unknown",
   "active_chamber": "PL",
-  "vars": {
-    "PL_surface_temp": -143.75,
-    "PL_process": true
-  }
+  "PL_surface_temp": -143.75,
+  "PL_process": true
 }
 ```
 
-The internal route must nest the raw LabVIEW variables under `vars`; flattening
-them at the engine boundary is not compatible with the production ingest
-contract. It must preserve `run_id`, monotone `seq`, timestamps, cycle identity,
-mode, operating state, and active chamber. Authentication and the deployed
-Convene route configuration are external secrets/infrastructure and are not
-stored in this repository.
+The engine collects only exact, case-sensitive LabVIEW names into its internal
+`vars` block. `PL_*` values feed the plastics estimator, `MT_*` values feed the
+metals estimator, shared `MW_*` power is attributed by authoritative
+`active_chamber`, and `sim_*` input is rejected as a feedback loop. Production
+ingest accepts `mode=live`, `mode=harness`, and `mode=replay` without changing
+the label. It preserves `run_id`, monotone `seq`, timestamps, cycle identity,
+operating state, and active chamber.
+
+The `POST /ingest` response contains the accepted computed `state` and a flat
+`variables` object with every finite scalar under its cloud-owned `sim_*` name.
+Convene routes that response directly to the visualization; the old VM file
+state bridge is not part of this path. Authentication and the deployed Convene
+route configuration are external secrets/infrastructure and are not stored in
+this repository.
 
 <!-- VERIFY: capture the deployed Convene route mapping, authentication owner, and one accepted response without storing credentials. -->
 
@@ -126,11 +137,14 @@ pi_gateway/macos/start-rehearsal-scenario.sh stop
 selected value is also published as `active_chamber`. Only one scenario sender
 may run at a time. The MacBook receiver remains on `127.0.0.1:9070`, its status
 surface remains on `127.0.0.1:9080`, and its direct cloud transport remains
-disabled.
+disabled. Its File Watch path is
+`/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`.
+For every File Watch binding, use the exact variable name as the JSON path and
+leave capture regex blank.
 
 ## Repository state and verified evidence
 
-At commit `2f536f8` before this documentation consolidation:
+Verified locally on 2026-08-24 before the final commit:
 
 - Windows live and MacBook scenario publishers send canonical envelope scalars
   and exact raw LabVIEW names to Convene without a generated prefix.
@@ -138,7 +152,7 @@ At commit `2f536f8` before this documentation consolidation:
   loss-of-data profiles with an explicit `PL` or `MT` chamber.
 - The cloud engine supports the 34-field LabVIEW record and continues gracefully
   when individual raw fields are `NaN`/unavailable.
-- The full local integration suite passed: 318 tests.
+- The full local integration suite passes: 324 tests.
 - No predictive engine or direct cloud telemetry transport is intended to run on
   the MacBook.
 
@@ -146,13 +160,11 @@ At commit `2f536f8` before this documentation consolidation:
 
 1. The deployed Convene internal mapping and authentication have not been
    captured in this repository or exercised by an automated end-to-end test.
-2. Production cloud ingest currently accepts only `mode=live`. MacBook scenarios
-   publish `mode=harness` or `mode=replay`, so they cannot use the same production
-   engine instance until the engine interface deliberately supports an isolated,
-   labeled scenario identity or Convene routes them to a non-production instance.
-3. The current VM return bridge also rejects any state whose mode is not `live`.
-   Scenario return requires an explicit, isolated bridge policy; changing the
-   mode in transit to disguise scenario data as live is forbidden.
+2. The updated flat-frame/multi-mode engine contract must be deployed to the VM
+   before Convene forwards MacBook scenarios to it.
+3. One engine process has one active run/model state. Convene must route only one
+   live or scenario source stream to that process at a time. Simultaneous streams
+   require separate engine instances; mixing them is forbidden.
 4. Exactly one deployed component must publish each `sim_*` variable. Disable any
    older VM agent, bridge, or Convene mapping that would create a second writer.
 5. The exact repository SHA must be deployed to the VM and Windows live gateway
@@ -178,9 +190,9 @@ system is an engineering demonstration, not a proven flawless end-to-end path.
 
 ## Pickup order
 
-1. Configure and inspect Convene's source-machine-to-engine transformation.
-2. Decide and implement the isolated scenario-mode engine/return policy.
-3. Confirm one and only one `sim_*` writer.
+1. Configure and inspect Convene's File Watch and source-machine route.
+2. Deploy the flat-frame/multi-mode cloud-engine SHA.
+3. Confirm one and only one active source stream and `sim_*` writer.
 4. Deploy the same SHA to the Windows gateway and cloud-engine VM.
 5. Run the three rehearsal profiles and retain correlated end-to-end evidence.
 6. Run the supervised live cRIO smoke test.

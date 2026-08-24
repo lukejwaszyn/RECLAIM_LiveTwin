@@ -2,13 +2,13 @@
 """
 redteam_ingest.py — live acceptance harness for the RECLAIM cloud engine endpoint.
 
-A fake edge gateway that emits `reclaim.telemetry.v1` envelopes carrying the REAL
+A fake Convene route that emits `reclaim.telemetry.v1` envelopes carrying the REAL
 cRIO/LabVIEW terminology (MW_power in provisionally W,
-PL_bottom1..4 / PL_surface_temp in degC, PL_chamber_pressure in Torr), pushes them at the engine (ideally THROUGH the
-Cloudflare tunnel), and asserts two things end to end:
+PL_bottom1..4 / PL_surface_temp in degC, PL_chamber_pressure in Torr), pushes them
+at the deployed engine endpoint, and asserts two things end to end:
 
   A. INGEST PIPELINE CONTRACT is intact — auth on /ingest, read-token gating on
-     the GET routes, harness-mode refused under --production, stale rejection,
+     the GET routes, live/harness acceptance under --production, stale rejection,
      duplicate / monotone-sequence dedup.
   B. AUTONOMOUS LIFECYCLE behaves — a mid-batch POWER CUT does NOT reset the
      engine (metrics freeze and resume in place), and a NEW batch (cycle_id
@@ -22,7 +22,7 @@ gone and the pipeline is unchanged.
 Usage (tokens are read from the environment so they do not enter the process list):
     RECLAIM_INGEST_TOKEN=<T> RECLAIM_READ_TOKEN=<T> \
       python3 redteam_ingest.py --url https://<host>
-    # restricted-DNS networks (can't resolve the tunnel host): pin the visitor edge
+    # restricted-DNS networks: pin the endpoint host when explicitly required
     python3 redteam_ingest.py --url https://<host> ... --pin-ip 104.16.230.132
 
 Exit code 0 iff every check passes.
@@ -36,7 +36,7 @@ import requests
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="RECLAIM cloud-engine live acceptance harness")
-    ap.add_argument("--url", required=True, help="engine base URL (tunnel hostname), e.g. https://x.trycloudflare.com")
+    ap.add_argument("--url", required=True, help="Convene-routed engine base URL")
     ap.add_argument("--ingest-token", default=os.environ.get("RECLAIM_INGEST_TOKEN", ""),
                     help="POST /ingest bearer (prefer RECLAIM_INGEST_TOKEN environment variable)")
     ap.add_argument("--read-token", default=os.environ.get("RECLAIM_READ_TOKEN", ""),
@@ -92,7 +92,7 @@ def main() -> int:
                 r = fn()
             except requests.exceptions.RequestException:
                 time.sleep(1.5); continue
-            if r.status_code >= 500:          # account-less quick-tunnel 530/5xx blip — retry
+            if r.status_code >= 500:          # transient upstream/engine error — retry
                 last = r; time.sleep(1.5); continue
             return r
         return last
@@ -121,12 +121,16 @@ def main() -> int:
     r = get("/state"); check("/state requires read token (401)", r.status_code == 401, str(r.status_code))
     r = get("/state", read); check("/state with read token (200)", r.status_code == 200, str(r.status_code))
     r = post([env(1, "A", "S_MicrowaveHeating", lv(300, 180, 2000))], token=""); check("POST /ingest no token -> 401", r.status_code == 401, str(r.status_code))
-    res = {}
-    for _ in range(5):
-        res = rj(post([env(90001, "A", "S_MicrowaveHeating", lv(300, 180, 2000), mode="harness")])).get("results", [{}])[0]
-        if res.get("code"): break
-        time.sleep(1.0)
-    check("harness mode rejected in --production", res.get("status") == "rejected" and res.get("code") == "mode_rejected", str(res.get("code")))
+    harness = env(1, "A", "S_MicrowaveHeating", lv(300, 180, 2000), mode="harness")
+    harness.update({"run_id": RUN + "-harness", "source_id": SRC + "-harness"})
+    # Convene File Watch forwards a flat object: raw LabVIEW names are peers of
+    # the canonical envelope rather than nested under `vars`.
+    harness.update(harness.pop("vars"))
+    harness_response = rj(post([harness]))
+    res = harness_response.get("results", [{}])[0]
+    returned_vars = harness_response.get("variables", {})
+    check("flat harness frame accepted in --production", res.get("status") == "accepted", str(res.get("code")))
+    check("computed response uses only sim_* names", bool(returned_vars) and all(k.startswith("sim_") for k in returned_vars), str(sorted(returned_vars)[:3]))
     res = rj(post([env(90002, "A", "S_MicrowaveHeating", lv(300, 180, 2000), ts=now(-60))])).get("results", [{}])[0]
     check("stale frame rejected/final", res.get("status") == "rejected" and res.get("code") == "timestamp_stale" and res.get("final"), str(res.get("code")))
 

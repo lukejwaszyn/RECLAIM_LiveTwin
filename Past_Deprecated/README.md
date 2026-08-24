@@ -17,6 +17,8 @@ cloud engine and computed state back to Convene.
   evaluation and remote-gateway preflight.
 - `deployment/` and `root-level/` — older 2026-08-23 archives retained from the
   preceding repository cleanup.
+- `pi_gateway/macos/retired-2026-08-24-file-watch/` — former direct Convene API
+  pairing utility, superseded by the scenario File Watch JSON.
 
 Nothing was deleted during the 2026-08-24 consolidation; files were moved so
 they remain recoverable through Git history and this archive.

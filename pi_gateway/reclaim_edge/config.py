@@ -65,6 +65,11 @@ class Config:
     convene_credentials_path: str = "~/.convene_agent.json"
     convene_timeout_s: float = 10.0
 
+    # Local flat JSON output for Convene File Watch. This is the preferred
+    # MacBook scenario seam and requires no Convene API credential.
+    file_watch_enabled: bool = False
+    file_watch_path: str = "~/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json"
+
     # buffer (store-and-forward)
     buffer_path: str = "/var/lib/reclaim-edge/queue.db"
     buffer_max_frames: int = 500_000    # drop-oldest beyond this
@@ -179,4 +184,10 @@ class Config:
                 raise ValueError("convene_enabled requires convene_credentials_path")
             if cfg.convene_timeout_s <= 0:
                 raise ValueError("convene_timeout_s must be positive")
+        if cfg.file_watch_enabled:
+            expanded_path = os.path.expandvars(os.path.expanduser(cfg.file_watch_path))
+            if not expanded_path or not os.path.isabs(expanded_path):
+                raise ValueError("file_watch_enabled requires an absolute file_watch_path")
+            if os.path.isdir(expanded_path):
+                raise ValueError("file_watch_path must name a file, not a directory")
         return cfg

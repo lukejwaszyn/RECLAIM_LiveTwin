@@ -132,13 +132,14 @@ def test_non_production_engine_accepts_a_harness_frame():
     assert out is not None
 
 
-def test_production_engine_refuses_a_harness_frame():
-    """The guarantee that synthetic data cannot reach the live sim_ namespace."""
+def test_production_engine_accepts_and_labels_a_harness_frame():
+    """Convene may route scenarios, but their harness identity must survive."""
     engine = DualPushEngine(production=True)
     raw = build_raw_frame(600.0, 500.0, 2200.0, 110.0, "S_MicrowaveHeating")
-    with pytest.raises(Exception) as excinfo:
-        engine.ingest(_envelope(raw, mode="harness"))
-    assert "mode" in str(excinfo.value).lower()
+    out = engine.ingest(_envelope(raw, mode="harness"))
+    assert out["mode"] == "harness"
+    assert out["source_id"] == "reclaim-synthetic-scenario"
+    assert out["PL_sensor_valid"] is True
 
 
 def test_gateway_stamped_scenario_advances_the_production_engine(tmp_path):

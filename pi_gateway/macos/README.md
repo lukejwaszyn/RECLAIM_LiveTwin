@@ -2,11 +2,13 @@
 
 > The Windows 10 desktop is the sole live-data client/gateway. The MacBook is
 > loopback-only and scenario-only. It must never connect to the real cRIO,
-> expose its receiver on a LAN, or publish directly to the cloud engine.
+> expose its receiver on a LAN, or publish directly to the cloud engine or
+> Convene API.
 
-The MacBook serves synthetic and approved capture-replay scenarios through its
-own Convene machine. Convene's internal routing owns the downstream engine path
-and computed-state return.
+The MacBook serves synthetic and approved capture-replay scenarios through one
+owner-private local JSON file. Convene File Watch reads that file each heartbeat;
+Convene's internal routing owns the downstream engine path and computed-state
+return.
 
 ## Required installed configuration
 
@@ -25,7 +27,9 @@ Required health/config state:
 - `listen_host: 127.0.0.1`
 - `transport: console`
 - empty cloud ingest token
-- Convene enabled with the MacBook machine credential
+- direct Convene API publishing disabled
+- File Watch enabled at
+  `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`
 
 `configure_production_interfaces.py` is a retired guard and always refuses.
 
@@ -46,6 +50,33 @@ reports `harness` or `replay`. For bounded checks, set
 `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
 playback. Use `run` in place of `start` only when a foreground process is useful.
 
+## Convene File Watch setup
+
+Create one File Watch variable for each required source field. Every variable
+uses the same settings except its name/JSON path:
+
+- **File path:** `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json`
+- **Variable name:** the exact field name
+- **JSON path:** the exact same field name
+- **Capture regex:** leave blank
+
+Required envelope bindings are `schema_version`, `mode`, `run_id`, `source_id`,
+`cycle_id`, `seq`, `ts`, `source_op_state`, and `active_chamber`.
+
+Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
+`PL_chamber_pressure`, `PL_top_condenser_temp`, `PL_bottom_condenser_temp`,
+`PL_wall1`, `PL_wall2`, `PL_bottom1`, `PL_bottom2`, `PL_bottom3`, `PL_bottom4`,
+`PL_flow_meter`, `PL_process`, `PL_preprocess`, `MW_reverse_coupler`,
+`PL_postprocess`, `PL_chamber_pump`, `PL_purge_pump`,
+`MT_crucible_temperature`, `MT_top`, `MT_bottom`, `MW_water_state`,
+`MW_flow_state`, `MW_RF`, `MW_status`, `MW_power`, `MW_reverse`, `MW_period`,
+`MW_width`, `MW_freq`, `MW_water_temp`, `MW_flow_rate`, `PL_Probe1`, and
+`PL_Probe2`.
+
+The file is atomically replaced with mode `0600`, so a heartbeat sees either the
+previous complete frame or the next complete frame, never partial JSON. Missing
+or `NaN` sensors are omitted rather than fabricated.
+
 ## Windows capture replay
 
 The supplied comma-separated `name: value` capture format is replayed with:
@@ -65,12 +96,13 @@ are unavailable values and are invalid in the strict JSON/Convene contract.
 ## Acceptance
 
 During a bounded run, `/health` must show received equals delivered, queue depth
-zero, no drops/dead letters, and zero Convene failures. `/latest` must show
+zero, no drops/dead letters, and `file_watch.failed: 0`. `/latest` must show
 `mode: harness` or `replay` and a scenario-labeled `source_id`. This proves
-source-to-Convene delivery only; the production engine and return bridge
-currently reject non-live mode, so an end-to-end scenario result requires the
-isolated policy described in the current system handoff.
+source-to-file delivery; confirm Convene heartbeat timestamps separately. The
+cloud ingest accepts honestly labeled `harness` and `replay` frames through the
+same naming adapter as live data. Only one source stream may drive one engine
+process at a time.
 
 Ports `9070` and `9080` must both listen only on `127.0.0.1`. The MacBook must
-hold no VM ingest token. Preserve the configuration backup, logs, evidence, and
-exact Git SHA.
+hold no VM ingest token and needs no Convene API token for scenario telemetry.
+Preserve the configuration backup, logs, evidence, and exact Git SHA.

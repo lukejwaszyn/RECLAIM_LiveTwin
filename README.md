@@ -27,7 +27,7 @@ uv sync --locked --all-extras --dev --python 3.13
 python3 scripts/check_repository_hygiene.py
 ```
 
-### 2. Tests — expect **318 passed**
+### 2. Tests — expect **324 passed**
 
 Green across the combined gateway, tooling, cloud-engine, source-record, and
 Convene-bridge suite is the pre-flight go-signal; **any red means stop, do not
@@ -77,9 +77,10 @@ for Windows/live-gateway work and is not the MacBook scenario-host entry point.
 
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its
 Convene scenario publisher. They do not enter the Windows 10 live gateway or
-directly target the VM. Convene owns the downstream route. Production engine and
-return-bridge `mode=live` enforcement is still an explicit scenario integration
-gap. Inspect the scenario host on loopback `9080`.
+directly target the VM. Convene owns the downstream route. The engine accepts the
+flat exact-name snapshot in `live`, `harness`, or `replay` mode and returns
+computed `sim_*` variables in the POST response. Inspect the scenario host on
+loopback `9080`.
 
 **`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
 keep answering and the last values stay readable, but the data stops advancing:
@@ -87,12 +88,10 @@ keep answering and the last values stay readable, but the data stops advancing:
 condition the check exists to rehearse — a consumer must detect staleness rather
 than trust a last-good value.
 
-Note what the engine does **not** give you: `/state` carries no wall-clock
-timestamp and no age field, so "how stale" cannot be answered from the engine
-alone — only "not advancing". Real freshness gating lives downstream in the
-bridge, which requires `state_age_ms` and `mode: live` and therefore only accepts
-the production dual-ingest path. Rehearsal on 8177–8181 exercises the engine and
-its HTTP surface, **not** the bridge's freshness/identity gating.
+The source `ts` and monotone `seq` are present in the File Watch snapshot and the
+engine returns `ts_source`, `ts_engine`, `ingest_age_ms`, and the preserved mode.
+Convene must use those fields to reject stale source or computed state rather
+than treating a last-good value as fresh.
 
 **Where to run them.** The scenarios are self-contained — they need only this
 checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
@@ -114,7 +113,7 @@ data.
 ```text
 cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 
-MacBook local scenarios -> loopback scenario service -> Convene scenario machine
+MacBook local scenarios -> loopback service -> atomic JSON -> Convene File Watch
 
 Either Convene machine -> Convene internal route -> cloud dual engine
                         -> computed state -> Convene sim_* / .stp visualization

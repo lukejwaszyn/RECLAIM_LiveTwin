@@ -13,6 +13,9 @@ import json
 import math
 from pathlib import Path
 import sys
+import threading
+from http.server import ThreadingHTTPServer
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -20,7 +23,14 @@ ENGINE_ROOT = Path(__file__).resolve().parents[1]
 if str(ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(ENGINE_ROOT))
 
-from push_ingest_dual import DualPushEngine, FrameRejected, STATE_SCHEMA, TELEMETRY_SCHEMA
+from push_ingest_dual import (
+    DualPushEngine,
+    FrameRejected,
+    STATE_SCHEMA,
+    TELEMETRY_SCHEMA,
+    _make_handler,
+    convene_result_variables,
+)
 
 
 def _now():
@@ -110,7 +120,7 @@ def test_duplicate_frame_does_not_step_the_estimator_twice():
 
 
 @pytest.mark.parametrize("field,value,code", [
-    ("mode", "harness", "mode_rejected"),
+    ("mode", "simulated", "mode_invalid"),
     ("source_op_state", "not-a-state", "state_invalid"),
     ("active_chamber", "both", "chamber_invalid"),
 ])
@@ -119,6 +129,88 @@ def test_production_rejects_invalid_provenance(field, value, code):
     with pytest.raises(FrameRejected) as error:
         engine.ingest(_frame(**{field: value}))
     assert error.value.code == code
+
+
+@pytest.mark.parametrize("mode", ["live", "harness", "replay"])
+def test_production_accepts_flat_convene_snapshot_in_all_labeled_modes(mode):
+    nested = _frame(
+        mode=mode,
+        source_id=f"convene-{mode}-machine",
+        active_chamber="MT",
+    )
+    nested["vars"]["PL_process"] = False
+    flat = {key: value for key, value in nested.items() if key != "vars"}
+    flat.update(nested["vars"])
+
+    out = DualPushEngine(production=True).ingest(flat)
+
+    assert out["mode"] == mode
+    assert out["source_id"] == f"convene-{mode}-machine"
+    assert out["active_chamber"] == "MT"
+    assert out["MT_sensor_valid"] is True
+    assert out["MT_P_fwd"] == 3000.0
+    assert out["PL_P_fwd"] == 0.0
+
+
+def test_flat_convene_snapshot_rejects_sim_feedback_loop():
+    frame = _frame()
+    flat = {key: value for key, value in frame.items() if key != "vars"}
+    flat.update(frame["vars"])
+    flat["sim_PL_T_bed_est"] = 500.0
+
+    disposition = DualPushEngine(production=True).ingest_line(flat)
+
+    assert disposition["status"] == "rejected"
+    assert disposition["code"] == "feedback_rejected"
+
+
+def test_convene_result_variables_prefixes_only_finite_scalars():
+    variables = convene_result_variables({
+        "mode": "harness",
+        "active_chamber": "PL",
+        "PL_T_bed_est": 500.0,
+        "missing": None,
+        "bad": math.nan,
+        "nested": {"unsafe": True},
+    })
+
+    assert variables == {
+        "sim_mode": "harness",
+        "sim_active_chamber": "PL",
+        "sim_PL_T_bed_est": 500.0,
+    }
+
+
+def test_ingest_http_returns_computed_sim_variables_for_convene():
+    engine = DualPushEngine(production=True)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(engine, "token"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        nested = _frame(mode="harness", source_id="convene-scenario-machine")
+        flat = {key: value for key, value in nested.items() if key != "vars"}
+        flat.update(nested["vars"])
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/ingest",
+            data=(json.dumps(flat) + "\n").encode("utf-8"),
+            headers={
+                "Authorization": "Bearer token",
+                "Content-Type": "application/x-ndjson",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["ingested"] == 1
+    assert payload["state"]["mode"] == "harness"
+    assert payload["variables"]["sim_mode"] == "harness"
+    assert payload["variables"]["sim_active_chamber"] == "PL"
+    assert payload["variables"]["sim_PL_sensor_valid"] is True
 
 
 # ----------------------------------------------------- C3: monotone sequencing

@@ -12,7 +12,8 @@ curl --fail http://127.0.0.1:9080/health
 ```
 
 Confirm `src=reclaim-macbook-scenario-01`, `mode=harness`, `transport=console`,
-and no cloud token. Confirm ports 9070 and 9080 listen only on loopback.
+`convene_enabled=false`, `file_watch_enabled=true`, and no cloud token. Confirm
+ports 9070 and 9080 listen only on loopback.
 
 ## Run generated scenarios
 
@@ -35,7 +36,8 @@ shared microwave-power attribution follow that selection.
 ```
 
 The capture is input data only. Exact field names and values are preserved;
-unknown sequencer state is labeled `S_Unknown`. Convene's internal routing owns
+unknown sequencer state is labeled `S_Unknown`. The gateway atomically writes the
+flat scenario variables to the owner-private File Watch JSON. Convene's internal routing owns
 the engine request and computed-state return. In automatic mode, a record-level `active_chamber`
 is promoted into the envelope; an explicit command option overrides it. `NaN`
 sensor readings are omitted as unavailable because strict JSON cannot carry
@@ -44,8 +46,10 @@ them.
 ## Accept
 
 Require matching receive/deliver counts, zero queue depth, drops, dead letters,
-and Convene failures, plus a scenario-labeled `/latest` frame. This is
-source-to-Convene acceptance; the scenario engine round trip remains blocked by
-the production `mode=live` checks until an isolated scenario policy is deployed.
+and File Watch failures, plus a scenario-labeled `/latest` frame. Confirm the
+JSON file advances with `seq` and `ts`. This is source-to-Convene acceptance only
+after Convene heartbeat evidence. The common engine accepts the preserved
+`harness`/`replay` mode, but one engine process must receive only one active
+source stream at a time.
 Never change the MacBook to `mode=live`, a non-loopback listener, or direct cloud
 transport.

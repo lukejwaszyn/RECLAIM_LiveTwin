@@ -13,7 +13,7 @@ two configs, two streams in, two states out. The streams never collide:
         MT_*  ->  metals   engine (chamber_params 'MT')  ->  MT_* published state
 
 Endpoints (identical surface to push_ingest_service.py):
-    POST /ingest   newline-delimited JSON frames whose `vars` carry PL_*/MT_* channels
+    POST /ingest   newline-delimited nested frames or flat Convene snapshots
     GET  /state    combined latest state: PL_* and MT_* estimates/forecasts/residuals
     GET  /manifest self-describing catalog (both chambers)
     GET  /history  last N combined frames
@@ -47,6 +47,12 @@ LIVE INGEST CONTRACT (v1.1, fixes C1-C4/H1/H3 of the 2026-08 review):
   * NO FABRICATED MEASUREMENTS. A chamber with no valid temperature readings is
     NOT stepped; it publishes <CH>_sensor_valid=false (and SENSOR_MISSING when
     it is the active chamber) instead of a made-up 300 K.
+
+Convene compatibility: a flat File Watch snapshot is normalized by exact source
+names into the same internal `vars` block. `mode=live`, `mode=harness`, and
+`mode=replay` all use the same estimator and remain honestly labeled in output.
+The POST response includes a flat `variables` object with one `sim_*` key per
+computed scalar so Convene can route results back without a second bridge.
 
 Backward compatibility: if a frame carries UN-prefixed vars (legacy single-chamber
 feed), they are routed to the plastics engine and published under PL_* — so old
@@ -91,6 +97,11 @@ _BOOLEAN_PASSTHROUGH = {
     "process", "preprocess", "postprocess", "chamber_pump", "purge_pump",
 }
 
+_ENVELOPE_FIELDS = frozenset({
+    "schema_version", "mode", "run_id", "source_id", "cycle_id", "seq",
+    "ts", "source_op_state", "active_chamber",
+})
+
 
 def _passthrough_value(name: str, value):
     """Preserve the declared scalar type of plant readbacks in /state."""
@@ -116,6 +127,50 @@ class FrameRejected(ValueError):
         super().__init__(message)
         self.code = code
         self.final = final
+
+
+def normalize_convene_frame(frame: dict) -> dict:
+    """Normalize one flat Convene File Watch snapshot to the canonical envelope.
+
+    Nested gateway frames remain unchanged. A flat snapshot may contain routing
+    metadata, but only exact, case-sensitive LabVIEW source names enter `vars`.
+    Computed `sim_*` values are rejected so a Convene feedback loop cannot feed
+    engine output back into its own input.
+    """
+    if not isinstance(frame, dict):
+        return frame
+    if any(isinstance(key, str) and key.startswith("sim_") for key in frame):
+        raise FrameRejected("feedback_rejected", "flat source frame contained sim_* output")
+    if "vars" in frame:
+        mixed = sorted(set(labview_map.LABVIEW_RAW_FIELDS).intersection(frame))
+        if mixed:
+            raise FrameRejected(
+                "frame_ambiguous",
+                "source fields must be nested under vars or flat, not both: "
+                + ", ".join(mixed),
+            )
+        return frame
+    raw = {
+        key: value
+        for key, value in frame.items()
+        if key in labview_map.LABVIEW_RAW_FIELDS
+    }
+    normalized = {key: frame[key] for key in _ENVELOPE_FIELDS if key in frame}
+    normalized["vars"] = raw
+    return normalized
+
+
+def convene_result_variables(state: dict) -> dict:
+    """Return finite scalar engine state under the cloud-owned `sim_*` namespace."""
+    variables = {}
+    for key, value in state.items():
+        if value is None or not isinstance(value, (str, bool, int, float)):
+            continue
+        if isinstance(value, float) and not math.isfinite(value):
+            continue
+        target = key if key.startswith("sim_") else f"sim_{key}"
+        variables[target] = value
+    return variables
 
 
 def _utc_now() -> datetime:
@@ -440,8 +495,8 @@ class DualPushEngine:
         """Validate the envelope and return its normalized provenance values.
 
         Development accepts legacy frames so existing synthetic tools continue to
-        work. Production requires the complete v1 contract and only accepts live
-        telemetry; no invalid frame ever advances an estimator.
+        work. Production requires the complete v1 contract; live, harness, and
+        replay remain distinct provenance modes but use the same estimator.
         """
         if not isinstance(frame, dict):
             raise FrameRejected("frame_invalid", "frame must be a JSON object")
@@ -452,10 +507,10 @@ class DualPushEngine:
             raise FrameRejected("schema_unsupported", "unsupported schema_version")
 
         mode = frame.get("mode", "legacy")
-        if self.production and mode != "live":
-            raise FrameRejected("mode_rejected", "production accepts mode=live only")
         if mode not in ("live", "harness", "replay", "legacy"):
             raise FrameRejected("mode_invalid", "mode must be live, harness, replay, or legacy")
+        if self.production and mode == "legacy":
+            raise FrameRejected("mode_rejected", "production requires live, harness, or replay mode")
 
         required = ("run_id", "source_id", "seq", "ts", "cycle_id", "source_op_state",
                     "active_chamber", "vars")
@@ -642,6 +697,7 @@ class DualPushEngine:
         decisions and estimator stepping happen under ONE lock (fix M2).
         """
         try:
+            frame = normalize_convene_frame(frame)
             meta = self._validate_frame(frame)
             prepared = self._prepare_telemetry(frame, meta)
         except FrameRejected as exc:
@@ -901,10 +957,13 @@ def _make_handler(pe: DualPushEngine, ingest_token: str = "", read_token: str = 
             # v1.1 contract: the request was processed -> 200, with per-frame
             # results. A bad frame never fails its batch-mates (fix C1/H3).
             # `bad`/`errors` retained for pre-1.1 clients.
+            state = pe.svc.state() if ingested or duplicate else {}
             self._send({"ingested": ingested, "duplicate": duplicate,
                         "rejected": rejected, "bad": rejected,
                         "results": results, "errors": errors[:5],
-                        "total": pe.count, "command": pe.command}, 200)
+                        "total": pe.count, "command": pe.command,
+                        "state": state,
+                        "variables": convene_result_variables(state)}, 200)
 
         def do_GET(self):
             path = self.path.split("?")[0].rstrip("/")
@@ -953,7 +1012,7 @@ def main():
     ap.add_argument("--port", type=int, default=8078)
     ap.add_argument("--env", default="earth_lab")
     ap.add_argument("--production", action="store_true",
-                    help="require authenticated, complete mode=live telemetry envelopes")
+                    help="require authenticated complete live/harness/replay envelopes")
     ap.add_argument("--ingest-token", default=os.environ.get("RECLAIM_INGEST_TOKEN", ""),
                     help="Bearer token for POST /ingest (prefer RECLAIM_INGEST_TOKEN env; "
                          "a CLI value is visible in the process list)")

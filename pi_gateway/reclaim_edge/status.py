@@ -1,8 +1,7 @@
 """RECLAIM Edge Gateway — read-only status HTTP endpoint.
 
-Makes the gateway *readable* locally without opening additional inbound ports
-in the production sense: this is a small localhost HTTP server that a tunnel
-(cloudflared / ngrok / tailscale) exposes over an OUTBOUND-initiated connection.
+Makes the gateway *readable* on its loopback-only diagnostic surface. This
+endpoint is not a telemetry route and must not be exposed through a tunnel.
 
 Endpoints (GET, JSON):
     /health   gateway metrics — rx, tx, queue depth, drops, last-ack age, uptime
@@ -25,7 +24,8 @@ log = logging.getLogger("reclaim_edge.status")
 
 
 class StatusServer(threading.Thread):
-    def __init__(self, port, receiver, publisher, buffer, src, convene=None):
+    def __init__(self, port, receiver, publisher, buffer, src, convene=None,
+                 file_watch=None):
         super().__init__(name="status", daemon=True)
         self.port = port
         self.receiver = receiver
@@ -33,6 +33,7 @@ class StatusServer(threading.Thread):
         self.buffer = buffer
         self.src = src
         self.convene = convene
+        self.file_watch = file_watch
         self.t0 = time.time()
         self._httpd = None
 
@@ -76,6 +77,20 @@ class StatusServer(threading.Thread):
                 }
             else:
                 health["convene"] = {"enabled": False}
+            if self.file_watch is not None:
+                health["file_watch"] = {
+                    "enabled": True,
+                    "path": str(self.file_watch.path),
+                    "delivered": self.file_watch.delivered,
+                    "failed": self.file_watch.failed,
+                    "coalesced": self.file_watch.coalesced,
+                    "last_success_age_s": (
+                        round(self.file_watch.last_success_age, 2)
+                        if self.file_watch.last_success_age is not None else None
+                    ),
+                }
+            else:
+                health["file_watch"] = {"enabled": False}
             return health
         return {
             "service": "reclaim-edge-gateway",

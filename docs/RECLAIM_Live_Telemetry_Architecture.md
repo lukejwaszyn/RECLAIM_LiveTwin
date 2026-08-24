@@ -11,6 +11,8 @@ cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 SCENARIO DATA
 synthetic generator or approved capture file
   -> MacBook 127.0.0.1:9070 (harness/replay)
+  -> atomic flat local JSON
+  -> Convene File Watch heartbeat
   -> MacBook Convene machine
 
 BOTH SOURCE PATHS
@@ -21,6 +23,9 @@ The paths converge in Convene, not on the MacBook. The MacBook is not a live
 client, has no direct cloud transport, and has no production ingest token. A
 separate gateway-to-cloud HTTPS/cloudflared telemetry seam is not part of this
 architecture.
+
+The MacBook also makes no direct Convene API call for scenario telemetry. Its
+only egress artifact is the owner-private File Watch JSON; Convene reads it.
 
 ## Naming
 
@@ -34,10 +39,12 @@ MacBook records must identify a synthetic or file-replay source and use
 `mode=harness` or `mode=replay`. They must never claim current physical data.
 Live freshness and identity are owned by the Windows 10/production path.
 
-Convene must rebuild the canonical envelope and nest raw channels under `vars`
-before `POST /ingest`. The existing production engine and return bridge enforce
-`mode=live`; scenario round trips need a deliberately isolated, honestly labeled
-policy and are not yet proven by repository evidence.
+Convene may forward the flat File Watch snapshot directly to `POST /ingest` or
+send the equivalent nested envelope. The engine normalizes exact raw names,
+accepts honestly labeled `live`, `harness`, and `replay`, allocates PL/MT by
+prefix plus `active_chamber`, rejects `sim_*` feedback, and returns computed
+`sim_*` variables in the POST response. One engine process must not receive
+simultaneous source streams.
 
 The predictive engine remains advisory. No command, setpoint, or actuation path
 is authorized by this architecture document.

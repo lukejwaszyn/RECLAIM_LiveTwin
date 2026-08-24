@@ -24,11 +24,11 @@ auth_token: ""
 tls_ca: ""
 verify_tls: true
 
-# Scenario publication to the MacBook Convene machine.
-convene_enabled: true
-convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
-convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
-convene_timeout_s: 10.0
+# Convene reads this owner-private local file on each heartbeat. The MacBook
+# gateway does not call the Convene API directly.
+convene_enabled: false
+file_watch_enabled: true
+file_watch_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.json
 
 buffer_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/edge-gateway/queue.db
 buffer_max_frames: 500000
