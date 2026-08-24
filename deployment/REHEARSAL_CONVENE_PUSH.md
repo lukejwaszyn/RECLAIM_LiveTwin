@@ -1,163 +1,147 @@
-# Rehearsal Scenarios → Convene (push path)
+# Scenario -> gateway -> engine -> Convene
 
-> **Status:** gateway leg and the synthetic cRIO both implemented and proven
-> locally 2026-08-23. What remains for the cloud leg is **VM-side configuration,
-> not code** (§4).
-> **Standing status unchanged: labeled engineering shadow — NO-GO for any
-> production claim.**
+> Current route as of 2026-08-23. This supersedes the separate 8177-8181
+> estimator services and the `rehearsal_*` direct publisher for operational
+> scenario runs.
 
-## 1. Why this exists
+## One canonical path
 
-Convene is designed to read the rehearsal services by *polling* them through
-collectors delivered in the heartbeat response. That path is dead: the backend
-lacks its `machineCommands` composite index, every heartbeat returns HTTP 500,
-no `autoVars` are ever returned, and the agent therefore polls nothing. See
-`CONVENE_FIRESTORE_INDEX_HANDOVER.md`.
+Every scenario uses the installed data path, with no side estimator and no
+second source of predicted state:
 
-Rather than wait on a backend fix we do not own, this inverts the direction and
-**pushes** — the same direct `POST /machine/publish` technique the gateway's
-`gw_` audit tap already proves under sustained load (450 frames, 0 failed). It
-uses no collector, so the missing index cannot block it.
+```text
+TruthPlant scenario
+  -> raw LabVIEW-shaped TCP frame
+  -> installed edge gateway :9070
+       -> direct Convene audit publish (gw_*)
+       -> durable HTTPS publish to the production cloud /ingest
+  -> DualPushEngine /state
+  -> installed VM state bridge / Convene agent (sim_*)
+```
 
-This is the technique borrowed from `gw_`, **not** the `gw_` namespace.
+The gateway is the single fan-out point. The exact canonical frame represented
+by `gw_*` is the frame consumed by the cloud engine. Only the cloud engine may
+produce predicted `sim_*` state.
 
-## 2. Isolation contract compliance
+The older scenario services on 8177-8181 and
+`tools/windows/start-rehearsal-convene-publisher.ps1` remain diagnostic tools,
+but are not part of this route and must not be started alongside it.
 
-Rehearsal data is synthetic and must never be mistakable for live state. Per the
-contract in `CONVENE_REINTEGRATION_HANDOFF.md`, each profile publishes under its
-own non-live identity and prefix:
+## Fixed contract defect
 
-| Profile | Identity | Prefix | Source |
-|---|---|---|---|
-| `nominal` | `reclaim-rehearsal-nominal` | `rehearsal_nominal_` | `127.0.0.1:8177` |
-| `power-outage` | `reclaim-rehearsal-outage` | `rehearsal_outage_` | `127.0.0.1:8178` |
-| `lunar` | `reclaim-rehearsal-lunar` | `rehearsal_lunar_` | `127.0.0.1:8179` |
+The first synthetic-cRIO implementation omitted `active_chamber`. The gateway
+therefore emitted `active_chamber: null`; production `/ingest` rejects that
+envelope before estimator stepping. This explains the observed split where a
+gateway-side `gw_*` audit could advance without a corresponding engine/sim
+output.
 
-Enforced in code, as hard failures rather than warnings
-(`tools/rehearsal_convene.py`):
+`tools/synthetic_crio.py` now emits every required upstream hint:
 
-- a prefix outside the `rehearsal_` namespace is rejected;
-- any emitted name starting `sim_` or `gw_` raises, as defense in depth;
-- the production gateway credential is refused by path;
-- nulls, nested objects and non-finite floats are dropped, never coerced — a
-  frozen loss-of-data rehearsal must read as stale, not as a last-good value.
+- `source_id` identifies the scenario, scenario name, and environment;
+- `source_op_state` carries the sequencer state;
+- `active_chamber` is explicitly `PL`;
+- `cycle_id` is non-empty and unique per scenario cycle;
+- `ts` is generated immediately before transmission;
+- `vars` contains the raw LabVIEW channel block.
 
-**`loss-of-data` (port 8181) is deliberately refused.** The contract grants it no
-identity or prefix, and inventing one nobody reviewed would defeat the point. Add
-it to the contract table and to `PROFILES` before publishing it.
+The installed gateway still owns `schema_version`, `mode`, `run_id`, and `seq`.
+For this explicitly initiated commissioning/scenario route it remains
+`mode=live`, which is required by the production engine and the installed
+`sim_*` bridge. Synthetic provenance remains visible in both `gw_source_id` and
+`sim_source_id`. The launcher refuses to run while the real cRIO is connected.
 
-## 3. Running it
+## Run
 
-Start a scenario, then publish alongside it:
+First deploy/restart the gateway from the same repository revision. Then, with
+the real cRIO disconnected:
 
 ```powershell
+cd C:\Users\latitude4\Documents\Codex\2026-08-16\i\RECLAIM_LiveTwin
 .\cloud_engine\windows\start-rehearsal-scenario.ps1 nominal
-.\tools\windows\start-rehearsal-convene-publisher.ps1 nominal -DryRun
 ```
 
-`-DryRun` exercises the whole fetch → flatten → prefix path and prints the
-variables while publishing nothing — it needs no credential and mutates nothing.
-Use it to prove the mapping before any external Convene change.
+Other profiles are `power-outage`, `lunar`, and `loss-of-data`.
 
-To publish for real:
+The launcher refuses to start unless all of these are true:
+
+- exactly one gateway listener exists on `192.168.1.1:9070`;
+- no `192.168.1.2` cRIO session is connected or waiting;
+- loopback gateway status is available on port 9080;
+- transport is HTTPS and mode is live;
+- the independent Convene gateway fan-out is enabled.
+
+While running, inspect the common path:
 
 ```powershell
-.\tools\windows\start-rehearsal-convene-publisher.ps1 nominal `
-    -Api https://<backend>/api `
-    -Credential C:\ProgramData\RECLAIM\rehearsal\nominal.convene_agent.json
+Invoke-RestMethod http://127.0.0.1:9080/health
+Invoke-RestMethod http://127.0.0.1:9080/latest
 ```
 
-Proven locally 2026-08-23 against a live `nominal` scenario: 41 variables, all
-`rehearsal_nominal_`-prefixed, 0 in a live namespace.
+Expected evidence:
 
-### Still required before real publishing
+- `received` advances: scenario reached the gateway;
+- `delivered` advances and `queue_depth` returns to zero: the cloud engine
+  acknowledged the same frames;
+- `convene.delivered` advances: `gw_*` reached Convene;
+- `/latest.source_id` starts with `reclaim-synthetic-scenario:`;
+- Convene `gw_source_id` and `sim_source_id` match that source;
+- `sim_seq` advances behind `gw_seq`, subject to the VM bridge cadence.
 
-Creating the three rehearsal machines is an **external Convene mutation**, which
-the reintegration handoff says must not be performed without explicit
-authorization in-session. It has not been done. Each identity needs its own agent
-credential, holding only its matching `rehearsal_*` prefix and loopback source —
-never a production ingest/read token or tunnel route.
+If `gw_*` advances but `sim_*` does not, do not add another estimator or desktop
+publisher. The remaining fault is after cloud ingest: inspect the cloud engine
+`/state`, then the installed VM state bridge and Convene agent. The known
+`machineCommands` composite-index heartbeat failure is documented in
+`CONVENE_FIRESTORE_INDEX_HANDOVER.md`; `gw_*` bypasses it through direct publish,
+while the VM agent's `simVars` heartbeat can still be affected.
 
-## 4. The cloud/VM leg — how it should be done
+## Verification
 
-The intent is for rehearsal telemetry to also traverse the cloud the way live
-telemetry does: gateway → VM `/ingest` → cloud engine → `/state` → bridge →
-Convene. **The pipeline already supports this by design.**
+`tools/tests/test_synthetic_crio.py` proves the complete local contract against
+real components: raw scenario frames traverse an actual TCP receiver and gateway
+framer, the exact resulting `mode=live` canonical frame is accepted by a
+production `DualPushEngine`, and it publishes valid PL state. The gateway and
+synthetic-cRIO suite currently passes 64 tests.
 
-Live telemetry enters at `pi_gateway/reclaim_edge/receiver.py`: a plain TCP
-server that accepts the cRIO's connection and reads line-delimited JSON frames.
-Nothing downstream of that socket — framer, buffer, publisher, VM `/ingest`,
-dual engine, `/state`, bridge — knows or cares what produced the bytes.
+## Live deployment result: 2026-08-23
 
-So driving synthetic telemetry through the *identical* path needs exactly one new
-component: a **synthetic cRIO** that connects to the gateway's listen port and
-writes canonical frames. It requires no change to the scenario services, no new
-seam in the engine, and no second copy of the pipeline.
+Sandbox tests were not treated as deployment verification. Four bounded streams
+were sent to the actual `192.168.1.1:9070` listener with the real cRIO
+disconnected. The installed gateway then performed its real HTTPS and Convene
+operations.
 
-Two things the design already handles, which is the strongest evidence this is
-the intended route:
+| Run | Rate / frames | Gateway received | `gw_*` delivered | Cloud ack | Dead-letter |
+|---|---:|---:|---:|---:|---:|
+| contract smoke | 10 Hz / 30 | 30 | 4 | 0 | 30 |
+| accelerated continuous | 10 Hz / 150 | 150 | 20 | 0 | 150 |
+| configured-rate check | 2 Hz / 120 | 120 | 74 | 0 | 120 |
+| conservative check | 1 Hz / 180 | 180 | 178 | 0 | 180 |
 
-- **`mode: "harness"` is a first-class frame value.** `push_ingest_dual.py:457`
-  accepts `live`, `harness`, `replay`, `legacy`. Synthetic input was anticipated.
-- **Contamination is already fail-closed.** An engine started `--production`
-  rejects any frame whose mode is not `live` (`push_ingest_dual.py:455`,
-  `mode_rejected`). A synthetic `harness` frame therefore *cannot* enter the
-  production engine or reach `sim_`, even by misconfiguration.
+All gateway-Convene deliveries reported zero failures and carried
+`reclaim-synthetic-scenario:nominal:earth_lab`. Thus real scenario data did land
+in Convene under `gw_*`. Every cloud rejection was final `timestamp_stale`; the
+measured source-to-dead-letter delay was 15.5-85.9 seconds. An isolated single
+frame also took 27.8 seconds and was rejected. The public engine `/health`
+remained fast (~0.5 seconds), at `ingested_total=2830`, and retained active run
+`e61a982f-2d31-456b-9213-7a403361a4af`; it never adopted gateway run
+`c26e3f03-d380-4e1b-adbf-58edba146ac5`.
 
-### The synthetic cRIO — built
-
-`tools/synthetic_crio.py` drives `TruthPlant` and writes raw LabVIEW frames to
-the gateway's TCP receiver, in the cRIO's own schema and units (degC/Torr, which
-`labview_map` converts back to K/kPa). It sets **no** identity of its own: the
-gateway assigns `run_id`, `seq` and `mode`, exactly as it does for real hardware.
+This is a live **FAIL** for the engine/`sim_*` leg. Do not claim Convene `sim_*`
+verification and do not work around it with a second estimator. On the VM,
+inspect the engine service logs and durable identity state for the gateway run:
 
 ```powershell
-# Print frames without opening a socket:
-.venv\Scripts\python.exe tools\synthetic_crio.py --dry-run --max-frames 5
+$run = 'c26e3f03-d380-4e1b-adbf-58edba146ac5'
+Get-ChildItem C:\ProgramData\RECLAIM\engine\logs -File |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 6 |
+  ForEach-Object { Select-String -Path $_.FullName -Pattern $run,'internal_error','persist','supersession','timestamp_stale' }
 
-# Drive a gateway configured mode: harness
-.venv\Scripts\python.exe tools\synthetic_crio.py --scenario nominal --port 9070 --speed 2
+Get-Acl C:\ProgramData\RECLAIM\engine\state\ingest_state.json | Format-List
+Get-Content C:\ProgramData\RECLAIM\engine\state\ingest_state.json
+Invoke-RestMethod http://127.0.0.1:8078/health
 ```
 
-Proven by `tools/tests/test_synthetic_crio.py` (8 tests) against the real
-components, not restated copies of them:
-
-- units round-trip through the actual `labview_map.normalize()`, with the
-  four-TC mean recovering the true bed temperature;
-- frames traverse a real `Receiver` over a real socket, and come out canonical
-  with the gateway's own `mode: harness` stamp;
-- a **non-production** `DualPushEngine` accepts a harness frame;
-- a **`--production`** `DualPushEngine` refuses it — synthetic data provably
-  cannot reach the live `sim_` namespace.
-
-### What remains — VM-side configuration, owned by the engine owner
-
-No further code is required. `cloud_engine` is the VM's software and is
-**read-only from the gateway desktop**, so these are the owner's actions:
-
-1. **A non-production engine instance** — its own port and `--state-file`,
-   started *without* `--production`. Production `8078` is not a valid target,
-   and the mode gate above enforces that independently of configuration.
-2. **A second gateway instance configured `mode: harness`**, pointed at that
-   engine's `/ingest`. The mode value already exists in `config.py:44`; nothing
-   needs adding.
-3. **A rehearsal bridge instance** reading that engine and publishing under the
-   same `rehearsal_*` identities, so the cloud leg and the gateway leg agree.
-
-Note this is *complementary to*, not a replacement for, §1-3. The scenario
-services on 8177-8181 run their own estimator in-process and are consumed
-directly by the push publisher. The synthetic cRIO is a second route that
-exercises the real end-to-end pipeline instead of short-cutting it.
-
-## 5. Files
-
-| Path | Role |
-|---|---|
-| `tools/rehearsal_convene.py` | scenario /state publisher, profile table, namespace guards |
-| `tools/tests/test_rehearsal_convene_publisher.py` | 9 tests, all guards covered |
-| `tools/windows/start-rehearsal-convene-publisher.ps1` | publisher launcher |
-| `tools/synthetic_crio.py` | synthetic cRIO: raw frames into the real pipeline |
-| `tools/tests/test_synthetic_crio.py` | 8 tests, incl. real-socket and mode-gate proofs |
-
-Everything lives in `tools/` and imports `cloud_engine` read-only. `cloud_engine`
-is the VM's software and is not modified from the gateway desktop.
+Do not print either engine token. Repair the actual pre-commit/persistence fault
+shown by those logs, restart only `RECLAIMIngestEngine` if required, then repeat
+one bounded 1 Hz stream. A pass requires cloud acknowledgements above zero, the
+engine active run matching the gateway run, and visible advancing `sim_*` values.

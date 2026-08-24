@@ -14,12 +14,12 @@ so every stage afterwards runs unmodified and cannot tell the difference:
 Nothing in this file is new machinery. It writes the same line-delimited raw
 LabVIEW frames the cRIO writes, in the same units, to the same socket.
 
-**Labeling is not this tool's job, by design.** The gateway stamps the frame's
-`mode` from its own config (`framer.py:130`), and that config already supports
-`harness` (`config.py:44`). Point this at a gateway configured `mode: harness`
-and every frame is labeled synthetic at the source. A `--production` engine
-rejects any non-`live` frame outright (`push_ingest_dual.py:455`), so synthetic
-data cannot reach the live `sim_` namespace even if aimed at it by mistake.
+The installed gateway remains the one envelope owner and fan-out point. During
+an explicitly initiated scenario run it stamps its configured ``mode=live`` so
+the production cloud engine accepts the frame and its existing bridge produces
+``sim_*``. The raw frame carries a conspicuous ``reclaim-synthetic-scenario``
+source identity, and the launcher refuses to run while the real cRIO is
+connected. This is the same guarded commissioning path, with realistic values.
 
 Read-only with respect to `cloud_engine`: it imports the physics harness and
 changes nothing there.
@@ -105,7 +105,8 @@ def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
 def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                     p_refl_W: float, op_state: str,
                     p_chamber_kPa: float | None = None,
-                    cycle_id: str = "") -> Dict[str, Any]:
+                    cycle_id: str = "synthetic-scenario",
+                    source_id: str = "reclaim-synthetic-scenario") -> Dict[str, Any]:
     """One line on the wire, in the shape the gateway's receiver requires.
 
     Network input is stricter than the framer's direct-caller API: `parse_line`
@@ -114,8 +115,10 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
     (`framer.py:127-131`); everything else is a channel.
     """
     return {
+        "source_id": source_id,
         "ts": _now_iso(),
-        "op_state": op_state,
+        "source_op_state": op_state,
+        "active_chamber": "PL",
         "cycle_id": cycle_id,
         "vars": build_channels(t_bed_K, t_wall_K, p_fwd_W, p_refl_W, p_chamber_kPa),
     }
@@ -127,13 +130,14 @@ def plant_frames(scenario_name: str, env_name: str, cycle: int = 1
     env = ENVIRONMENTS[env_name]
     scenario = SCENARIOS[scenario_name](env)
     truth = TruthPlant(PhysicalParams(), scenario, seed=cycle)
-    cycle_id = f"synthetic-cycle-{cycle:03d}"
+    source_id = f"reclaim-synthetic-scenario:{scenario_name}:{env_name}"
+    cycle_id = f"synthetic-{scenario_name}-{env_name}-{cycle:03d}"
     for t, z, p_fwd, p_refl, _x in truth.stream():
         op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
         p_chamber = scenario.pressure_fn(t) if scenario.pressure_fn else None
         yield t, build_raw_frame(float(z[0]), float(z[1]), float(p_fwd),
                                  float(p_refl), op_state, p_chamber,
-                                 cycle_id), scenario.dt
+                                 cycle_id, source_id), scenario.dt
 
 
 class SyntheticCrio:
@@ -201,8 +205,8 @@ def main(argv: list[str] | None = None) -> int:
     log.info("synthetic cRIO: scenario=%s env=%s speed=%sx -> %s:%d%s",
              args.scenario, args.env, args.speed, args.host, args.port,
              "  [DRY RUN, no socket]" if args.dry_run else "")
-    log.info("the gateway stamps mode from its own config; point this at a "
-             "gateway configured mode: harness so frames are labeled synthetic")
+    log.info("one path: gateway fans each canonical frame to Convene gw_* and "
+             "the cloud engine; the engine's bridge produces Convene sim_*")
 
     crio = None if args.dry_run else SyntheticCrio(args.host, args.port)
     if crio is not None:

@@ -60,6 +60,7 @@ class StatusServer(threading.Thread):
                 "dead_lettered_session": self.publisher.dead_lettered,
                 "last_ack_age_s": round(self.publisher.last_ack_age, 2),
                 "transport": self.publisher.cfg.transport,
+                "mode": self.publisher.cfg.mode,
             }
             if self.convene is not None:
                 health["convene"] = {

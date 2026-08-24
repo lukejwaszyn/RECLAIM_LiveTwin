@@ -30,12 +30,12 @@ def _envelope(raw, mode="harness", seq=1):
         "schema_version": TELEMETRY_SCHEMA,
         "mode": mode,
         "run_id": "synthetic-run-001",
-        "source_id": "synthetic-crio-01",
+        "source_id": raw.get("source_id", "synthetic-crio-01"),
         "cycle_id": raw.get("cycle_id", ""),
         "seq": seq,
         "ts": datetime.now(timezone.utc).isoformat(),
-        "source_op_state": raw.get("op_state"),
-        "active_chamber": "PL",
+        "source_op_state": raw.get("source_op_state"),
+        "active_chamber": raw.get("active_chamber"),
         "vars": vars_only,
     }
 
@@ -46,8 +46,10 @@ def test_wire_frame_has_the_vars_block_the_receiver_requires():
     assert "vars" in raw
     assert looks_like_labview(raw["vars"])
     # Envelope hints stay at the top level, where the framer reads them.
-    for key in ("ts", "op_state", "cycle_id"):
+    for key in ("source_id", "ts", "source_op_state", "active_chamber", "cycle_id"):
         assert key in raw and key not in raw["vars"]
+    assert raw["source_id"] == "reclaim-synthetic-scenario"
+    assert raw["active_chamber"] == "PL"
 
 
 def test_units_round_trip_through_the_real_mapper():
@@ -88,6 +90,8 @@ def test_frames_stream_from_the_real_harness():
     assert len(frames) == 5
     assert dt > 0
     assert all(looks_like_labview(f["vars"]) for f in frames)
+    assert all(f["source_id"] == "reclaim-synthetic-scenario:nominal:earth_lab"
+               for f in frames)
     # Temperatures advance rather than repeating a constant.
     assert len({f["vars"]["PL_bottom1"] for f in frames}) > 1
 
@@ -106,6 +110,18 @@ def test_production_engine_refuses_a_harness_frame():
     with pytest.raises(Exception) as excinfo:
         engine.ingest(_envelope(raw, mode="harness"))
     assert "mode" in str(excinfo.value).lower()
+
+
+def test_gateway_stamped_scenario_advances_the_production_engine(tmp_path):
+    """The deployed gateway's live envelope is the route that produces sim_."""
+    engine = DualPushEngine(production=True, state_file=str(tmp_path / "identity.json"))
+    raw = build_raw_frame(600.0, 500.0, 2200.0, 110.0, "S_MicrowaveHeating")
+    out = engine.ingest(_envelope(raw, mode="live"))
+
+    assert out["mode"] == "live"
+    assert out["source_id"] == "reclaim-synthetic-scenario"
+    assert out["active_chamber"] == "PL"
+    assert out["PL_sensor_valid"] is True
 
 
 def test_frames_traverse_the_real_gateway_receiver(tmp_path):
@@ -133,7 +149,7 @@ def test_frames_traverse_the_real_gateway_receiver(tmp_path):
     port = probe.getsockname()[1]
     probe.close()
 
-    cfg = Config(run_id="synthetic-run", mode="harness", strict_fields=False,
+    cfg = Config(run_id="synthetic-run", mode="live", strict_fields=False,
                  listen_host="127.0.0.1", listen_port=port)
     buffer = Buffer(str(tmp_path / "buf.db"), max_frames=100)
     stop = threading.Event()
@@ -159,10 +175,19 @@ def test_frames_traverse_the_real_gateway_receiver(tmp_path):
     frame = receiver.last_frame
     assert frame is not None
     # The gateway owns identity and labeling, exactly as it does for the cRIO.
-    assert frame["mode"] == "harness", "gateway must stamp the synthetic label"
+    assert frame["mode"] == "live", "installed gateway owns the cloud acceptance mode"
     assert frame["run_id"] == "synthetic-run"
+    assert frame["source_id"] == "reclaim-synthetic-scenario:nominal:earth_lab"
     assert frame["seq"] >= 1
     assert frame["vars"]["MW_power"] == 2200.0
     assert "PL_bottom1" in frame["vars"]
     # It is a real canonical frame: the cloud mapper recognises it.
     assert looks_like_labview(frame["vars"])
+
+    # The exact canonical frame that produced gw_* also advances the production
+    # engine; its existing state bridge is therefore what produces sim_*.
+    engine = DualPushEngine(production=True, state_file=str(tmp_path / "identity.json"))
+    state = engine.ingest(frame)
+    assert state["mode"] == "live"
+    assert state["source_id"] == frame["source_id"]
+    assert state["PL_sensor_valid"] is True

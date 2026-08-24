@@ -17,6 +17,8 @@ folder stays current. Most docs carry a **stage/status banner** under their titl
   (authoritative go/no-go). `DEPLOYMENT_TOPOLOGY.md` is the platform record.
 - **Demo / rehearsal:** `RECLAIM_72_HOUR_DEMO_DEPLOYMENT_STRATEGY.md` and
   `NEXT_SESSION_CD_REHEARSAL_PLAN.md` (nominal / power-outage / lunar scenarios).
+- **Replacement gateway:** `NEW_GATEWAY_SCENARIO_DEPLOYMENT.md`; do not deploy
+  scenarios until the VM owner completes `CLOUD_ENGINE_LIVE_SCENARIO_HANDOFF_PROMPT.md`.
 
 ## Integration stages (status 2026-08-23)
 
@@ -55,6 +57,8 @@ Read roughly in this order.
 | `CRIO_GATEWAY_CUTOVER_RUNSHEET.md` | Ordered bench-VI → production-listener cutover (desktop/gateway side). |
 | `ENGINE_SIDE_UPDATES_HANDOFF.md` | Proposals for the `cloud_engine` owner (not applied): chamber params for rehearsal, `/state` freshness field, and the deferred batch-boundary edge. |
 | `CONVENE_FIRESTORE_INDEX_HANDOVER.md` | Ready-to-apply fix for the Convene backend owner: the missing `machineCommands` composite index that blocks rehearsal scenarios from reaching Convene. |
+| `NEW_GATEWAY_SCENARIO_DEPLOYMENT.md` | Exact-SHA replacement gateway staging, protected config, service install, one-engine scenario acceptance, and real-source cutover. |
+| `CLOUD_ENGINE_LIVE_SCENARIO_HANDOFF_PROMPT.md` | Copy/paste VM-owner prompt for the proven live gateway-ack failure blocking `sim_*`. |
 | `CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md` | **Start here when the cRIO is connected and frames are not flowing.** Known-good baseline, first-frame checklist, fault ladder, and known non-bugs. |
 | `LIFECYCLE_RESTART_AUDIT_RECORD.md` | Audit record of graceful-closure/restart handling, scenario targets, and the open `active_heating_s`/`S_Restart` semantics question. |
 | `CRIO_PSP_LIVE_ADAPTER_HANDOFF.md` | NI-PSP live adapter — retained as the diagnostic/**fallback** source, not the primary seam. |
@@ -83,7 +87,7 @@ Read roughly in this order.
 | `../docs/RECLAIM_Predictive_Engine_Lifecycle_Memo.md` | Fault/fix analysis (§4.1 design of record). |
 | `../docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md` | Red-team findings (RT-01..08), advisory-default command authority. |
 | `../cloud_engine/tools/redteam_ingest.py` | Live acceptance harness. |
-| `../cloud_engine/windows/start-rehearsal-scenario.ps1` | Scenario launcher: `nominal` (8177) / `power-outage` (8178) / `lunar` (8179) / `loss-of-data` (8181), advisory-only, never production port 8078. |
+| `../cloud_engine/windows/start-rehearsal-scenario.ps1` | Operational scenario launcher: raw scenario frames enter the installed gateway on 9070, fan to `gw_*`, and traverse the one production engine to `sim_*`; refuses an active cRIO session. |
 
 ### Stage 3 — Contract gates + V&V (reference, LIVING)
 

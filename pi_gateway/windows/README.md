@@ -4,6 +4,13 @@ This directory contains the guarded desktop-side workflow for the Windows 10
 edge gateway. `pi_gateway` is a legacy directory name; no Raspberry Pi is in the
 live path.
 
+For a replacement laptop, start with
+`deployment/NEW_GATEWAY_SCENARIO_DEPLOYMENT.md`. It pins one Git SHA, stages the
+service without overwriting its protected config, installs the gateway, and
+requires correlated live `gw_*` plus `sim_*` evidence. The current VM-side
+blocking issue and its copy/paste owner prompt are in
+`deployment/CLOUD_ENGINE_LIVE_SCENARIO_HANDOFF_PROMPT.md`.
+
 ## Fixed topology
 
 ```text
