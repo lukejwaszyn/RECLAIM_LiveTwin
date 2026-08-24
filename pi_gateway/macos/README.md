@@ -35,20 +35,42 @@ Required health/config state:
 
 ## Built-in scenarios
 
+Run from the repository root. Pick one `start` command; only one scenario sender
+may run at a time:
+
 ```bash
 pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
 pi_gateway/macos/start-rehearsal-scenario.sh start power-outage MT
+pi_gateway/macos/start-rehearsal-scenario.sh start lunar PL
+pi_gateway/macos/start-rehearsal-scenario.sh start loss-of-data MT
 pi_gateway/macos/start-rehearsal-scenario.sh status
 pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
 The same command starts, reports, and stops the one allowed scenario process.
-Every start requires an explicit `PL` or `MT`; the generated sensor bank,
+`start` runs in the background. Every start requires an explicit `PL` or `MT`;
+all four profiles support either chamber. The generated sensor bank,
 `active_chamber`, cycle identity, PL process flag, and shared microwave-power
 attribution all follow that selection. The launcher refuses unless health
 reports `harness` or `replay`. For bounded checks, set
 `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
 playback. Use `run` in place of `start` only when a foreground process is useful.
+
+Examples:
+
+```bash
+# One complete nominal PL processing cycle, then stop automatically
+RECLAIM_SCENARIO_CYCLES=1 \
+  pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
+
+# Short accelerated local plumbing check
+RECLAIM_SCENARIO_MAX_FRAMES=20 RECLAIM_SCENARIO_SPEED=10 \
+  pi_gateway/macos/start-rehearsal-scenario.sh start nominal MT
+```
+
+Use real-time speed for a Convene demonstration so its approximately 30-second
+heartbeat can sample multiple changing frames. `loss-of-data` defaults to one
+cycle and then deliberately stops updating the watched file.
 
 ## Convene File Watch setup
 
@@ -62,7 +84,9 @@ entire frame:
 - **JSON path:** leave blank
 - **Capture regex:** leave blank
 
-Do not split this into 35 Convene variables. Keeping the record intact preserves
+Do not rename this working Convene variable, and do not change the file path.
+The local file name and Convene variable name do not need to match. Do not split
+the frame into 35 Convene variables. Keeping the record intact preserves
 LabVIEW `NaN` tokens and gives the cloud engine the same payload shape for live
 and scenario telemetry. The frame itself contains `active_chamber` plus all 34
 raw fields. Do not add `schema_version`, `mode`, `run_id`, `source_id`,
@@ -111,13 +135,15 @@ direct Convene publishing, a non-console cloud transport, `mode=live`, or a
 non-loopback listener. A stale config therefore cannot silently recreate a
 competing scenario route.
 
-During a bounded run, `/health` must show received equals delivered, queue depth
-zero, no drops/dead letters, and `file_watch.failed: 0`. `/latest` must show
+During a bounded run, `/health` must show received and delivered converging,
+queue depth zero after drain, no drops/dead letters, and
+`file_watch.failed: 0`. `/latest` must show
 `mode: harness` or `replay` and a scenario-labeled `source_id`. This proves
-source-to-file delivery; confirm Convene heartbeat timestamps separately. The
-cloud ingest accepts honestly labeled `harness` and `replay` frames through the
-same naming adapter as live data. Only one source stream may drive one engine
-process at a time.
+source-to-file delivery; manually confirm that the whole-frame Convene value
+changes across heartbeat timestamps. The MacBook does not automate or sign in to
+Convene. The common cloud ingest receives the same raw 35-field text shape as
+live telemetry and does not infer whether it originated from live or scenario
+data. Only one source stream may drive one engine process at a time.
 
 Ports `9070` and `9080` must both listen only on `127.0.0.1`. The MacBook must
 hold no VM ingest token and needs no Convene API token for scenario telemetry.

@@ -44,16 +44,32 @@ Bench replay must end `{'accepted': 3, ..., 'rejected': 0, 'sent': 3}`:
 PYTHONPATH="pi_gateway:cloud_engine:$PWD" python -m crio_source_record.bench_replay
 ```
 
-### 3. Rehearsal scenarios — one command each, any time
+### 3. MacBook rehearsal scenarios
 
-**Pick ONE line and run it.** Each line below is a complete, self-contained
-command — there is no setup step, and nothing above it needs to be run first. If
-the locked environment does not exist yet, the runner builds it once on first use,
-so these work from a fresh checkout.
+Run these commands from the repository root on the MacBook. The one-time setup
+locks the service to loopback-only scenario mode and enables its atomic File
+Watch output:
 
-On the MacBook, scenarios enter the loopback-only scenario listener. The same
-controller starts, reports, and stops the one allowed sender; every start chooses
-the active chamber:
+```bash
+.venv-macbook/bin/python pi_gateway/macos/configure_scenario_host.py
+launchctl kickstart -k "gui/$(id -u)/com.reclaim.edge-gateway"
+pi_gateway/macos/audit-scenario-host.sh
+```
+
+In Convene, keep the File Watch configuration that is already working:
+
+- File path: `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
+- Variable name: keep the existing whole-frame telemetry variable name
+- JSON path: blank
+- Capture regex: blank
+
+Do not rename the working Convene variable, change the file path, or create 35
+individual bindings. Convene reads one complete text frame containing
+`active_chamber` plus all 34 raw telemetry fields. The file name and the Convene
+variable name do not need to match.
+
+To run a scenario, pick one start command. Only one sender is allowed at a time,
+and every start explicitly selects the authoritative chamber:
 
 ```bash
 pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
@@ -63,6 +79,13 @@ pi_gateway/macos/start-rehearsal-scenario.sh start loss-of-data MT
 pi_gateway/macos/start-rehearsal-scenario.sh status
 pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
+
+Every profile supports either `PL` or `MT`; the examples above deliberately
+exercise both. `start` runs in the background, `status` reports the active
+sender, and `stop` ends it. For a single bounded cycle, prefix a start command
+with `RECLAIM_SCENARIO_CYCLES=1`. For accelerated local testing, also set
+`RECLAIM_SCENARIO_SPEED=10`; use real-time speed for Convene verification so its
+heartbeat can observe multiple frames.
 
 The MacBook never connects to the real cRIO. Obsolete Windows/Mac direct scenario
 publishers are archived and cannot be invoked from the active tree.
@@ -77,29 +100,39 @@ publishers are archived and cannot be invoked from the active tree.
 These profiles traverse the MacBook's loopback `9070` scenario ingress and its
 atomic File Watch writer. They do not enter the Windows 10 live gateway or
 directly target the VM. Convene owns the downstream route. The engine accepts the
-the identical 35-field text input through `/ingest` regardless of origin, then
+identical 35-field text input through `/ingest` regardless of origin, then
 returns computed `sim_*` variables in the
 POST response. Inspect the scenario host on loopback `9080`.
 
-**`loss-of-data` — what to watch.** After its single cycle finishes, the endpoints
-keep answering and the last values stay readable, but the data stops advancing:
-`/health` and `/state` report `status: stopped` and `t_sim` freezes. That is the
-condition the check exists to rehearse — a consumer must detect staleness rather
-than trust a last-good value.
+**`loss-of-data` — what to watch.** After its single cycle finishes, the gateway
+keeps answering and the last complete file remains readable, but its modification
+time and values stop advancing. `/health` continues to report the gateway while
+its last-success age grows. That is the condition the check exists to rehearse:
+downstream consumers must detect staleness rather than trust a last-good value.
 
 The watched frame intentionally has no source `ts` or `seq`, matching current live
 telemetry. The engine creates unclassified receipt `ts_source`, monotone `seq`,
 `ts_engine`, and `ingest_age_ms`. Convene must use advancing engine receipt/state
 time to reject stale output rather than treating a last-good value as fresh.
 
-**Where to run them.** The scenarios are self-contained — they need only this
-checkout, never the cRIO, the gateway, or a network feed. Run them on any machine
-that is **not** currently serving production `8078`. In practice that means the
-MacBook scenario host during a deploy or demo session, which keeps
-machine-level separation from the VM's production port. Do not run them on the
-predictive-engine VM while it serves production: the script's port guard is only
-port-level protection, and `8177`–`8181` must never be routed to production or
-bound as live mission state.
+**Verification.** While a scenario runs, the watched value in Convene should
+change on each Convene heartbeat (currently about 30 seconds). Local verification
+is:
+
+```bash
+curl --fail http://127.0.0.1:9080/health
+curl --fail http://127.0.0.1:9080/latest
+pi_gateway/macos/audit-scenario-host.sh
+```
+
+Require received and delivered counts to converge, queue depth zero, no drops or
+dead letters, `file_watch.failed: 0`, one 35-field line, and the selected
+`active_chamber`. This proves scenario-to-file delivery. The user confirms the
+Convene heartbeat manually; the MacBook does not sign in to or automate Convene.
+
+Run scenarios only on the MacBook scenario host. Never run them on the Windows
+live gateway or predictive-engine VM, and never route rehearsal ports
+`8177`–`8181` into production.
 
 For every run retain: commit SHA, engine receipt run ID/timestamps, expected vs observed,
 screenshots, and deviations. Keep synthetic services clearly labeled as rehearsal
