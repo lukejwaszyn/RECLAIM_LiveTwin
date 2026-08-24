@@ -71,6 +71,26 @@ def test_units_round_trip_through_the_real_mapper():
     assert engine_vars["MT_P_fwd"] == 0.0
 
 
+def test_mt_scenario_uses_mapped_mt_sensors_and_power():
+    t_bed_K, t_wall_K = 586.568, 510.25
+    channels = build_channels(
+        t_bed_K, t_wall_K, 1800.0, 45.0, active_chamber="MT"
+    )
+    assert "PL_bottom1" not in channels
+    assert "PL_surface_temp" not in channels
+    assert channels["PL_process"] is False
+    assert "MT_bottom" in channels and "MT_top" in channels
+
+    # The envelope supplies this same authoritative hint before normalization.
+    channels["active"] = "MT"
+    engine_vars, _mw, active = normalize(channels)
+    assert active == "MT"
+    assert engine_vars["MT_T_bed_tc1"] == pytest.approx(t_bed_K, abs=1e-3)
+    assert engine_vars["MT_T_wall_meas"] == pytest.approx(t_wall_K, abs=1e-3)
+    assert engine_vars["MT_P_fwd"] == pytest.approx(1800.0)
+    assert engine_vars["PL_P_fwd"] == 0.0
+
+
 def test_pressure_is_omitted_rather_than_faked_when_absent():
     raw = build_raw_frame(600.0, 500.0, 2200.0, 110.0, "S_MicrowaveHeating")
     assert "PL_chamber_pressure" not in raw["vars"]
@@ -90,10 +110,19 @@ def test_frames_stream_from_the_real_harness():
     assert len(frames) == 5
     assert dt > 0
     assert all(looks_like_labview(f["vars"]) for f in frames)
-    assert all(f["source_id"] == "reclaim-synthetic-scenario:nominal:earth_lab"
+    assert all(f["source_id"] == "reclaim-synthetic-scenario:PL:nominal:earth_lab"
                for f in frames)
     # Temperatures advance rather than repeating a constant.
     assert len({f["vars"]["PL_bottom1"] for f in frames}) > 1
+
+
+def test_mt_frames_stream_from_the_real_harness():
+    _t, raw, _dt = next(plant_frames("nominal", "earth_lab", active_chamber="MT"))
+    assert raw["active_chamber"] == "MT"
+    assert raw["source_id"] == "reclaim-synthetic-scenario:MT:nominal:earth_lab"
+    assert raw["cycle_id"].startswith("synthetic-MT-nominal-earth_lab-")
+    assert "MT_bottom" in raw["vars"] and "MT_top" in raw["vars"]
+    assert raw["vars"]["PL_process"] is False
 
 
 def test_non_production_engine_accepts_a_harness_frame():
@@ -177,7 +206,7 @@ def test_frames_traverse_the_real_gateway_receiver(tmp_path):
     # The gateway owns identity and labeling, exactly as it does for the cRIO.
     assert frame["mode"] == "live", "installed gateway owns the cloud acceptance mode"
     assert frame["run_id"] == "synthetic-run"
-    assert frame["source_id"] == "reclaim-synthetic-scenario:nominal:earth_lab"
+    assert frame["source_id"] == "reclaim-synthetic-scenario:PL:nominal:earth_lab"
     assert frame["seq"] >= 1
     assert frame["vars"]["MW_power"] == 2200.0
     assert "PL_bottom1" in frame["vars"]

@@ -31,9 +31,24 @@ def test_records_ignores_header_and_blank_lines(tmp_path):
     assert list(records(capture)) == [parse_record(LINE)]
 
 
+def test_embedded_chamber_is_promoted_and_nan_sensors_are_omitted(tmp_path):
+    line = (
+        "active_chamber: MT, PL_process: TRUE, MT_crucible_temperature: 313.418, "
+        "MT_top: NaN, MT_bottom: NaN, MW_power: 0.000000"
+    )
+    parsed = parse_record(line)
+    assert parsed["active_chamber"] == "MT"
+    assert inferred_chamber(parsed) == "MT"
+    assert parsed["MT_crucible_temperature"] == 313.418
+    assert "MT_top" not in parsed and "MT_bottom" not in parsed
+
+
 def test_replay_emits_structured_scenario_envelope(tmp_path):
     capture = tmp_path / "capture.txt"
-    capture.write_text("08/03/26 12:57:43 PM\n\n" + LINE + "\n", encoding="ascii")
+    capture.write_text(
+        "08/03/26 12:57:43 PM\n\nactive_chamber: MT, " + LINE + "\n",
+        encoding="ascii",
+    )
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
     listener.listen(1)
@@ -52,5 +67,6 @@ def test_replay_emits_structured_scenario_envelope(tmp_path):
     thread.join(timeout=2)
 
     assert received[0]["source_op_state"] == "S_Unknown"
-    assert received[0]["active_chamber"] == "PL"
+    assert received[0]["active_chamber"] == "MT"
+    assert "active_chamber" not in received[0]["vars"]
     assert received[0]["vars"]["PL_surface_temp"] == 22.677758

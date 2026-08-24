@@ -40,7 +40,7 @@ if str(_CLOUD_ENGINE) not in sys.path:
     sys.path.insert(0, str(_CLOUD_ENGINE))
 
 from reclaim_predictive_engine.harness import TruthPlant  # noqa: E402
-from reclaim_predictive_engine.config import ENVIRONMENTS, PhysicalParams  # noqa: E402
+from reclaim_predictive_engine.config import ENVIRONMENTS, chamber_params  # noqa: E402
 # Import the scenario table the rehearsals themselves use, so the two can never
 # drift apart. Importing the module defines names only; it starts no server.
 from reclaim_predictive_engine.service import SCENARIOS  # noqa: E402
@@ -71,7 +71,8 @@ def _now_iso() -> str:
 
 
 def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
-                   p_refl_W: float, p_chamber_kPa: float | None = None
+                   p_refl_W: float, p_chamber_kPa: float | None = None,
+                   active_chamber: str = "PL",
                    ) -> Dict[str, Any]:
     """The raw LabVIEW channel block, in the cRIO's own names and units.
 
@@ -80,20 +81,31 @@ def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
     node, chamber pressure, the shared SSMG power pair, and the flags that tell
     the mapper which chamber the SSMG is driving.
     """
+    if active_chamber not in {"PL", "MT"}:
+        raise ValueError("active_chamber must be PL or MT")
+
     channels: Dict[str, Any] = {
-        # Plastics bed bank -> PL_T_bed_tc1..4
-        **{f"PL_bottom{i + 1}": round(_k_to_c(t_bed_K) + offset, 3)
-           for i, offset in enumerate(_TC_OFFSETS)},
-        # IR skin -> PL_T_wall_meas
-        "PL_surface_temp": round(_k_to_c(t_wall_K), 3),
-        # Shared SSMG. MW_RF true + PL_process true marks plastics as active,
-        # which is how labview_map attributes the power to PL and zeroes MT.
+        # Shared SSMG power is attributed by the authoritative envelope chamber.
         "MW_power": round(float(p_fwd_W), 1),
         "MW_reverse": round(float(p_refl_W), 2),
         "MW_RF": bool(p_fwd_W > 0.0),
-        "PL_process": True,
+        # Keep the legacy inference signal consistent with the envelope so an MT
+        # scenario does not generate a false CHAMBER_MISMATCH diagnostic.
+        "PL_process": active_chamber == "PL",
     }
-    if p_chamber_kPa is not None and math.isfinite(p_chamber_kPa):
+    if active_chamber == "PL":
+        channels.update({
+            f"PL_bottom{i + 1}": round(_k_to_c(t_bed_K) + offset, 3)
+            for i, offset in enumerate(_TC_OFFSETS)
+        })
+        channels["PL_surface_temp"] = round(_k_to_c(t_wall_K), 3)
+    else:
+        # These are the two signed MT channels currently mapped by labview_map.
+        channels["MT_bottom"] = round(_k_to_c(t_bed_K), 3)
+        channels["MT_top"] = round(_k_to_c(t_wall_K), 3)
+
+    if (active_chamber == "PL" and p_chamber_kPa is not None
+            and math.isfinite(p_chamber_kPa)):
         channels["PL_chamber_pressure"] = round(_kpa_to_torr(p_chamber_kPa), 4)
     return channels
 
@@ -102,7 +114,8 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                     p_refl_W: float, op_state: str,
                     p_chamber_kPa: float | None = None,
                     cycle_id: str = "synthetic-scenario",
-                    source_id: str = "reclaim-synthetic-scenario") -> Dict[str, Any]:
+                    source_id: str = "reclaim-synthetic-scenario",
+                    active_chamber: str = "PL") -> Dict[str, Any]:
     """One line on the wire, in the shape the gateway's receiver requires.
 
     Network input is stricter than the framer's direct-caller API: `parse_line`
@@ -114,26 +127,30 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
         "source_id": source_id,
         "ts": _now_iso(),
         "source_op_state": op_state,
-        "active_chamber": "PL",
+        "active_chamber": active_chamber,
         "cycle_id": cycle_id,
-        "vars": build_channels(t_bed_K, t_wall_K, p_fwd_W, p_refl_W, p_chamber_kPa),
+        "vars": build_channels(
+            t_bed_K, t_wall_K, p_fwd_W, p_refl_W, p_chamber_kPa,
+            active_chamber,
+        ),
     }
 
 
-def plant_frames(scenario_name: str, env_name: str, cycle: int = 1
+def plant_frames(scenario_name: str, env_name: str, cycle: int = 1,
+                 active_chamber: str = "PL",
                  ) -> Iterator[tuple[float, Dict[str, Any], float]]:
     """Yield (t_sim, raw_frame, dt) from the same harness the rehearsals use."""
     env = ENVIRONMENTS[env_name]
     scenario = SCENARIOS[scenario_name](env)
-    truth = TruthPlant(PhysicalParams(), scenario, seed=cycle)
-    source_id = f"reclaim-synthetic-scenario:{scenario_name}:{env_name}"
-    cycle_id = f"synthetic-{scenario_name}-{env_name}-{cycle:03d}"
+    truth = TruthPlant(chamber_params(active_chamber), scenario, seed=cycle)
+    source_id = f"reclaim-synthetic-scenario:{active_chamber}:{scenario_name}:{env_name}"
+    cycle_id = f"synthetic-{active_chamber}-{scenario_name}-{env_name}-{cycle:03d}"
     for t, z, p_fwd, p_refl, _x in truth.stream():
         op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
         p_chamber = scenario.pressure_fn(t) if scenario.pressure_fn else None
         yield t, build_raw_frame(float(z[0]), float(z[1]), float(p_fwd),
                                  float(p_refl), op_state, p_chamber,
-                                 cycle_id, source_id), scenario.dt
+                                 cycle_id, source_id, active_chamber), scenario.dt
 
 
 class SyntheticCrio:
@@ -188,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--scenario", default="nominal", choices=sorted(SCENARIOS))
     parser.add_argument("--env", default="earth_lab", choices=sorted(ENVIRONMENTS))
+    parser.add_argument("--active-chamber", choices=("PL", "MT"), default="PL")
     parser.add_argument("--host", default="127.0.0.1", help="gateway receiver host")
     parser.add_argument("--port", type=int, default=9070, help="gateway receiver port")
     parser.add_argument("--speed", type=float, default=2.0, help="sim s per wall s")
@@ -198,8 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    log.info("synthetic cRIO: scenario=%s env=%s speed=%sx -> %s:%d%s",
-             args.scenario, args.env, args.speed, args.host, args.port,
+    log.info("synthetic cRIO: chamber=%s scenario=%s env=%s speed=%sx -> %s:%d%s",
+             args.active_chamber, args.scenario, args.env, args.speed, args.host, args.port,
              "  [DRY RUN, no socket]" if args.dry_run else "")
     log.info("scenario path: local source -> MacBook -> Convene exact-name variables")
 
@@ -212,7 +230,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         while True:
             cycle += 1
-            for t, frame, dt in plant_frames(args.scenario, args.env, cycle):
+            for t, frame, dt in plant_frames(
+                args.scenario, args.env, cycle, args.active_chamber
+            ):
                 if args.dry_run:
                     print(json.dumps(frame))
                 else:
