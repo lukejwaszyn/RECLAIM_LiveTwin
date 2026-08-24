@@ -31,7 +31,7 @@ This plan is the integration point for:
 
 - [Predictive engine red-team assessment](../PREDICTIVE_ENGINE_RED_TEAM_ASSESSMENT.md): `RT-01` through `RT-08`
 - [Gateway deployment red-team assessment](../GATEWAY_DEPLOYMENT_RED_TEAM_ASSESSMENT.md): `GW-01` through `GW-10`
-- [CI/CD red-team integration handoff](../deployment/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md): `CD-01` through `CD-10`
+- [Archived CI/CD red-team integration handoff](../Past_Deprecated/deployment/retired-2026-08-24-convene-routing/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md): historical `CD-01` through `CD-10` evidence only
 - [Predictive-engine remediation and command-authority plan](RECLAIM_Predictive_Engine_RedTeam_Remediation.md)
 - [Live telemetry architecture](RECLAIM_Live_Telemetry_Architecture.md)
 

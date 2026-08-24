@@ -6,9 +6,9 @@
 to the integration reviewer this session; every item below is answered by the
 LabVIEW/controls engineer **with evidence** (block-diagram capture, VI property
 screenshot, measurement, or hash), and countersigned by the controls owner. A blank or
-"trust me" answer keeps Gate 3 open. Spec references: `CRIO_LABVIEW_PRODUCER_HANDOFF.md`
-(the build spec), `CRIO_TELEMETRY_SOCKET_SETUP.md` §4–6 (socket + RT placement),
-`CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` §5 Gate 3 (the gate definition).
+"trust me" answer keeps Gate 3 open. Current references:
+`CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`, `CRIO_TELEMETRY_SOCKET_SETUP.md`
+§4–6 (socket + RT placement), and `CRIO_SOURCE_RECORD_SIGNED_MAPS.md`.
 
 Evidence types: `BD` = block-diagram capture showing the wire, `PROP` = VI/loop property
 capture, `MEAS` = measurement with method stated, `HASH` = recorded hash, `DIFF` =

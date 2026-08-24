@@ -1,7 +1,7 @@
-"""RECLAIM Edge Gateway — cloud publisher (Seam B).
+"""RECLAIM Edge Gateway — retained direct publisher compatibility path.
 
-Drains the durable buffer and delivers frames outbound over TLS (through the
-Cloudflare Tunnel ingress). Pluggable transport:
+Drains the durable buffer. Current deployments select ``console`` because Convene
+internal routing owns engine delivery. Retained pluggable transports:
   - console : local testing (E0), prints frames, always "delivers"
   - https   : POST batched NDJSON to the cloud /ingest route (bearer token, TLS)
   - mqtts   : publish to a broker topic (paho, QoS 1, TLS)

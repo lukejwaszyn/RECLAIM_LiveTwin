@@ -47,7 +47,8 @@ class Config:
     listen_host: str = "0.0.0.0"       # bind to LAN interface
     listen_port: int = 9070
 
-    # Seam B — live gateway -> cloud (disabled on the MacBook scenario host)
+    # Legacy direct cloud transport. Current deployments keep this on console;
+    # Convene internal routing owns cloud-engine delivery.
     transport: str = "console"          # console | https | mqtts
     cloud_url: str = "https://vm.example/ingest"   # https mode
     mqtt_host: str = "vm.example"       # mqtts mode

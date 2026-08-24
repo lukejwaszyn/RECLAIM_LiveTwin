@@ -7,15 +7,21 @@
 
 | Role | Host | Allowed input | Allowed output |
 |---|---|---|---|
-| Live-data client/gateway | Windows 10 desktop | Real cRIO/LabVIEW stream | Production live-data path |
+| Live-data client/gateway | Windows 10 desktop | Real cRIO/LabVIEW stream | Convene live machine |
 | Scenario host | MacBook | Local synthetic generators and approved capture replays | Convene scenario machine |
-| Predictive engine | Prepared separately | Live/scenario interface prepared by its owner | `sim_*` computed state |
+| Routing plane | Convene | Source-machine variables | Canonical frame to cloud engine and computed state back to Convene |
+| Predictive engine | Cloud VM | Convene-routed canonical telemetry | `sim_*` computed state returned through Convene |
 
 The MacBook must not connect to, listen for, impersonate, or forward the real
 cRIO live stream. Its scenario receiver binds only `127.0.0.1`, runs in
 `harness` or `replay` mode, and has no direct cloud transport or ingest token.
-Convene publishing remains enabled for scenario data. Any Convene-to-VM pipe is
-owned and configured outside the MacBook workstream.
+Convene publishing remains enabled for scenario data. Convene's internal routing
+is the only approved source-to-engine and engine-to-display path.
+
+Production cloud ingest and the return bridge currently enforce `mode=live`.
+Scenario round-trip support therefore remains an explicit integration gap and
+must use an isolated, honestly labeled scenario policy; scenario data must never
+be relabeled as live.
 
 ## Scenario naming
 

@@ -2,24 +2,25 @@
 
 **Effective:** 2026-08-24
 
-## Separate source paths
+## Convene-routed source paths
 
 ```text
 REAL LIVE DATA
-cRIO / LabVIEW -> Windows 10 desktop live gateway -> production live-data path
+cRIO / LabVIEW -> Windows 10 desktop live gateway -> Convene live machine
 
 SCENARIO DATA
 synthetic generator or approved capture file
   -> MacBook 127.0.0.1:9070 (harness/replay)
   -> MacBook Convene machine
-  -> separately owned Convene-to-VM scenario pipe
 
-COMPUTED DATA
-predictive-engine VM -> state bridge -> Convene sim_*
+BOTH SOURCE PATHS
+Convene internal route -> cloud stochastic engine -> Convene sim_*
 ```
 
-The paths must not be merged on the MacBook. The MacBook is not a live client,
-has no direct cloud transport, and has no production ingest token.
+The paths converge in Convene, not on the MacBook. The MacBook is not a live
+client, has no direct cloud transport, and has no production ingest token. A
+separate gateway-to-cloud HTTPS/cloudflared telemetry seam is not part of this
+architecture.
 
 ## Naming
 
@@ -33,5 +34,10 @@ MacBook records must identify a synthetic or file-replay source and use
 `mode=harness` or `mode=replay`. They must never claim current physical data.
 Live freshness and identity are owned by the Windows 10/production path.
 
-The predictive engine remains advisory. No scenario, live, command, return,
-setpoint, or actuation path is authorized by this architecture document.
+Convene must rebuild the canonical envelope and nest raw channels under `vars`
+before `POST /ingest`. The existing production engine and return bridge enforce
+`mode=live`; scenario round trips need a deliberately isolated, honestly labeled
+policy and are not yet proven by repository evidence.
+
+The predictive engine remains advisory. No command, setpoint, or actuation path
+is authorized by this architecture document.

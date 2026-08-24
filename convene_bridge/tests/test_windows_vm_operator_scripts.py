@@ -6,6 +6,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOYMENT = ROOT / "deployment"
 WINDOWS_VM = DEPLOYMENT / "windows-vm"
+ARCHIVED_DEPLOYMENT = (
+    ROOT
+    / "Past_Deprecated"
+    / "deployment"
+    / "retired-2026-08-24-convene-routing"
+)
 
 
 def test_proven_windows_vm_operator_workflows_are_published() -> None:
@@ -42,7 +48,7 @@ def test_no_codex_temporary_deployment_scripts_remain() -> None:
 
 
 def test_recap_and_operator_index_reference_the_proven_workflows() -> None:
-    recap = (DEPLOYMENT / "CONVENE_MISSION_OPERATIONS_RECAP.md").read_text(
+    recap = (ARCHIVED_DEPLOYMENT / "CONVENE_MISSION_OPERATIONS_RECAP.md").read_text(
         encoding="utf-8"
     )
     index = (WINDOWS_VM / "README.md").read_text(encoding="utf-8")

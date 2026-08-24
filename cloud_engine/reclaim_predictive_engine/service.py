@@ -186,7 +186,7 @@ CHAMBERS = ("PL", "MT")
 def _build_engine(svc: TwinStateService, env_name: str, chamber_id: str = "PL"):
     # chamber_params(chamber_id) applies the CAD-derived geometry, material, and
     # t_wall_limit for the named chamber; the bare PhysicalParams() default this
-    # replaced carries none of that (see ENGINE_SIDE_UPDATES_HANDOFF.md item 1).
+    # replaced carries none of that (see the current Convene-routed handoff).
     cfg = EngineConfig(physical=chamber_params(chamber_id), environment=env_name,
                        chamber_id=chamber_id)
     cfg.forecast.every = 1

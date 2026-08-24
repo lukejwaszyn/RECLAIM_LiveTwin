@@ -10,7 +10,7 @@ The current implementation is **not fit for autonomous or operator-relied predic
 
 The independent hardware interlock limits the likelihood of an ultimate over-temperature event, but does not make the predictive layer reliable. It cannot correct wrong lead-time forecasts, prevent nuisance intervention, protect state integrity after retry, or provide a fail-safe reaction to a blind/stale predictive engine.
 
-The distinction matters because the repository describes Convene as read-only, while the cloud engine also returns a `ControlCommand` to the gateway and local control hub/HMI. This is an operational control path, not merely a visualization path. See [Remote Gateway Preflight](docs/RECLAIM_Remote_Gateway_Preflight.md#44-command-signal-return-path).
+The distinction mattered to the assessed historical route because the cloud engine also returned a `ControlCommand` to the gateway and local control hub/HMI. The current Convene-routed architecture authorizes no command or actuation path. See the [archived Remote Gateway Preflight](Past_Deprecated/docs/retired-2026-08-24-convene-routing/RECLAIM_Remote_Gateway_Preflight.md#44-command-signal-return-path) for the original finding.
 
 ## Severity interpretation in this digital-twin context
 

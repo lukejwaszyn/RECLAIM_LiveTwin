@@ -5,8 +5,8 @@
 > expose its receiver on a LAN, or publish directly to the cloud engine.
 
 The MacBook serves synthetic and approved capture-replay scenarios through its
-own Convene machine. The downstream Convene-to-VM scenario pipe is configured
-elsewhere.
+own Convene machine. Convene's internal routing owns the downstream engine path
+and computed-state return.
 
 ## Required installed configuration
 
@@ -66,7 +66,10 @@ are unavailable values and are invalid in the strict JSON/Convene contract.
 
 During a bounded run, `/health` must show received equals delivered, queue depth
 zero, no drops/dead letters, and zero Convene failures. `/latest` must show
-`mode: harness` or `replay` and a scenario-labeled `source_id`.
+`mode: harness` or `replay` and a scenario-labeled `source_id`. This proves
+source-to-Convene delivery only; the production engine and return bridge
+currently reject non-live mode, so an end-to-end scenario result requires the
+isolated policy described in the current system handoff.
 
 Ports `9070` and `9080` must both listen only on `127.0.0.1`. The MacBook must
 hold no VM ingest token. Preserve the configuration backup, logs, evidence, and

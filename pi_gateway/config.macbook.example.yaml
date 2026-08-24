@@ -13,7 +13,8 @@ conn_idle_timeout_s: 15.0
 max_line_bytes: 8192
 strict_fields: false
 
-# Fail closed: MacBook never publishes directly to the cloud engine.
+# Fail closed: MacBook never publishes directly to the cloud engine. Convene's
+# internal routing owns the downstream scenario path.
 transport: console
 cloud_url: https://disabled.invalid/ingest
 mqtt_host: disabled.invalid

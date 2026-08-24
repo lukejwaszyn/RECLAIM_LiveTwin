@@ -1,9 +1,9 @@
 """Best-effort Convene publisher for gateway/scenario machine identities.
 
-This path is deliberately independent of the durable cloud publisher. Each
+This path is deliberately independent of the legacy durable direct publisher. Each
 canonical cRIO frame is flattened to scalar variables and submitted to
 Convene's connected-machine ``/machine/publish`` endpoint. A one-frame queue
-coalesces during outages so Convene can never block cRIO receipt or VM delivery.
+coalesces during outages so Convene can never block cRIO receipt.
 """
 from __future__ import annotations
 

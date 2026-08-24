@@ -1,4 +1,10 @@
-# Windows VM Proven Operator Scripts
+# Windows VM retained operator scripts
+
+> **Current-route warning — 2026-08-24:** Convene internal routing now owns
+> source-to-engine delivery and computed-state return. The direct public-engine,
+> Cloudflare quick-tunnel, and file-state-bridge workflows below are retained for
+> audit/recovery history and are not the current deployment procedure. Start at
+> `deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`.
 
 These scripts are the credential-safe PowerShell workflows exercised during the
 2026-08-18/19 `reclaim-engine-2` integration. Run them from elevated Windows
@@ -58,8 +64,9 @@ expects:
 - healthy engine and bridge services before the transaction; and
 - the existing protected engine state/credential and bridge credential files.
 
-It is not a generic first-install script. Use `VM_ENGINE_RUNBOOK.md` and
-`WINDOWS_VM_CONVENE_STATE_BRIDGE_RUNBOOK.md` for clean installation.
+It is not a generic first-install script. The superseded clean-install runbooks
+are preserved under
+`Past_Deprecated/deployment/retired-2026-08-24-convene-routing/`.
 
 ## Recovery note
 
@@ -75,8 +82,8 @@ confirming the registered executable path is repository-owned.
   token.
 - The agent installer supplied by Convene is VM-specific and token-bearing; it is
   deliberately not in this repository.
-- Production port `8078` remains loopback-only; cloudflared is the only external
-  route.
+- Do not expose production port `8078` or start a competing direct telemetry
+  route; Convene's approved internal route owns engine ingress.
 - Rehearsal ports `8177`–`8181` must never be routed into production or bound as
   live mission state.
 - All predictive commands remain advisory and must not acquire hardware authority.

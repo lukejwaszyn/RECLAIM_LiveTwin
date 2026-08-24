@@ -35,8 +35,8 @@ shared microwave-power attribution follow that selection.
 ```
 
 The capture is input data only. Exact field names and values are preserved;
-unknown sequencer state is labeled `S_Unknown`. Convene-to-VM routing is outside
-this deployment procedure. In automatic mode, a record-level `active_chamber`
+unknown sequencer state is labeled `S_Unknown`. Convene's internal routing owns
+the engine request and computed-state return. In automatic mode, a record-level `active_chamber`
 is promoted into the envelope; an explicit command option overrides it. `NaN`
 sensor readings are omitted as unavailable because strict JSON cannot carry
 them.
@@ -44,5 +44,8 @@ them.
 ## Accept
 
 Require matching receive/deliver counts, zero queue depth, drops, dead letters,
-and Convene failures, plus a scenario-labeled `/latest` frame. Never change the
-MacBook to `mode=live`, a non-loopback listener, or direct cloud transport.
+and Convene failures, plus a scenario-labeled `/latest` frame. This is
+source-to-Convene acceptance; the scenario engine round trip remains blocked by
+the production `mode=live` checks until an isolated scenario policy is deployed.
+Never change the MacBook to `mode=live`, a non-loopback listener, or direct cloud
+transport.
