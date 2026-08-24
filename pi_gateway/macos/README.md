@@ -54,28 +54,20 @@ playback. Use `run` in place of `start` only when a foreground process is useful
 
 The file contains exactly one current frame and is replaced on every source
 update. It uses the live LabVIEW style from the supplied data stream:
-`name: value, name: value`. Create one File Watch variable for each required
-source field. Every variable uses the same settings except its name/regex:
+`name: value, name: value`. Configure one Convene File Watch variable for the
+entire frame:
 
 - **File path:** `/Users/lukewaszyn/Library/Application Support/RECLAIM/scenarios/convene_file_watch.txt`
-- **Variable name:** the exact field name
+- **Variable name:** use the existing whole-frame telemetry variable
 - **JSON path:** leave blank
-- **Capture regex:** `(?:^|, )FIELD_NAME: ([^,\r\n]+)` with `FIELD_NAME`
-  replaced by the exact variable name
+- **Capture regex:** leave blank
 
-Required routing binding is `active_chamber`. Do not add `schema_version`, `mode`,
-`run_id`, `source_id`, `cycle_id`, `seq`, `ts`, or `source_op_state` to the watched
-file. The common `/ingest` endpoint owns unclassified receipt provenance.
-
-Required raw bindings are `PL_surface_temp`, `PL_output_pressure`,
-`PL_chamber_pressure`, `PL_top_condenser_temp`, `PL_bottom_condenser_temp`,
-`PL_wall1`, `PL_wall2`, `PL_bottom1`, `PL_bottom2`, `PL_bottom3`, `PL_bottom4`,
-`PL_flow_meter`, `PL_process`, `PL_preprocess`, `MW_reverse_coupler`,
-`PL_postprocess`, `PL_chamber_pump`, `PL_purge_pump`,
-`MT_crucible_temperature`, `MT_top`, `MT_bottom`, `MW_water_state`,
-`MW_flow_state`, `MW_RF`, `MW_status`, `MW_power`, `MW_reverse`, `MW_period`,
-`MW_width`, `MW_freq`, `MW_water_temp`, `MW_flow_rate`, `PL_Probe1`, and
-`PL_Probe2`.
+Do not split this into 35 Convene variables. Keeping the record intact preserves
+LabVIEW `NaN` tokens and gives the cloud engine the same payload shape for live
+and scenario telemetry. The frame itself contains `active_chamber` plus all 34
+raw fields. Do not add `schema_version`, `mode`, `run_id`, `source_id`,
+`cycle_id`, `seq`, `ts`, or `source_op_state`; the common `/ingest` endpoint owns
+receipt metadata and does not classify the source as live or scenario.
 
 The file is atomically replaced with mode `0600`, so a heartbeat sees either the
 previous complete frame or the next complete frame, never partial text. It
