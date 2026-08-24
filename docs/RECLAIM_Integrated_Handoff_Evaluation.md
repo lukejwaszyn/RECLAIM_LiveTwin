@@ -1,16 +1,18 @@
 # Integrated Handoff Evaluation
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Historical review record — not an operational runbook.** The platform
 > assumptions in this 2026-08-16 snapshot were corrected on 2026-08-17. The live
 > cloud guest is Windows Server 2025 in Kubernetes-managed infrastructure, and
-> the live gateway is a Windows 10 laptop. Findings that cite Linux VM paths,
+> the live gateway is a MacBook. Findings that cite Linux VM paths,
 > systemd units, Raspberry Pi deployment, missing Git initialization, or absent
 > locks describe the repository at review time and are superseded by
 > `deployment/DEPLOYMENT_TOPOLOGY.md` plus the current runbooks. Safety findings
 > remain historical evidence until individually closed.
 
-**Review date:** 2026-08-16  
-**Repository reviewed:** `/Users/lukewaszyn/RECLAIM_LiveTwin`  
+**Review date:** 2026-08-16
+**Repository reviewed:** `/Users/lukewaszyn/RECLAIM_LiveTwin`
 **Review mode:** Read-only architecture, safety, and execution-readiness review. No runtime, service, deployment, CI, secret, host, or Git changes were made.
 
 Citation convention: source references below are repository-relative to `/Users/lukewaszyn/RECLAIM_LiveTwin` and include exact line numbers. This makes, for example, `cloud_engine/push_ingest_dual.py:518-594` an exact local reference to `/Users/lukewaszyn/RECLAIM_LiveTwin/cloud_engine/push_ingest_dual.py`, lines 518 through 594.
@@ -363,7 +365,7 @@ Only decisions that cannot safely be inferred are listed.
 5. **Charge-mass model:** Model/controls owners must choose mass initialization/source, live transition semantics, uncertainty/process noise, observability treatment, and calibration evidence for PL and MT.
 6. **Gateway host boundary:** Decide and authorize removal or relocation of the SYSTEM-level Convene remote-shell agent; identify the permitted narrow remote-management mechanism and its approvers/audit controls.
 7. **Local governor/actuator boundary:** Name the component and owner that independently enforces command schema, source correlation, expiry, replay/idempotency, caps, health, and non-actionable advisory policy. Provide the physical-interlock independence evidence owner.
-8. **Supported build targets:** Choose supported Python versions and target OS/ABI for Mac development, Linux VM, and Windows gateway. Python 3.13 on the staged gateway is not yet an approved target (`deployment/GATEWAY_GO_LIVE.md:254-262`).
+8. **Supported build targets:** Choose supported Python versions and target OS/ABI for Mac development, Linux VM, and MacBook scenario host. Python 3.13 on the staged gateway is not yet an approved target (`deployment/GATEWAY_GO_LIVE.md:254-262`).
 9. **Release trust root:** Choose the signer/identity, trusted verifier policy/key location, tag/release immutability rules, CODEOWNERS, required safety reviewers, and artifact/evidence retention.
 10. **Persistence compatibility:** Define telemetry, command, state, ingest-identity, and queue schema versions; migration/backup/restore rules; and coordinated VM/gateway rollout order.
 11. **Maintenance authority:** Name who may attest idle state and independent power removal, approve artifact digest/rollback target/window, and authorize rollback.

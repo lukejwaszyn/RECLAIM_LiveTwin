@@ -1,7 +1,9 @@
 # cRIO Telemetry Socket — Setup and Configuration
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 **Scope.** How to set up and configure the single TCP socket that carries the RECLAIM
-telemetry shadow stream from the cRIO to the Windows edge gateway. This is the
+telemetry shadow stream from the cRIO to the Windows 10 desktop live gateway. This is the
 offline→live interface: it specifies both ends of the wire so that a cRIO producer
 built to this document mates with the existing gateway receiver without surprises.
 
@@ -15,8 +17,8 @@ authentication, or any return/command channel to this socket.
 
 | Property | cRIO (producer) | Gateway (consumer) |
 |---|---|---|
-| Device | cRIO-9024, VxWorks/PowerPC, LabVIEW 2019 | Windows 10 edge gateway |
-| Address | `192.168.1.2/24` | `192.168.1.1/24` |
+| Device | cRIO-9024, VxWorks/PowerPC, LabVIEW 2019 | Windows 10 desktop live gateway |
+| Address | `<CRIO_SOURCE_IP>/24` | `<WINDOWS10_GATEWAY_IP>/24` |
 | Socket role | **TCP client** — opens the connection | **TCP server** — listens on `9070` |
 | Direction | write-only (never reads frames back) | read-only (never sends — verified: no `send`/`sendall` in `receiver.py`) |
 | Concurrency | exactly one connection | serves one connection at a time (`listen(1)`) |
@@ -54,13 +56,13 @@ its byte output is exactly what the receiver accepts.
 ## 3. Gateway (server) socket configuration
 
 The receiver is already built; these are the knobs on `reclaim_edge.config.Config`
-(set via the YAML selected by `RECLAIM_EDGE_CONFIG` on the Windows gateway). It sets
+(set via the YAML selected by `RECLAIM_EDGE_CONFIG` on the MacBook scenario host). It sets
 `SO_REUSEADDR`, enables `SO_KEEPALIVE`, and on Linux tunes `TCP_KEEPIDLE/INTVL/CNT`;
 the Windows host applies its own keepalive defaults.
 
 | Setting | Recommended | Meaning / effect |
 |---|---|---|
-| `listen_host` | `192.168.1.1` | Bind to the OT NIC specifically on the dual-homed gateway, rather than `0.0.0.0`, so `9070` is never offered on the WAN interface. |
+| `listen_host` | `<WINDOWS10_GATEWAY_IP>` | Bind to the OT NIC specifically on the dual-homed gateway, rather than `0.0.0.0`, so `9070` is never offered on the WAN interface. |
 | `listen_port` | `9070` | The telemetry ingress port. |
 | `max_line_bytes` | `8192` | Pre-LF line bound; must equal the producer's cap. |
 | `conn_idle_timeout_s` | `10`–`30` | A connection silent this long is dropped so a reconnect can be served (half-open defense). Keep it above several telemetry periods so normal jitter never drops a live link; lower it toward 10 s for faster recovery after an ungraceful cRIO drop (see §5). `0` disables the drop — not recommended. |
@@ -74,7 +76,7 @@ can stall a control loop.
 
 | Setting | Recommended | Rationale |
 |---|---|---|
-| Connect target | `192.168.1.1:9070` | The gateway listener; TCP Open Connection with a finite timeout. |
+| Connect target | `<WINDOWS10_GATEWAY_IP>:9070` | The gateway listener; TCP Open Connection with a finite timeout. |
 | Connect timeout | ~2 s | Fail fast and retry with backoff rather than hang. |
 | Write timeout | < one cadence (e.g. 0.5–1 s) | A write that can't complete promptly means the peer is gone; drop and reconnect. |
 | Nagle / `TCP_NODELAY` | not exposed in base LabVIEW TCP | Not required here — each frame is one bounded write ending in LF, so coalescing latency is a non-issue. Only relevant if a lower-level socket config is ever added. |
@@ -143,7 +145,7 @@ Telemetry loop  (normal / low priority; its own loop, decoupled by SNAP):
     backoff = 1000 ms                         # shift register, cap 10000
     loop:
         if conn == <not connected>:
-            conn, err = TCP Open Connection(addr="192.168.1.1", port=9070, timeout=2000ms)
+            conn, err = TCP Open Connection(addr="<WINDOWS10_GATEWAY_IP>", port=9070, timeout=2000ms)
             if err:  Wait(backoff); backoff = min(backoff*2, 10000); next
             backoff = 1000
         val, timed_out = RT FIFO Read(SNAP, timeout=0ms)     # latest only; empty -> skip
@@ -175,13 +177,14 @@ Notes on the primitives:
 
 ## 7. Network and firewall setup
 
-1. Confirm static addressing on the isolated segment: cRIO `192.168.1.2/24`, gateway
-   `192.168.1.1/24`, same subnet, direct cable or a dedicated switch with no other
+1. Confirm static addressing on the isolated segment: cRIO `<CRIO_SOURCE_IP>/24`, gateway
+   `<WINDOWS10_GATEWAY_IP>/24`, same subnet, direct cable or a dedicated switch with no other
    traffic.
-2. On the gateway, allow **inbound TCP 9070 only from `192.168.1.2`** and only on the
-   OT NIC. The repo's `pi_gateway/windows/configure-crio-network-firewall.ps1` is the
-   intended helper for this rule; review it against the site before running.
-3. Bind the gateway listener to `192.168.1.1` (§3) so the port is never exposed on the
+2. On the MacBook, allow **inbound TCP 9070 only from `<CRIO_SOURCE_IP>`** and only on the
+   OT interface. Use the site's approved macOS packet-filter policy and retain
+   the exact rule plus rollback; the macOS application firewall alone is not
+   evidence of source/interface scoping.
+3. Bind the gateway listener to `<WINDOWS10_GATEWAY_IP>` (§3) so the port is never exposed on the
    WAN NIC, and keep the loopback status port (`9080`) off any tunnel.
 4. Do not open any path from this segment to the cloud; the gateway's WAN NIC and the
    TLS publisher handle egress separately.
@@ -218,11 +221,11 @@ steps remain gated on the controls owner.
 
 | Parameter | Value | Owner/where |
 |---|---|---|
-| Gateway endpoint | `192.168.1.1:9070` | fixed |
-| cRIO source address | `192.168.1.2/24` | fixed |
+| Gateway endpoint | `<WINDOWS10_GATEWAY_IP>:9070` | fixed |
+| cRIO source address | `<CRIO_SOURCE_IP>/24` | fixed |
 | Line framing | UTF-8 JSON + single `0x0A` | contract (`frame_builder.py`) |
 | Max line (incl. LF) | 8192 bytes | `max_line_bytes` / producer cap |
-| Gateway listen bind | `192.168.1.1` | `listen_host` |
+| Gateway listen bind | `<WINDOWS10_GATEWAY_IP>` | `listen_host` |
 | Gateway idle drop | 10–30 s | `conn_idle_timeout_s` |
 | Gateway strict fields | `false` | `strict_fields` |
 | Connect timeout | ~2 s | producer |
@@ -231,4 +234,4 @@ steps remain gated on the controls owner.
 | Keepalive | enabled both ends | producer + `receiver.py` |
 | Nagle | n/a in base LabVIEW TCP; not required | producer |
 | Cadence | source-driven (~0.38 s) | producer |
-| Firewall | inbound 9070 from `192.168.1.2` only | gateway OT NIC |
+| Firewall | inbound 9070 from `<CRIO_SOURCE_IP>` only | gateway OT NIC |

@@ -1,9 +1,8 @@
 """RECLAIM Edge Gateway — configuration.
 
 Typed config loaded from YAML (or defaults). One config object is threaded through
-the whole service. On the Windows 10 deployment, secrets (tokens/certs) live in
-the YAML selected by RECLAIM_EDGE_CONFIG under a restricted NTFS ACL, never in
-code.
+the whole service. Deployment secrets live in the YAML selected by
+RECLAIM_EDGE_CONFIG with mode 0600, never in code.
 
 Author: LJW.
 """
@@ -44,11 +43,11 @@ class Config:
     mode: str = "live"                # live | replay | harness
     schema_version: str = "reclaim.telemetry.v1"
 
-    # Seam A — cRIO -> Windows 10 gateway laptop (trusted LAN, plaintext TCP)
+    # Seam A — source -> gateway/scenario receiver
     listen_host: str = "0.0.0.0"       # bind to LAN interface
     listen_port: int = 9070
 
-    # Seam B — Windows 10 gateway laptop -> cloud (TLS)
+    # Seam B — live gateway -> cloud (disabled on the MacBook scenario host)
     transport: str = "console"          # console | https | mqtts
     cloud_url: str = "https://vm.example/ingest"   # https mode
     mqtt_host: str = "vm.example"       # mqtts mode
@@ -58,7 +57,7 @@ class Config:
     tls_ca: str = ""                    # path to CA bundle (optional)
     verify_tls: bool = True
 
-    # Independent best-effort gateway audit tap -> Convene (gw_ variables only).
+    # Independent best-effort gateway audit tap -> Convene (raw variables only).
     # This never participates in the durable VM queue or its acknowledgements.
     convene_enabled: bool = False
     convene_api: str = "https://reservation-backend-25386666460.us-central1.run.app/api"

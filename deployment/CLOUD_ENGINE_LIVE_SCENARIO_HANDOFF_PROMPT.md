@@ -22,7 +22,7 @@ scenario/cRIO -> edge gateway -> authenticated POST /ingest
 -> RECLAIMStateBridge -> VM Convene agent -> sim_*
 ```
 
-The gateway already publishes the same canonical frame directly as `gw_*`.
+The gateway already publishes the same canonical frame directly as exact-name gateway variables.
 `sim_*` must come only from this production `DualPushEngine` instance.
 
 ## Proven live evidence from the gateway
@@ -30,7 +30,7 @@ The gateway already publishes the same canonical frame directly as `gw_*`.
 - Gateway scenario run: `c26e3f03-d380-4e1b-adbf-58edba146ac5`.
 - Engine remained on active run: `e61a982f-2d31-456b-9213-7a403361a4af`.
 - Public engine health was fast (~0.5 s) and stayed at `ingested_total=2830`.
-- Actual gateway runs delivered `gw_*` successfully with zero Convene failures:
+- Actual gateway runs delivered exact-name gateway variables successfully with zero Convene failures:
   30 frames at 10 Hz, 150 at 10 Hz, 120 at 2 Hz, 180 at 1 Hz, plus one isolated
   frame.
 - Cloud acknowledgements were zero for every run. Every frame was eventually
@@ -117,7 +117,7 @@ Coordinate one bounded 1 Hz scenario run from the gateway. PASS requires all:
 5. State bridge health is `ok`, writes the same correlated state, and renews its
    lease.
 6. Convene visibly advances matching `sim_run_id`, `sim_source_id`, and `sim_seq`.
-7. `gw_source_id` and `sim_source_id` match; only the VM owns `sim_*`.
+7. `source_id` and `sim_source_id` match; only the VM owns `sim_*`.
 8. Stopping the stream makes `sim_data_live=false` after the configured freshness
    limit.
 

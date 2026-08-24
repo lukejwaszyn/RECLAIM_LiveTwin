@@ -1,8 +1,12 @@
 # RECLAIM RT-03 / RT-05 Failing Regression Baseline
 
-**Session date:** 2026-08-16  
-**Repository path:** `/Users/lukewaszyn/RECLAIM_LiveTwin`  
-**Scope:** test-first evidence for RT-03 and the type/dimension/finiteness portion of RT-05 only  
+> **Platform note 2026-08-23:** the edge gateway is the MacBook. Windows gateway
+> service/task references in this historical test baseline are superseded;
+> cloud-engine algorithm and Windows VM evidence remain applicable.
+
+**Session date:** 2026-08-16
+**Repository path:** `/Users/lukewaszyn/RECLAIM_LiveTwin`
+**Scope:** test-first evidence for RT-03 and the type/dimension/finiteness portion of RT-05 only
 **Authority:** advisory only; no command/control connection or active authority was created
 
 ## Outcome

@@ -1,0 +1,37 @@
+# RECLAIM MacBook scenario-host template.
+# The Windows 10 desktop remains the sole live-data client/gateway.
+
+src: reclaim-macbook-scenario-01
+run_id: ""
+mode: harness
+schema_version: reclaim.telemetry.v1
+
+# Local scenario tools only. Never bind this MacBook receiver to LAN/WAN.
+listen_host: 127.0.0.1
+listen_port: 9070
+conn_idle_timeout_s: 15.0
+max_line_bytes: 8192
+strict_fields: false
+
+# Fail closed: MacBook never publishes directly to the cloud engine.
+transport: console
+cloud_url: https://disabled.invalid/ingest
+mqtt_host: disabled.invalid
+mqtt_port: 8883
+mqtt_topic: reclaim/scenario
+auth_token: ""
+tls_ca: ""
+verify_tls: true
+
+# Scenario publication to the MacBook Convene machine.
+convene_enabled: true
+convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
+convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
+convene_timeout_s: 10.0
+
+buffer_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/edge-gateway/queue.db
+buffer_max_frames: 500000
+publish_batch: 50
+publish_interval_s: 0.5
+health_interval_s: 10.0
+status_port: 9080

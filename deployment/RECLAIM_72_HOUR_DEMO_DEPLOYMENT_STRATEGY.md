@@ -9,7 +9,8 @@
 **Live posture:** optional stretch path only; currently NO-GO
 
 **Platform correction (2026-08-17):** the live cloud guest is Windows Server
-2025 in Kubernetes-managed infrastructure and the edge gateway is a Windows 10
+2025 in Kubernetes-managed infrastructure, the live gateway is the Windows 10
+desktop, and this MacBook is scenario-only
 laptop. All VM guest work uses PowerShell, Windows services, NTFS paths, and
 ACLs. There is no Linux or Raspberry Pi runtime in Track B.
 
@@ -194,7 +195,7 @@ Every row must be green by `T+48h`; unknown equals NO-GO.
 - [ ] cRIO/gateway static addressing and physical link are verified by their owners.
 - [ ] Gateway live config passes preflight; queue/status behavior and strict cloud
       acknowledgment correlation are verified.
-- [ ] The six telemetry contract gates and three-column V&V pass using `gw_` audit
+- [ ] The six telemetry contract gates and three-column V&V pass using raw gateway audit
       fields before the single live publisher binds `sim_` fields.
 - [ ] Active chamber is `NONE`, power is independently verified removed, and the
       approved operational window is open for deploy/cutover.

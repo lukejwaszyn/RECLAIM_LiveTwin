@@ -148,7 +148,7 @@ Suites green at the time of writing: **`pi_gateway` 55 / `cloud_engine` 76 /
 
 - **`CONVENE_FIRESTORE_INDEX_HANDOVER.md`** — the Convene backend fix. Blocks
   rehearsal scenarios from appearing in Convene at all (no collectors are delivered
-  while the heartbeat 500s). Live `gw_` publishing is unaffected.
+  while the heartbeat 500s). Live raw gateway publishing is unaffected.
 - **`CRIO_INTERFACING_TROUBLESHOOTING_HANDOFF.md`** — for the first-frame session
   once the cRIO is connected.
 

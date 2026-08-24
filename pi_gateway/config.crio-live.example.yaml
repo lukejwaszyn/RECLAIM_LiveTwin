@@ -1,6 +1,5 @@
-# RECLAIM Windows 10 Edge Gateway — cRIO LIVE LINK example.
-# Copy to C:/RECLAIM/pi_gateway/config.windows.yaml and edit for the site.
-# Secrets live here under a restricted NTFS ACL, never in code.
+# RECLAIM Windows 10 live gateway — cRIO LIVE LINK example.
+# Secrets live in a mode-0600 file, never in code.
 #
 # This example pins the Seam A (cRIO -> gateway) socket to the values in
 # deployment/CRIO_TELEMETRY_SOCKET_SETUP.md. Seam B (gateway -> cloud) is
@@ -13,9 +12,11 @@ run_id: ""
 mode: live
 schema_version: reclaim.telemetry.v1
 
-# --- Seam A: cRIO -> Windows 10 gateway (isolated OT LAN, plaintext TCP) ---
+# --- Seam A: cRIO -> Windows 10 desktop live gateway ---
 # Bind to the OT NIC address specifically so 9070 is never offered on the WAN NIC.
-listen_host: 192.168.1.1
+# Safe refusal-by-default value. Replace with the dedicated static OT address
+# only after the interface and real cRIO peer are confirmed.
+listen_host: 127.0.0.1
 listen_port: 9070
 # Half-open guard: drop a silent cRIO connection after this many seconds so a
 # reconnect is served. Keep it above several telemetry periods (~0.38 s each) but
@@ -41,17 +42,18 @@ auth_token: ""                # bearer token (https) / password (mqtts)
 tls_ca: ""                    # path to CA bundle, or empty for system store
 verify_tls: true
 
-# Independent desktop audit tap (gw_ variables only); never blocks the VM queue.
+# Independent live-gateway audit tap; never blocks the VM queue.
 convene_enabled: false
 convene_api: https://reservation-backend-25386666460.us-central1.run.app/api
-convene_credentials_path: C:/Windows/System32/config/systemprofile/.convene_agent.json
+convene_credentials_path: /Users/lukewaszyn/.convene_agent.json
 convene_timeout_s: 10.0
 
 # buffer (store-and-forward)
-buffer_path: C:/ProgramData/RECLAIM/queue.db
+buffer_path: /Users/lukewaszyn/Library/Application Support/RECLAIM/edge-gateway/queue.db
 buffer_max_frames: 500000
 
 # runtime
 publish_batch: 50
 publish_interval_s: 0.5
 health_interval_s: 10.0
+status_port: 9080

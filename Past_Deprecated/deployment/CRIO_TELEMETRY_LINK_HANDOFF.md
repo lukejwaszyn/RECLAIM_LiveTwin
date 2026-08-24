@@ -1,5 +1,7 @@
 # RECLAIM cRIO-to-Edge Telemetry Link Architecture Handoff
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 > **Scope:** produce real, read-only telemetry from the cRIO/LabVIEW application
 > and deliver it over the isolated Ethernet seam to the Windows 10 edge gateway.
 >

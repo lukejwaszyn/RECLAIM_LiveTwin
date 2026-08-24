@@ -1,5 +1,10 @@
 # Lifecycle / Restart Audit — Work Record
 
+> **Gateway platform update 2026-08-23:** Windows task/script observations in
+> this record are historical evidence only. Repeat every gateway lifecycle and
+> restart result on the authoritative MacBook using `launchd`; VM-side Windows
+> evidence remains applicable.
+
 > **Stage:** 2→3 · **Date:** 2026-08-23 · **Branch:** `desktop/edge-gateway`
 > **Scope:** audit of the graceful-closure and restart handling, scenario
 > rehearsal targets, and the deploy-prompt accuracy pass. Advisory path only —
@@ -184,16 +189,16 @@ production dual-ingest path. Rehearsal exercises the engine, not that gating.
 
 ---
 
-## 3c. Convene `gw_` audit tap — PROVEN on the live gateway
+## 3c. Convene raw gateway audit tap — PROVEN on the live gateway
 
-The `gw_` tap was never broken. It had never been **exercised**: the gateway had
+The raw gateway tap was never broken. It had never been **exercised**: the gateway had
 `received: 0`, and the publisher loads its credential lazily on first delivery,
 so `machine_id` was null and nothing had ever been attempted. Convene showed the
 machine as connected because the *agent* heartbeat updates presence before it
 500s — presence is not telemetry.
 
 One labeled synthetic frame (`COMMISSIONING-NOT-CRIO-20260823T203214Z`) sent into
-`192.168.1.1:9070` settled it. Both seams delivered:
+`<WINDOWS10_GATEWAY_IP>:9070` settled it. Both seams delivered:
 
 ```
 received: 0 -> 1        delivered: 1        queue_depth: 0
@@ -202,7 +207,7 @@ convene: machine_id BcryPSMP2iLbSRns5uhm, delivered 1, failed 0, last_success_ag
 ```
 
 So Seam A (cRIO-style TCP -> framer -> durable queue), Seam B (Cloudflare -> VM
-`/ingest`, **acked**), and the independent Convene `gw_` tap all work on the
+`/ingest`, **acked**), and the independent Convene raw gateway tap all work on the
 current build. The remaining Convene defect is unrelated and backend-owned: the
 agent's heartbeat/command plane still returns HTTP 500 for want of the Firestore
 composite `machineCommands` index (2622 occurrences in `agent.log`).
@@ -267,7 +272,7 @@ VmActiveRunId == LatestRunId  (e61a982f-…)
 delivered and ingested by the VM, the queue fully drained, and the retained
 dead-letter count did not move. Run identity matched end to end.
 
-**The 270/180 Convene split is correct, not loss.** The `gw_` tap is deliberately a
+**The 270/180 Convene split is correct, not loss.** The raw gateway tap is deliberately a
 nonblocking one-frame queue that *replaces* an older pending frame rather than
 blocking the receiver — 270 delivered + 180 coalesced = 450 accounted for. Coalescing
 is the audit tap protecting the durable path, exactly as designed; it never
@@ -389,7 +394,7 @@ Convene rehearsal identities. Run them alongside live data.
 
 **Unplugging the Ethernet is safe, and is the right tool for demonstrating
 loss-of-data on the live path.** Verified: with the adapter reading `Disconnected`,
-`192.168.1.1:9070` stayed bound and `/health` kept serving — because the NIC address
+`<WINDOWS10_GATEWAY_IP>:9070` stayed bound and `/health` kept serving — because the NIC address
 is **static** (`PrefixOrigin: Manual`). It is an *ungraceful* drop (no FIN), caught
 by half-open detection plus the 15 s idle timeout; queued frames stay durable and
 the cRIO reconnects on its own. **If that interface is ever moved to DHCP this stops
@@ -407,8 +412,8 @@ an already-established connection and muddies the guarded firewall audit.
 | # | Item | Owner | Blocking |
 |---|---|---|---|
 | 1 | ~~`active_heating_s` / `S_Restart` semantics~~ — **resolved** by measuring forward power instead of op_state (§2) | — | closed |
-| 2 | ~~Convene `gw_` binding not live~~ — **PROVEN 2026-08-23** on the live gateway (§3c); runtime config already had `convene_enabled: true` (repo templates ship `false` by design) | — | closed |
-| 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; `gw_` publish itself is unaffected | Convene backend | external |
+| 2 | ~~Convene raw gateway binding not live~~ — **PROVEN 2026-08-23** on the live gateway (§3c); runtime config already had `convene_enabled: true` (repo templates ship `false` by design) | — | closed |
+| 3 | Convene backend Firestore composite index over `machineId`/`status`/`createdAt` — heartbeat returns HTTP 500; raw gateway publish itself is unaffected | Convene backend | external |
 | 4 | **27 raw `vars` names unconfirmed against a real cRIO frame** (GO_LIVE §9.5); Mod2 semantic aliases withheld pending the approved profile | controls | first live frame |
 | 5 | **Signed maps UNSIGNED** — `cycle_id`, `source_op_state`, `active_chamber` and every raw channel are placeholder/unratified | controls | Gate 1 |
 | 5b | ~~159 persisted dead-lettered frames~~ — **accepted 2026-08-23**: old frames are not of interest provided new ones publish, and the live probe delivered clean (`delivered 1, failed 0, dead_lettered_session 0`). Data left in place rather than purged; purge is a separate explicit action | — | closed |

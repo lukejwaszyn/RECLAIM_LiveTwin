@@ -1,11 +1,13 @@
 # Windows cRIO NI-PSP adapter proof of concept
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Current role:** diagnostic engineering fallback, not the selected production
 > source. See `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` for the proven
 > USB record seam and the authoritative path forward.
 
 This adapter uses the installed 32-bit NI DataSocket COM client to subscribe to
-an explicit input-module allowlist on `192.168.1.2`. It has no runtime resource
+an explicit input-module allowlist on `<CRIO_SOURCE_IP>`. It has no runtime resource
 browse option and contains no shared-variable write, target-control, deployment,
 output-module, command, setpoint, or actuation call.
 
@@ -49,8 +51,8 @@ is not an accepted live cadence and the cause remains to be resolved. This is
 observed commissioning behavior, not a deployed cadence approval.
 
 Missing fields are absent from each canonical frame; the adapter never invents
-or clears them. Convene may retain an older `gw_` value from synthetic or prior
-frames, so every absent field—especially `gw_MW_*` and `gw_PL_purge_pump`—must
+or clears them. Convene may retain an older raw gateway value from synthetic or prior
+frames, so every absent field—especially `MW_*` and `PL_purge_pump`—must
 be gated unavailable using current-frame presence/provenance/freshness. A
 retained display value is not evidence that the live PSP stream supplied it.
 
@@ -71,9 +73,9 @@ connection:
 ## Direct TCP `GET` discovery
 
 The supplied Socket Test VI establishes a second, distinct source seam: the cRIO
-listens on `192.168.1.2:9070`, and a Windows client sends exactly the three ASCII
+listens on `<CRIO_SOURCE_IP>:9070`, and a Windows client sends exactly the three ASCII
 bytes `GET`. `capture-crio-tcp-get.ps1` performs one fail-closed evidence capture.
-It never connects to the gateway at `192.168.1.1:9070`, never parses unknown bytes
+It never connects to the gateway at `<WINDOWS10_GATEWAY_IP>:9070`, never parses unknown bytes
 as telemetry, and refuses to overwrite an existing capture.
 
 Run this only during a controls-approved window in which a second client cannot
@@ -94,7 +96,7 @@ types, units, validity semantics, and snapshot behavior.
 
 `capture_crio_tcp_proxy.py` is a separate diagnostic experiment for observing the
 known-working desktop VI without consuming its socket. It listens only on
-`127.0.0.1:19070`, forwards bytes unchanged to `192.168.1.2:9070`, and records
+`127.0.0.1:19070`, forwards bytes unchanged to `<CRIO_SOURCE_IP>:9070`, and records
 only cRIO-to-VI bytes with a timestamped chunk index. Local socket tests pass, but
 the 2026-08-23 live VI/cRIO attempt did not establish a usable proxied stream or
 capture data. Do not install or treat the proxy as a live source.
@@ -102,7 +104,7 @@ capture data. Do not install or treat the proxy as a live source.
 ## Supervised one-frame live proof
 
 This opens read-only NI-PSP subscriptions and sends one LF-delimited frame to
-the existing desktop gateway. It does not deploy or run a cRIO VI:
+the Windows 10 desktop live gateway. It does not deploy or run a cRIO VI:
 
 ```powershell
 & "$env:WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" `

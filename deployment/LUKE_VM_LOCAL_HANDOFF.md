@@ -1,10 +1,12 @@
 # Luke Handoff — Windows Cloud VM, Convene, and Local Coordination
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Owner:** Luke
 > **Status:** Ready for Windows VM integration
 > **Platform:** Windows Server 2025 VM in Kubernetes-managed cloud infrastructure
 
-Read `DEPLOYMENT_TOPOLOGY.md` first. The edge gateway is a Windows 10 laptop.
+Read `DEPLOYMENT_TOPOLOGY.md` first. The edge gateway is a MacBook.
 No Linux or Raspberry Pi runtime is part of the live pipeline.
 
 ## Finish line for Luke's lane
@@ -24,7 +26,7 @@ No Linux or Raspberry Pi runtime is part of the live pipeline.
 
 | Luke | Adam | Joint checkpoint |
 |---|---|---|
-| PR/CI, exact SHA, Windows VM engine, Cloudflare route, state bridge, VM `sim_` publisher, Convene coordination | Windows 10 gateway, cRIO link, real raw-frame validation, `gw_` audit publisher | endpoint handoff, first accepted frame, field reconciliation, full sequence, fail-closed evidence |
+| PR/CI, exact SHA, Windows VM engine, Cloudflare route, state bridge, VM `sim_` publisher, Convene coordination | Windows 10 live gateway and cRIO link; MacBook scenario publication | endpoint handoff, field reconciliation, full sequence, fail-closed evidence |
 
 Kubernetes/hosting operators own the outer VM workload and storage policy. Controls
 operators retain hardware authority and the independent interlock.
@@ -105,17 +107,17 @@ wired to control.
 ## Wednesday full-pipeline sequence
 
 1. Verify safe hardware state and the independent interlock.
-2. Establish the Windows 10 laptop/cRIO direct network and narrow firewall rule.
+2. Establish the Windows 10 desktop/cRIO direct network and narrow firewall rule.
 3. Run the gateway manually before installing or starting its boot task.
 4. Capture the first real `/latest` frame and reconcile names/units.
 5. Pass fresh, duplicate, harness, stale, gateway-restart, engine-restart, and
    freshness-decay gates.
-6. Publish the separate `gw_` audit namespace; never write `sim_` from the laptop.
-7. Run one complete controlled process sequence with LabVIEW/`gw_`/`sim_`
+6. Publish the separate raw gateway audit namespace; never write `sim_` from the laptop.
+7. Run one complete controlled process sequence with LabVIEW/raw gateway/`sim_`
    agreement and bounded lag.
 8. Exercise network interruption, queue drain, telemetry stop, and component
    restart behavior.
-9. Install the gateway boot task only after the manual path passes.
+9. Install the MacBook `launchd` LaunchAgent only after the foreground path passes.
 
 ## Evidence
 

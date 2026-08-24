@@ -104,7 +104,7 @@ def test_gateway_raw_view_and_cloud_normalization_remain_distinct():
 
     state = DualPushEngine(production=True).ingest(frame)
 
-    # The gw_ machine reads this raw object and therefore retains LabVIEW units.
+    # The gateway machine reads this raw object and therefore retains LabVIEW units.
     assert frame == gateway_raw
     assert gateway_raw["vars"]["PL_bottom1"] == 100.0  # degC
     assert gateway_raw["vars"]["PL_chamber_pressure"] == 760.0  # Torr

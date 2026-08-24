@@ -1,24 +1,30 @@
-# RECLAIM Windows Gateway Closeout
+# Historical Windows gateway closeout
 
-This directory contains the guarded desktop-side workflow for the Windows 10
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
+> **Superseded 2026-08-23:** the authoritative edge gateway is the MacBook.
+> Nothing in this directory is an operational competition procedure. Retain it
+> only as evidence of the earlier Windows commissioning and rollback design.
+
+This directory contains the retired desktop-side workflow for the former Windows
 edge gateway. `pi_gateway` is a legacy directory name; no Raspberry Pi is in the
 live path.
 
 For a replacement laptop, start with
 `deployment/NEW_GATEWAY_SCENARIO_DEPLOYMENT.md`. It pins one Git SHA, stages the
 service without overwriting its protected config, installs the gateway, and
-requires correlated live `gw_*` plus `sim_*` evidence. The current VM-side
+requires correlated live exact-name gateway variables plus `sim_*` evidence. The current VM-side
 blocking issue and its copy/paste owner prompt are in
 `deployment/CLOUD_ENGINE_LIVE_SCENARIO_HANDOFF_PROMPT.md`.
 
 ## Fixed topology
 
 ```text
-cRIO 192.168.1.2 / Scan Engine network-published variables
+cRIO <CRIO_SOURCE_IP> / Scan Engine network-published variables
   -> NI-PSP read over the isolated Ethernet link
-Windows 10 input-only PSP adapter
-  -> compact LF-delimited TCP to 192.168.1.1:9070 on the same desktop
-Windows 10 gateway process
+Historical Windows input-only PSP adapter
+  -> compact LF-delimited TCP to <WINDOWS10_GATEWAY_IP>:9070 on the same desktop
+MacBook scenario host process
   -> durable SQLite queue
   -> authenticated HTTPS /ingest through the VM Cloudflare hostname
 Windows Server 2025 predictive-engine VM
@@ -26,7 +32,7 @@ Windows Server 2025 predictive-engine VM
 Independent audit tap:
 canonical gateway frame
   -> nonblocking /machine/publish using desktop machine credential
-  -> gw_ variables only
+  -> raw gateway variables only
 ```
 
 The desktop Convene agent never writes `sim_`. The VM is the only `sim_`
@@ -36,9 +42,9 @@ publisher. Neither path authorizes command actuation.
 
 Already applied on this desktop:
 
-- Ethernet: `192.168.1.1/24`, Private, no default route.
-- cRIO peer: `192.168.1.2/24`.
-- Inbound TCP 9070 is allowed only from `192.168.1.2` on Ethernet.
+- Ethernet: `<WINDOWS10_GATEWAY_IP>/24`, Private, no default route.
+- cRIO peer: `<CRIO_SOURCE_IP>/24`.
+- Inbound TCP 9070 is allowed only from `<CRIO_SOURCE_IP>` on Ethernet.
 - TCP 9080 is not exposed; status remains loopback-only.
 
 Re-audit or idempotently reapply from elevated PowerShell:
@@ -50,14 +56,14 @@ Re-audit or idempotently reapply from elevated PowerShell:
 
 Do not configure or deploy a cRIO/LabVIEW TCP sender. The selected source is the
 separate input-only Windows subscriber in `crio_psp_adapter`, which reads an
-explicit POC allowlist and is the sole TCP writer to `192.168.1.1:9070`. Replace
+explicit POC allowlist and is the sole TCP writer to `<WINDOWS10_GATEWAY_IP>:9070`. Replace
 that POC allowlist with the controls-approved production allowlist only after the
 mapping gate passes.
 The narrow inbound cRIO firewall rule remains unchanged as defensive historical
 configuration, but it is not evidence of the selected adapter path. Do not add a
 default gateway to the cRIO-facing Ethernet interface.
 
-## 2. Desktop Convene identity and `gw_` audit tap
+## 2. Desktop Convene identity and raw gateway audit tap
 
 Use the desktop-only tool; it does not inspect or change VM bindings:
 
@@ -73,7 +79,7 @@ create it, but direct `/machine/publish` is independent and reaches authenticate
 request validation.
 
 The production gateway enables a nonblocking one-frame worker that publishes the
-same canonical frame as `gw_` scalars directly. Verify its delivered/failed/
+same canonical frame as raw gateway scalars directly. Verify its delivered/failed/
 coalesced counters under `/health` and compare its names with
 `deployment/CONVENE_GW_MAPPING.md`. Do not configure shell collectors.
 
@@ -106,7 +112,7 @@ Back on this desktop, from elevated PowerShell:
 
 The script prompts invisibly for the ingest token, backs up the prior config,
 updates `cloud_url`/`auth_token`, enables the credential-reference-only direct
-Convene `gw_` publisher, validates through the deployed Python loader, and
+Convene raw gateway publisher, validates through the deployed Python loader, and
 restricts the config to SYSTEM and Administrators.
 
 If the installer reports an unexpected config ACL entry, repair the active file
@@ -143,7 +149,7 @@ a live source session is connected:
 ```
 
 This creates explicitly labeled `COMMISSIONING-NOT-CRIO-*` data in both the VM
-and desktop Convene `gw_` view. Run it once, retain the JSON evidence, and do not
+and desktop Convene raw gateway view. Run it once, retain the JSON evidence, and do not
 confuse its values with physical measurements.
 
 To span the predictive-state bridge and multiple Convene heartbeats, run a
@@ -169,11 +175,11 @@ thermocouples plus `scan_Mod3_AI0_raw`, `scan_Mod3_AI1_raw`, and
 `scan_Mod3_AI2_raw`. It does not provide `MW_*`, `PL_purge_pump`, the remaining
 process fields, or authoritative state/chamber/cycle metadata.
 
-The gateway forwards only fields present in the current frame. A Convene `gw_`
+The gateway forwards only fields present in the current frame. A Convene raw gateway
 value retained from an earlier synthetic or live frame must be shown unavailable
 when its source field is absent or its provenance/freshness does not match the
-current frame. In particular, do not interpret retained `gw_MW_*` or
-`gw_PL_purge_pump` values as current live telemetry.
+current frame. In particular, do not interpret retained `MW_*` or
+`PL_purge_pump` values as current live telemetry.
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:9080/health
@@ -192,6 +198,6 @@ Do not claim cutover or full-cycle operation until all are factual:
 - The durable queue drains through authenticated TLS with no unexpected drops or
   dead letters, and the VM state reflects the same sequence.
 - `/health` reports successful direct Convene publishes with no unexplained
-  failures/coalescing, and `gw_` agrees with the independent cRIO/VM evidence.
+  failures/coalescing, and raw gateway agrees with the independent cRIO/VM evidence.
 - The VM remains the sole `sim_` publisher.
 - `/command` remains advisory and disconnected from every actuator/control path.

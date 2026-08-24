@@ -1,5 +1,7 @@
 # RECLAIM Live Twin — CI/CD Architecture
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 > **Status:** Local CI/release-candidate baseline and private GitHub remote exist;
 > branch/tag controls and every production-promotion mechanism remain pending.
 > The red-team
@@ -7,7 +9,7 @@
 > take precedence over any conflicting language in this document.
 >
 > **Scope:** controlled code verification and future promotion from the MacBook
-> workspace to the predictive-engine VM and Windows gateway.
+> workspace to the predictive-engine VM and MacBook scenario host.
 
 ## Purpose
 
@@ -30,8 +32,8 @@ Approved release artifact is created
         +--> VM deployment --> Windows services: predictive engine + state bridge
         |                      + named Cloudflare Tunnel
         |
-        +--> Gateway deployment --> TeamViewer-operated PowerShell script
-                                      -> Windows Scheduled Task
+        +--> Gateway deployment --> local macOS operator
+                                      -> verified release + launchd LaunchAgent
 ```
 
 ## Topology and responsibilities
@@ -41,15 +43,14 @@ Approved release artifact is created
 | MacBook workspace | Source development, local sanity checks, Monte Carlo fault injection, release approval | Git client and GitHub web interface / CLI |
 | CI service | Tests, release packaging, traceability | GitHub Actions hosted runner |
 | Predictive-engine VM | Windows Server 2025 guest in Kubernetes-managed cloud infrastructure; production engine, loopback-only state bridge, headless Convene agent installed during bootstrap, Cloudflare Tunnel | Reviewed PowerShell/WinSW deployment; never a general CI runner |
-| Windows gateway | cRIO receiver, durable queue, authenticated cloud publisher | Approved, operator-run PowerShell release script through TeamViewer |
+| Windows 10 live gateway | cRIO receiver and production forwarding | Windows gateway operator |
+| MacBook scenario host | Loopback scenario receiver and Convene publisher | Local operator, exact SHA, macOS venv, protected config, and `launchd` LaunchAgent |
 | cRIO / LabVIEW | Live telemetry producer | Never deployed by this pipeline |
 | Convene | Read-only state consumer and visualization | Not changed until live V&V passes |
 
-The Windows gateway's WDAC policy prevents conventional inbound SSH/RDP
-administration. This is an architectural constraint: use TeamViewer for the
-gateway deployment step until a specifically approved, restricted outbound
-deployment mechanism exists. Do **not** repurpose the SYSTEM-level Convene agent
-as a general CI deployment runner.
+The gateway is administered locally on the MacBook. CI must not become a
+privileged deployment runner and the Convene credential must not be repurposed
+as a general remote-command channel.
 
 ## Source code enters the system
 
@@ -204,32 +205,32 @@ restart and would invalidate the gateway's cloud URL.
 
 ### Gateway deployment
 
-The gateway rollout remains human-triggered until a narrowly scoped outbound
-deployment capability is approved. The operator uses TeamViewer to run the
-idempotent deployment script after approving `production-gateway`.
+The gateway rollout remains human-triggered. The local MacBook operator verifies
+the approved artifact and performs the cutover after approving
+`production-gateway`.
 
 For release `v0.2.0`, the script must:
 
 1. Download the selected release archive and verify its signed manifest and
    exact digest against the independently pinned trust policy.
-2. Expand it to `C:\\RECLAIM\\releases\\v0.2.0`.
+2. Expand it under `~/Library/Application Support/RECLAIM/releases/v0.2.0`.
 3. Build/update the release virtual environment.
 4. Validate configuration without printing its token.
 5. Run gateway tests.
-6. Stop the `RECLAIM-EdgeGateway` scheduled task.
-7. Switch a `C:\\RECLAIM\\current` junction or equivalent stable path to the
+6. Stop `com.reclaim.edge-gateway` with `launchctl`.
+7. Switch a `current` symlink or equivalent stable path to the
    chosen release.
-8. Start the task and verify loopback health, queue state, and cloud
+8. Start the LaunchAgent and verify loopback health, queue state, and cloud
    acknowledgement.
 9. If verification fails, switch back to the previous release and restart it.
 
-Keep `C:\\RECLAIM\\pi_gateway\\config.windows.yaml` and
-`C:\\ProgramData\\RECLAIM\\queue.db` outside release directories. Restrict the
-configuration ACL because it contains the ingest token.
+Keep the protected configuration and queue under
+`~/Library/Application Support/RECLAIM/edge-gateway/`, outside release
+directories, with mode `0600` for credential-bearing files.
 
 Do not deploy the gateway until its existing live gates are complete: cRIO IP
 configuration, stable VM endpoint, real tokens, the six contract gates, and the
-three-column `gw_` / `sim_` V&V.
+three-column raw gateway / `sim_` V&V.
 
 ## Deprecating and offlining old code
 
@@ -239,7 +240,7 @@ code.
 1. **Run side-by-side.** Deploy a new version into a fresh directory and, when
    needed, a new port. Do not overwrite the active service in place.
 2. **Validate.** Complete health, duplicate/stale/restart contract gates and the
-   `gw_` versus `sim_` validation.
+   raw gateway versus `sim_` validation.
 3. **Cut over.** Stop the previous service or publisher only after the new one is
    proven. There must be one live gateway for the cRIO stream and one writer of
    the Convene `sim_` namespace.
@@ -272,8 +273,8 @@ active in order to be recoverable.
 6. Complete the VM manual deployment, then migrate it to a named Cloudflare
    Tunnel.
 7. Add the approved, fixed pull-based VM installer and deployment receipt flow.
-8. Add the TeamViewer-operated gateway release script.
-9. Complete live contract gates and `gw_` / `sim_` V&V before production gateway
+8. Add the local MacBook release/rollback workflow and verify the `launchd` target.
+9. Complete live contract gates and raw gateway / `sim_` V&V before production gateway
    promotion.
 
 ## Deliberately excluded complexity

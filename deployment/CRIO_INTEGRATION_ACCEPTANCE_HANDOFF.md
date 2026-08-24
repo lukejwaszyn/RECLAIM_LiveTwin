@@ -14,7 +14,7 @@ tool output, or a document.
 
 You are the integration and acceptance coordinator for the cRIO telemetry seam. The
 transport is built: the cRIO RT producer emits the source frame and the LabVIEW team has
-proven frames arriving at the desktop over TCP to `192.168.1.1:9070`. Your job is to
+proven frames arriving at the desktop over TCP to `<WINDOWS10_GATEWAY_IP>:9070`. Your job is to
 **review that producer, stand up the production desktop (gateway) path, and run the
 gated acceptance** — not to write new interface code.
 
@@ -27,9 +27,9 @@ NO-GO for any production claim.
 
 ## 2. Endpoint identities (name precisely; never "this machine")
 
-- **cRIO-9024 / VxWorks / PowerPC:** `192.168.1.2/24` — the telemetry producer (TCP
+- **cRIO-9024 / VxWorks / PowerPC:** `<CRIO_SOURCE_IP>/24` — the telemetry producer (TCP
   client).
-- **Windows 10 edge gateway:** `192.168.1.1/24`, TCP receiver `9070` — the Python
+- **Windows 10 desktop live gateway:** `<WINDOWS10_GATEWAY_IP>/24`, TCP receiver `9070` — the Python
   gateway (TCP server). Read-only health/latest on loopback `127.0.0.1:9080`.
 - **Windows Server 2025 predictive-engine VM:** downstream of the gateway.
 - **Convene:** downstream visualization only.
@@ -37,8 +37,8 @@ NO-GO for any production claim.
 ## 3. Current state — what is already done
 
 - **Transport built.** The cRIO RT producer opens one outbound TCP connection to
-  `192.168.1.1:9070` and writes one JSON object + LF per snapshot; frames have been read
-  on the desktop bench. The wiring is ready.
+  `<WINDOWS10_GATEWAY_IP>:9070` and writes one JSON object + LF per snapshot; frames have been read
+  on the bench. The wiring is ready.
 - **Offline contract complete and tested (Gate 2).** `crio_source_record/` — strict
   evidence parser, frame builder, quality/incomplete-bank policy, bench replay harness,
   and a **conformance checker** — 70 passing tests. The gateway receiver (55 tests) and
@@ -107,15 +107,15 @@ authoritative until §6-A confirms the signatures.
 
 1. **Own the port with the gateway, not the test VI.** Only one process can listen on
    `9070`. Stop the LabVIEW bench reader and start the Python gateway as the listener;
-   the cRIO keeps pointing at `192.168.1.1:9070`.
+   the cRIO keeps pointing at `<WINDOWS10_GATEWAY_IP>:9070`.
 2. **Configure the gateway** from `pi_gateway/config.crio-live.example.yaml`: bind
-   `listen_host: 192.168.1.1`, `listen_port: 9070`, `conn_idle_timeout_s` ~15,
+   `listen_host: <WINDOWS10_GATEWAY_IP>`, `listen_port: 9070`, `conn_idle_timeout_s` ~15,
    `max_line_bytes: 8192`, `strict_fields: false`. Set Seam B (gateway→VM) per
    `deployment/GATEWAY_GO_LIVE.md`.
-3. **Firewall + isolation.** Run `pi_gateway/windows/configure-crio-network-firewall.ps1`
-   in `Audit` first, then `-Mode Apply`: inbound TCP `9070` **from `192.168.1.2` only** on
-   the OT NIC, Private profile, and confirm the OT NIC has no default route. Confirm the
-   `InterfaceAlias` matches the actual OT adapter.
+3. **Firewall + isolation.** Verify the Windows 10 gateway OT interface/address and no-default-route
+   state, then apply only the site's reviewed macOS packet-filter policy scoped
+   to inbound TCP `9070` from `<CRIO_SOURCE_IP>` on that interface. Retain the
+   exact rule and rollback; never expose `9080`.
 4. **Pre-flight the software.** From `pi_gateway`, `cloud_engine`, and
    `crio_source_record`, run `PYTHONPATH="$PWD" python3 -m pytest tests -q` (expect
    55 / 76 / 70) and run the bench replay harness. Green is the go-signal to point the
@@ -148,7 +148,7 @@ is an explicitly labeled engineering shadow stream:
 - [ ] State/chamber/cycle/time sources authoritative and signed; clock inside the 15 s
       freshness window.
 - [ ] Producer is lower-priority and cannot block control or the USB logger.
-- [ ] One writer targets `192.168.1.1:9070`; no command/return path exists.
+- [ ] One writer targets `<WINDOWS10_GATEWAY_IP>:9070`; no command/return path exists.
 - [ ] Frame size, cadence, reconnect, drop, and stale policies reviewed.
 - [ ] Same-time USB/LabVIEW/gateway/VM correlation passes; disconnect/restart shows no
       control impact or stale replay.
@@ -170,7 +170,7 @@ process — not merely making bytes arrive.
 Everything referenced lives on `desktop/edge-gateway`: `crio_source_record/` (contract,
 conformance checker, bench harness, tests), `pi_gateway/` (gateway + config + firewall
 script), `cloud_engine/` (ingest + adapter), and the `deployment/CRIO_*` docs. Keep the
-`sim_`/`gw_` writer separation and the synthetic-commissioned gateway/VM/Convene path
+`sim_`/raw gateway writer separation and the synthetic-commissioned gateway/VM/Convene path
 untouched. Use focused commits; `git diff --check` clean; commit no LabVIEW binaries,
 raw data runs, credentials, or target exports. Maintain the evidence table
 (`Claim | proven/inferred/unknown | Evidence | Owner | Gate impact`) in

@@ -1,7 +1,12 @@
 # RECLAIM Integrated Remediation Architecture and Working-Session Plan
 
-**Date:** 2026-08-16  
-**Status:** Proposed implementation architecture — no runtime changes made by this document  
+> **Gateway supersession 2026-08-23:** the edge gateway is now the MacBook and
+> uses the macOS runtime/`launchd` contract in `pi_gateway/macos/README.md`.
+> Windows gateway task/path examples below are design history; Windows Server
+> 2025 VM instructions remain current.
+
+**Date:** 2026-08-16
+**Status:** Proposed implementation architecture — no runtime changes made by this document
 **Purpose:** Turn the predictive-engine, gateway, and CI/CD red-team findings into one safe delivery program.
 
 ## 1. Outcome and non-negotiable constraints

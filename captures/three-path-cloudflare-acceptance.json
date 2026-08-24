@@ -1,0 +1,108 @@
+{
+  "schema_version": "reclaim.three-path-acceptance.v1",
+  "started_at": "2026-08-24T05:20:16.984403+00:00",
+  "git_sha": "e29b2a6d6b28d753bd7e4011e207ef3ec2d5bb81",
+  "tunnel_mode": "cloudflare-quick-tunnel",
+  "scenarios": [
+    {
+      "profile": "nominal",
+      "frames_received": 401,
+      "frames_delivered": 401,
+      "queue_depth": 0,
+      "drops": 0,
+      "dead_letter": 0,
+      "gateway_convene_delivered": 119,
+      "gateway_convene_failed": 0,
+      "sink_gw_publications": 119,
+      "sink_sim_heartbeats": 84,
+      "correlation": {
+        "run_id": "three-path-20260824T052043Z",
+        "source_id": "reclaim-synthetic-scenario:nominal:earth_lab",
+        "cycle_id": "synthetic-nominal-earth_lab-001",
+        "seq": 401,
+        "source_op_state": "S_MicrowaveHeating",
+        "raw_bed_mean_degC": 209.59,
+        "computed_bed_K": 482.74,
+        "sim_data_live": true
+      },
+      "passed": true
+    },
+    {
+      "profile": "power-outage",
+      "frames_received": 901,
+      "frames_delivered": 901,
+      "queue_depth": 0,
+      "drops": 0,
+      "dead_letter": 0,
+      "gateway_convene_delivered": 374,
+      "gateway_convene_failed": 0,
+      "sink_gw_publications": 374,
+      "sink_sim_heartbeats": 271,
+      "correlation": {
+        "run_id": "three-path-20260824T052043Z",
+        "source_id": "reclaim-synthetic-scenario:power_outage:earth_lab",
+        "cycle_id": "synthetic-power_outage-earth_lab-001",
+        "seq": 1302,
+        "source_op_state": "S_MicrowaveHeating",
+        "raw_bed_mean_degC": 484.387,
+        "computed_bed_K": 757.537,
+        "sim_data_live": true
+      },
+      "passed": true
+    },
+    {
+      "profile": "lunar",
+      "frames_received": 401,
+      "frames_delivered": 401,
+      "queue_depth": 0,
+      "drops": 0,
+      "dead_letter": 0,
+      "gateway_convene_delivered": 489,
+      "gateway_convene_failed": 0,
+      "sink_gw_publications": 489,
+      "sink_sim_heartbeats": 356,
+      "correlation": {
+        "run_id": "three-path-20260824T052043Z",
+        "source_id": "reclaim-synthetic-scenario:nominal:lunar_surface",
+        "cycle_id": "synthetic-nominal-lunar_surface-001",
+        "seq": 1703,
+        "source_op_state": "S_MicrowaveHeating",
+        "raw_bed_mean_degC": 152.724,
+        "computed_bed_K": 425.874,
+        "sim_data_live": true
+      },
+      "passed": true
+    }
+  ],
+  "engine_tunnel_host": "obj-named-journalism-marks.trycloudflare.com",
+  "convene_tunnel_host": "bicycle-cams-jean-washing.trycloudflare.com",
+  "stale_expiry": {
+    "passed": true,
+    "sim_data_live": false,
+    "sim_bridge_status": "stale",
+    "sim_bridge_error_code": "STATE_STALE"
+  },
+  "final_gateway_health": {
+    "received": 1703,
+    "delivered": 1703,
+    "queue_depth": 0,
+    "drops": 0,
+    "dead_letter": 0,
+    "transport": "https",
+    "mode": "live",
+    "convene": {
+      "enabled": true,
+      "machine_id": "macbook-three-path-acceptance",
+      "delivered": 489,
+      "failed": 0,
+      "coalesced": 1214,
+      "last_success_age_s": 15.83
+    }
+  },
+  "heartbeat_agent": {
+    "delivered": 385,
+    "failed": 0
+  },
+  "passed": true,
+  "completed_at": "2026-08-24T05:24:06.280943+00:00"
+}

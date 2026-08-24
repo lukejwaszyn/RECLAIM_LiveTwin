@@ -1,0 +1,65 @@
+# RECLAIM MacBook scenario-host runtime
+
+> The Windows 10 desktop is the sole live-data client/gateway. The MacBook is
+> loopback-only and scenario-only. It must never connect to the real cRIO,
+> expose its receiver on a LAN, or publish directly to the cloud engine.
+
+The MacBook serves synthetic and approved capture-replay scenarios through its
+own Convene machine. The downstream Convene-to-VM scenario pipe is configured
+elsewhere.
+
+## Required installed configuration
+
+Run from the repository root:
+
+```bash
+.venv-macbook/bin/python pi_gateway/macos/configure_scenario_host.py
+launchctl kickstart -k "gui/$(id -u)/com.reclaim.edge-gateway"
+curl --fail http://127.0.0.1:9080/health
+```
+
+Required health/config state:
+
+- `src: reclaim-macbook-scenario-01`
+- `mode: harness` (or deliberately selected `replay`)
+- `listen_host: 127.0.0.1`
+- `transport: console`
+- empty cloud ingest token
+- Convene enabled with the MacBook machine credential
+
+`configure_production_interfaces.py` is a retired guard and always refuses.
+
+## Built-in scenarios
+
+```bash
+pi_gateway/macos/start-rehearsal-scenario.sh nominal
+pi_gateway/macos/start-rehearsal-scenario.sh power-outage
+pi_gateway/macos/start-rehearsal-scenario.sh lunar
+pi_gateway/macos/start-rehearsal-scenario.sh loss-of-data
+```
+
+The launcher refuses unless health reports `harness` or `replay`. For bounded
+checks, set `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to
+accelerate playback.
+
+## Windows capture replay
+
+The supplied comma-separated `name: value` capture format is replayed with:
+
+```bash
+.venv-macbook/bin/python tools/replay_windows_data_stream.py \
+  "/path/to/data_stream.txt" --max-frames 100 --speed 10
+```
+
+The replayer preserves exact channel names and scalar values. It labels unknown
+sequencer state `S_Unknown`; it never claims the file is current physical data.
+
+## Acceptance
+
+During a bounded run, `/health` must show received equals delivered, queue depth
+zero, no drops/dead letters, and zero Convene failures. `/latest` must show
+`mode: harness` or `replay` and a scenario-labeled `source_id`.
+
+Ports `9070` and `9080` must both listen only on `127.0.0.1`. The MacBook must
+hold no VM ingest token. Preserve the configuration backup, logs, evidence, and
+exact Git SHA.

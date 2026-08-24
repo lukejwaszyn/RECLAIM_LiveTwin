@@ -7,7 +7,7 @@ Run from elevated PowerShell after the predictive-engine operator privately
 provides the final HTTPS /ingest URL and ingest token. The token is prompted as a
 SecureString, never accepted on the command line, and never printed. The script
 backs up the prior config under an ACL-protected directory, updates the VM
-cloud_url/auth_token plus the credential-reference-only Convene gw_ audit path,
+cloud_url/auth_token plus the credential-reference-only Convene raw audit path,
 validates through the deployed Python loader, and restricts the active config to
 SYSTEM and Administrators.
 #>
@@ -241,7 +241,7 @@ try {
 
     Write-Host "Gateway config finalized and validated."
     Write-Host "Destination: $($CloudUrl.TrimEnd('/'))"
-    Write-Host "Convene audit: $($ConveneApi.TrimEnd('/'))/machine/publish (gw_ only)"
+    Write-Host "Convene audit: $($ConveneApi.TrimEnd('/'))/machine/publish (unprefixed raw variables)"
     Write-Host "Credential: stored but not displayed"
     Write-Host "ACL: SYSTEM and Administrators only"
     Write-Host "Backup: $backupPath"

@@ -8,13 +8,13 @@ See ``deployment/CONVENE_FIRESTORE_INDEX_HANDOVER.md``.
 
 This module inverts the direction. Instead of waiting to be polled, it polls the
 scenario locally and *pushes* to ``/machine/publish`` -- the same technique the
-gateway's ``gw_`` audit tap already proves under sustained load. It needs no
+gateway's raw audit tap already proves under sustained load. It needs no
 collector, so it is unaffected by the missing index.
 
 **Isolation contract.** Per ``deployment/CONVENE_REINTEGRATION_HANDOFF.md``,
 rehearsal data is synthetic and must never be mistakable for live state. Each
 profile publishes under its own non-live identity and ``rehearsal_*`` prefix,
-and this module refuses to emit a ``sim_`` or ``gw_`` name or to load the
+and this module refuses to emit a live ``sim_`` or legacy ``gw_`` name or to load the
 production gateway credential. Those are hard failures, not warnings.
 """
 from __future__ import annotations
@@ -96,7 +96,7 @@ def state_to_variables(state: Dict[str, Any], prefix: str) -> Dict[str, Any]:
     # write synthetic data into a live namespace.
     for name in variables:
         if name.startswith(RESERVED_PREFIXES):
-            raise ValueError("rehearsal publisher must never write sim_ or gw_ variables")
+            raise ValueError("rehearsal publisher must never write live or legacy-prefixed variables")
     return variables
 
 

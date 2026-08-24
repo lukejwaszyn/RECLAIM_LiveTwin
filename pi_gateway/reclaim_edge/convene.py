@@ -1,7 +1,7 @@
-"""Best-effort Convene audit publisher for the Windows desktop gateway.
+"""Best-effort Convene publisher for gateway/scenario machine identities.
 
 This path is deliberately independent of the durable cloud publisher. Each
-canonical cRIO frame is flattened to ``gw_`` scalar variables and submitted to
+canonical cRIO frame is flattened to unprefixed scalar variables and submitted to
 Convene's connected-machine ``/machine/publish`` endpoint. A one-frame queue
 coalesces during outages so Convene can never block cRIO receipt or VM delivery.
 """
@@ -40,21 +40,25 @@ def _scalar(value: Any) -> bool:
 
 
 def frame_to_variables(frame: Dict[str, Any]) -> Dict[str, Any]:
-    """Flatten one canonical frame to the desktop-only ``gw_`` namespace."""
+    """Flatten one canonical frame to the gateway machine's raw namespace."""
     variables: Dict[str, Any] = {}
     for name in _ENVELOPE_FIELDS:
         value = frame.get(name)
         if _scalar(value):
-            variables[f"gw_{name}"] = value
+            variables[name] = value
 
     raw = frame.get("vars")
     if isinstance(raw, dict):
         for name, value in raw.items():
             if isinstance(name, str) and name and _scalar(value):
-                variables[f"gw_{name}"] = value
+                variables[name] = value
 
-    if any(name.startswith("sim_") for name in variables):  # defense in depth
-        raise ValueError("desktop Convene publisher must never produce sim_ variables")
+    # Never manufacture a namespace here. Source fields are published under
+    # their exact canonical names, including a contract-defined gw_ name when
+    # one is genuinely present. The MacBook must still never impersonate the
+    # cloud engine's sim_ writer.
+    if any(name.startswith("sim_") for name in variables):
+        raise ValueError("gateway Convene publisher must never emit sim_ variables")
     return variables
 
 
@@ -110,7 +114,7 @@ class ConvenePublisher(threading.Thread):
             self._load_credential()
         variables = frame_to_variables(frame)
         if not variables:
-            raise ValueError("canonical frame produced no scalar gw_ variables")
+            raise ValueError("canonical frame produced no scalar gateway variables")
         response = self._requests.post(
             f"{self.cfg.convene_api.rstrip('/')}/machine/publish",
             json={"variables": variables},
@@ -124,22 +128,39 @@ class ConvenePublisher(threading.Thread):
         return True
 
     def run(self) -> None:
+        pending: Dict[str, Any] | None = None
+        backoff_s = 0.5
         while not self.stop.is_set():
+            if pending is None:
+                try:
+                    pending = self._pending.get(timeout=0.5)
+                except queue.Empty:
+                    continue
             try:
-                frame = self._pending.get(timeout=0.5)
-            except queue.Empty:
-                continue
-            try:
-                self._deliver(frame)
+                self._deliver(pending)
                 self.delivered += 1
                 self.last_success_at = time.time()
+                pending = None
+                backoff_s = 0.5
             except Exception as exc:
                 self.failed += 1
                 now = time.time()
                 if now - self._last_failure_log_at >= 30.0:
-                    log.warning("gw_ audit publish failed (%d total): %s",
+                    log.warning("gateway Convene publish failed (%d total): %s",
                                 self.failed, exc)
                     self._last_failure_log_at = now
+                # Preserve the newest audit value across a transient Convene
+                # failure. If telemetry advanced while this request was in
+                # flight, supersede the failed older value; otherwise retry it.
+                try:
+                    newer = self._pending.get_nowait()
+                except queue.Empty:
+                    newer = None
+                if newer is not None:
+                    pending = newer
+                    self.coalesced += 1
+                self.stop.wait(backoff_s)
+                backoff_s = min(backoff_s * 2.0, 10.0)
 
     @property
     def last_success_age(self) -> float | None:

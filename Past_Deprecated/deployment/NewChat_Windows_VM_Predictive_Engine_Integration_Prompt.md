@@ -1,5 +1,7 @@
 # Fresh Codex Prompt — Windows VM Predictive-Engine Integration
 
+> **Archived platform notice (2026-08-23):** the authoritative edge gateway is now the MacBook. Any Windows, Linux, Raspberry Pi, desktop-gateway, address, service, or task instructions below are historical evidence only and must not be used for the competition deployment. Use `deployment/DEPLOYMENT_TOPOLOGY.md` and `pi_gateway/macos/README.md`.
+
 Copy the prompt below into a new Codex session running directly on the
 cloud-hosted Windows Server 2025 VM.
 

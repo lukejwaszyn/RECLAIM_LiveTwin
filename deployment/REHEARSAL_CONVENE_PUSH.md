@@ -13,14 +13,14 @@ second source of predicted state:
 TruthPlant scenario
   -> raw LabVIEW-shaped TCP frame
   -> installed edge gateway :9070
-       -> direct Convene audit publish (gw_*)
+       -> direct Convene audit publish (exact-name gateway variables)
        -> durable HTTPS publish to the production cloud /ingest
   -> DualPushEngine /state
   -> installed VM state bridge / Convene agent (sim_*)
 ```
 
 The gateway is the single fan-out point. The exact canonical frame represented
-by `gw_*` is the frame consumed by the cloud engine. Only the cloud engine may
+by exact-name gateway variables is the frame consumed by the cloud engine. Only the cloud engine may
 produce predicted `sim_*` state.
 
 The older scenario services on 8177-8181 and
@@ -32,7 +32,7 @@ but are not part of this route and must not be started alongside it.
 The first synthetic-cRIO implementation omitted `active_chamber`. The gateway
 therefore emitted `active_chamber: null`; production `/ingest` rejects that
 envelope before estimator stepping. This explains the observed split where a
-gateway-side `gw_*` audit could advance without a corresponding engine/sim
+gateway-side exact-name gateway variables audit could advance without a corresponding engine/sim
 output.
 
 `tools/synthetic_crio.py` now emits every required upstream hint:
@@ -47,7 +47,7 @@ output.
 The installed gateway still owns `schema_version`, `mode`, `run_id`, and `seq`.
 For this explicitly initiated commissioning/scenario route it remains
 `mode=live`, which is required by the production engine and the installed
-`sim_*` bridge. Synthetic provenance remains visible in both `gw_source_id` and
+`sim_*` bridge. Synthetic provenance remains visible in both `source_id` and
 `sim_source_id`. The launcher refuses to run while the real cRIO is connected.
 
 ## Run
@@ -64,8 +64,8 @@ Other profiles are `power-outage`, `lunar`, and `loss-of-data`.
 
 The launcher refuses to start unless all of these are true:
 
-- exactly one gateway listener exists on `192.168.1.1:9070`;
-- no `192.168.1.2` cRIO session is connected or waiting;
+- exactly one gateway listener exists on `<WINDOWS10_GATEWAY_IP>:9070`;
+- no `<CRIO_SOURCE_IP>` cRIO session is connected or waiting;
 - loopback gateway status is available on port 9080;
 - transport is HTTPS and mode is live;
 - the independent Convene gateway fan-out is enabled.
@@ -73,8 +73,8 @@ The launcher refuses to start unless all of these are true:
 While running, inspect the common path:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:9080/health
-Invoke-RestMethod http://127.0.0.1:9080/latest
+curl --fail http://127.0.0.1:9080/health
+curl --fail http://127.0.0.1:9080/latest
 ```
 
 Expected evidence:
@@ -82,16 +82,16 @@ Expected evidence:
 - `received` advances: scenario reached the gateway;
 - `delivered` advances and `queue_depth` returns to zero: the cloud engine
   acknowledged the same frames;
-- `convene.delivered` advances: `gw_*` reached Convene;
+- `convene.delivered` advances: exact-name gateway variables reached Convene;
 - `/latest.source_id` starts with `reclaim-synthetic-scenario:`;
-- Convene `gw_source_id` and `sim_source_id` match that source;
-- `sim_seq` advances behind `gw_seq`, subject to the VM bridge cadence.
+- Convene `source_id` and `sim_source_id` match that source;
+- `sim_seq` advances behind `seq`, subject to the VM bridge cadence.
 
-If `gw_*` advances but `sim_*` does not, do not add another estimator or desktop
+If exact-name gateway variables advances but `sim_*` does not, do not add another estimator or desktop
 publisher. The remaining fault is after cloud ingest: inspect the cloud engine
 `/state`, then the installed VM state bridge and Convene agent. The known
 `machineCommands` composite-index heartbeat failure is documented in
-`CONVENE_FIRESTORE_INDEX_HANDOVER.md`; `gw_*` bypasses it through direct publish,
+`CONVENE_FIRESTORE_INDEX_HANDOVER.md`; exact-name gateway variables bypasses it through direct publish,
 while the VM agent's `simVars` heartbeat can still be affected.
 
 ## Verification
@@ -105,11 +105,11 @@ synthetic-cRIO suite currently passes 64 tests.
 ## Live deployment result: 2026-08-23
 
 Sandbox tests were not treated as deployment verification. Four bounded streams
-were sent to the actual `192.168.1.1:9070` listener with the real cRIO
+were sent to the actual `<WINDOWS10_GATEWAY_IP>:9070` listener with the real cRIO
 disconnected. The installed gateway then performed its real HTTPS and Convene
 operations.
 
-| Run | Rate / frames | Gateway received | `gw_*` delivered | Cloud ack | Dead-letter |
+| Run | Rate / frames | Gateway received | exact-name gateway variables delivered | Cloud ack | Dead-letter |
 |---|---:|---:|---:|---:|---:|
 | contract smoke | 10 Hz / 30 | 30 | 4 | 0 | 30 |
 | accelerated continuous | 10 Hz / 150 | 150 | 20 | 0 | 150 |
@@ -118,7 +118,7 @@ operations.
 
 All gateway-Convene deliveries reported zero failures and carried
 `reclaim-synthetic-scenario:nominal:earth_lab`. Thus real scenario data did land
-in Convene under `gw_*`. Every cloud rejection was final `timestamp_stale`; the
+in Convene under exact-name gateway variables. Every cloud rejection was final `timestamp_stale`; the
 measured source-to-dead-letter delay was 15.5-85.9 seconds. An isolated single
 frame also took 27.8 seconds and was rejected. The public engine `/health`
 remained fast (~0.5 seconds), at `ingested_total=2830`, and retained active run

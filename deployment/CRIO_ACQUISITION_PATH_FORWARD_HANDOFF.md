@@ -48,7 +48,7 @@ existing USB logger     bounded latest-wins handoff
                               |
                     low-priority TCP producer
                               |
-                  192.168.1.1:9070, JSON + LF
+                  <WINDOWS10_GATEWAY_IP>:9070, JSON + LF
                               |
                     existing edge gateway/VM
 ```
@@ -69,7 +69,7 @@ not committed to this repository.
 |---|---|---|
 | `Data Stream.vi` | `D120133ECFB516F69E0EFF22A7E42C17E0E7943629C80DE6C28A91F8290ED2C1` | Assigned beneath the cRIO RT target; references numerous inputs, Mod1 digital outputs, Mod4 analog outputs, VISA, and `RF Testing.vi` |
 | `Preheating Metals.vi` | `818F18474F8041AA783C3CEC416173039C1110067BD13AD58F1D768B3ADDBE27` | Assigned beneath the RT target; references inputs, outputs, VISA, and RF dependencies |
-| `Read Only Sensors.lvproj` | `198C7E412EDDC06FA399189DAEB5F30CF0B0578F4366B37B214FE5F89B4F2DE8` | LabVIEW 2019 project for cRIO-9024/VxWorks/PowerPC at `192.168.1.2`; contains no populated build specification proving deployed-source identity |
+| `Read Only Sensors.lvproj` | `198C7E412EDDC06FA399189DAEB5F30CF0B0578F4366B37B214FE5F89B4F2DE8` | LabVIEW 2019 project for cRIO-9024/VxWorks/PowerPC at `<CRIO_SOURCE_IP>`; contains no populated build specification proving deployed-source identity |
 
 These hashes differ from earlier hashes recorded in the PSP development plan.
 Treat the inspected files as a distinct evidence revision. The folder name "Read
@@ -167,7 +167,7 @@ signed by controls.
 After the controls gates pass, branch the existing per-record snapshot before its
 file write into a bounded, non-blocking handoff. A lower-priority telemetry loop
 serializes one reviewed JSON object, appends one LF, and maintains one TCP client
-connection to the existing gateway listener at `192.168.1.1:9070`.
+connection to the existing gateway listener at `<WINDOWS10_GATEWAY_IP>:9070`.
 
 Why this is selected:
 
@@ -347,7 +347,7 @@ remains an engineering shadow stream.
 - [ ] State/chamber/cycle/time sources are authoritative and signed.
 - [ ] Clock offset/drift fits the cloud freshness window.
 - [ ] Telemetry is lower priority and cannot block control or logging.
-- [ ] One writer targets `192.168.1.1:9070`; no command path exists.
+- [ ] One writer targets `<WINDOWS10_GATEWAY_IP>:9070`; no command path exists.
 - [ ] Frame size, cadence, reconnect, drop, and stale policies are reviewed.
 - [ ] Same-time USB/LabVIEW/gateway/VM correlation passes.
 - [ ] Disconnect and restart tests show no control impact or stale replay.

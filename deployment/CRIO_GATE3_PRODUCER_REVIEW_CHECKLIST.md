@@ -38,7 +38,7 @@ project dependency diff, `TEST` = conformance/bench output.
 
 | # | Item | Required evidence | Answer / reference | Pass |
 |---:|---|---|---|---|
-| 3.1 | Exactly one outbound TCP connection to `192.168.1.1:9070`; opened once, reused; no per-frame open/close | BD | | ☐ |
+| 3.1 | Exactly one outbound TCP connection to `<WINDOWS10_GATEWAY_IP>:9070`; opened once, reused; no per-frame open/close | BD | | ☐ |
 | 3.2 | TCP Open timeout finite (~2000 ms); TCP Write timeout finite (~500 ms, below one cadence); TCP Close finite; **no `-1` timeout anywhere** | BD showing every timeout terminal | | ☐ |
 | 3.3 | On write error: close, mark disconnected, discard the frame — **never retry the same frame** | BD (error case) | | ☐ |
 | 3.4 | Reconnect backoff bounded (e.g. 1 s doubling to 5–10 s cap), sized against the gateway's 15 s idle-drop | BD + stated values | | ☐ |

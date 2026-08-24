@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from reclaim_edge.buffer import Buffer
 from reclaim_edge.config import Config
@@ -24,23 +25,36 @@ def _frame():
         "vars": {
             "PL_bottom1": 100.2,
             "MW_RF": True,
+            "gw_quality_code": 7,
             "missing": None,
             "nested": {"unsafe": 1},
         },
     }
 
 
-def test_frame_to_variables_is_scalar_and_gw_only():
+def test_frame_to_variables_is_scalar_and_unprefixed():
     variables = frame_to_variables(_frame())
 
-    assert variables["gw_seq"] == 7
-    assert variables["gw_source_op_state"] == "S_MicrowaveHeating"
-    assert variables["gw_PL_bottom1"] == 100.2
-    assert variables["gw_MW_RF"] is True
-    assert "gw_missing" not in variables
-    assert "gw_nested" not in variables
-    assert all(name.startswith("gw_") for name in variables)
+    assert variables["seq"] == 7
+    assert variables["source_op_state"] == "S_MicrowaveHeating"
+    assert variables["PL_bottom1"] == 100.2
+    assert variables["MW_RF"] is True
+    assert variables["gw_quality_code"] == 7
+    assert "missing" not in variables
+    assert "nested" not in variables
     assert not any(name.startswith("sim_") for name in variables)
+
+
+def test_frame_to_variables_rejects_cloud_owned_sim_name():
+    frame = _frame()
+    frame["vars"]["sim_forbidden"] = 1
+
+    try:
+        frame_to_variables(frame)
+    except ValueError as exc:
+        assert "sim_" in str(exc)
+    else:
+        raise AssertionError("gateway accepted a cloud-owned sim_ variable")
 
 
 def test_direct_publish_uses_machine_token_and_does_not_emit_sim(tmp_path):
@@ -69,8 +83,8 @@ def test_direct_publish_uses_machine_token_and_does_not_emit_sim(tmp_path):
     url, request = Requests.calls[0]
     assert url.endswith("/api/machine/publish")
     assert request["headers"] == {"X-Agent-Token": "secret"}
-    assert request["json"]["variables"]["gw_seq"] == 7
-    assert all(key.startswith("gw_") for key in request["json"]["variables"])
+    assert request["json"]["variables"]["seq"] == 7
+    assert request["json"]["variables"]["gw_quality_code"] == 7
 
 
 def test_receiver_durably_enqueues_before_best_effort_audit_submit():
@@ -105,3 +119,33 @@ def test_submit_coalesces_without_blocking():
 
     assert publisher.coalesced == 1
     assert publisher._pending.get_nowait()["seq"] == 2
+
+
+def test_transient_failure_retries_latest_value_until_success(tmp_path):
+    credential = tmp_path / "credential.json"
+    credential.write_text(json.dumps({"machineId": "desktop-1", "agentToken": "secret"}))
+    stop = threading.Event()
+    publisher = ConvenePublisher(
+        Config(convene_enabled=True, convene_credentials_path=str(credential)), stop
+    )
+    delivered = []
+
+    def flaky(frame):
+        if not delivered:
+            delivered.append(("failed", frame["seq"]))
+            raise RuntimeError("transient")
+        delivered.append(("accepted", frame["seq"]))
+        return True
+
+    publisher._deliver = flaky
+    publisher.start()
+    publisher.submit({"seq": 1})
+    deadline = time.time() + 3
+    while publisher.delivered < 1 and time.time() < deadline:
+        time.sleep(0.02)
+    stop.set()
+    publisher.join(timeout=2)
+
+    assert delivered == [("failed", 1), ("accepted", 1)]
+    assert publisher.failed == 1
+    assert publisher.delivered == 1

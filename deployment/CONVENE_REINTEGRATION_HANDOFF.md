@@ -1,19 +1,20 @@
 # Convene Reintegration — Repository Proof and Operator Checkpoint
 
+> **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
+
 **Date:** 2026-08-17
 **Status:** repository side proven; no external Convene mutation performed
 
 The live predictive-engine guest is Windows Server 2025 in Kubernetes-managed
 cloud infrastructure. Its independent Windows state bridge writes
 `C:\ConveneAgent\sim_vars.json` for the VM Convene agent installed during
-bootstrap. The Windows 10
-gateway laptop remains the separate `gw_` audit source.
+bootstrap. The MacBook scenario host remains the separate raw gateway audit source.
 
 ## Proven repository contract
 
 The cloud dual engine is the future single writer of the live `sim_` set. Its
 read surface is `GET /state`; the gateway laptop remains a separate, read-only
-audit machine whose local `GET /latest` frame is published only as `gw_`.
+audit machine whose local `GET /latest` frame is published only as raw gateway.
 
 Automated coverage in `cloud_engine/tests/test_convene_binding_contract.py` and
 `pi_gateway/tests/test_framer_contract.py` proves:
@@ -32,7 +33,7 @@ Automated coverage in `cloud_engine/tests/test_convene_binding_contract.py` and
 The current `/state` contract publishes the plastics bed bank as the aggregate
 `PL_T_bed_meas`. It does not publish individual `PL_T_bed_tc1..4` fields. The
 gateway mapping has therefore been corrected: the audit view must compare the
-converted mean of `gw_PL_bottom1..4` to `sim_PL_T_bed_meas`.
+converted mean of `PL_bottom1..4` to `sim_PL_T_bed_meas`.
 
 ## Rehearsal isolation contract
 
@@ -46,11 +47,11 @@ Use three separate non-live identities and prefixes:
 
 These identities may read only their listed loopback synthetic service. They
 must not receive a production ingest/read token, tunnel route, `sim_` binding,
-or `gw_` binding. Synthetic services implement GET-only demonstration routes
+or raw gateway binding. Synthetic services implement GET-only demonstration routes
 and do not expose `POST /ingest`.
 
 The future live topology remains exactly one `sim_` publisher reading the
-production cloud `/state`, plus one separate `gw_` audit machine reading the
+production cloud `/state`, plus one separate raw gateway audit machine reading the
 gateway `/latest`. Never run a rehearsal, legacy publisher, CSV importer, or
 second bridge against either set.
 
@@ -96,15 +97,16 @@ mutation in the current session.
    `rehearsal_*` prefix and loopback source.
 2. Build three visibly labeled rehearsal views and implement the fail-closed
    display predicate above.
-3. Confirm no rehearsal field begins with `sim_` or `gw_`, and no rehearsal
+3. Confirm no rehearsal field begins with `sim_` or collides with an unprefixed
+   live gateway variable, and no rehearsal
    collector has a production token or URL.
 4. Capture: machine IDs, exported field lists, screenshots of each label and
    `DATA NOT LIVE` behavior, collector URLs with credentials redacted, and the
-   single-writer list for `sim_` and `gw_`.
+   single-writer list for `sim_` and the raw gateway machine.
 
 Expected result: three isolated rehearsal views receive only synthetic GET data;
-the live `sim_` namespace and gateway `gw_` audit machine are unchanged.
+the live `sim_` namespace and raw gateway audit machine are unchanged.
 
 Rollback: disable/delete only the new rehearsal collectors and bindings, verify
-their fields stop advancing, and re-capture the unchanged `sim_`/`gw_` writer
+their fields stop advancing, and re-capture the unchanged `sim_`/gateway writer
 list. Do not alter the live publisher, gateway agent, tunnel, tokens, or hardware.
