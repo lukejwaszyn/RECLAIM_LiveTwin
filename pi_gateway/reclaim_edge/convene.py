@@ -66,6 +66,11 @@ def frame_to_variables(frame: Dict[str, Any]) -> Dict[str, Any]:
 
     raw = frame.get("vars")
     if isinstance(raw, dict):
+        if any(
+            isinstance(name, str) and name.startswith("sim_")
+            for name in raw
+        ):
+            raise ValueError("raw telemetry must not contain cloud-owned sim_ names")
         for name, value in raw.items():
             if name in _LABVIEW_RAW_FIELD_SET and _scalar(value):
                 variables[name] = value

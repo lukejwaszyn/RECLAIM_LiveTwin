@@ -21,13 +21,15 @@ NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
 
 
-def scalar(text: str) -> bool | int | float:
+def scalar(text: str) -> bool | int | float | str | None:
     value = text.strip()
     upper = value.upper()
     if upper == "TRUE":
         return True
     if upper == "FALSE":
         return False
+    if upper == "NAN":
+        return None
     if INTEGER_RE.fullmatch(value):
         return int(value)
     number = float(value)
@@ -47,7 +49,17 @@ def parse_record(line: str) -> dict[str, Any]:
             raise ValueError(f"invalid channel name: {name!r}")
         if name in variables:
             raise ValueError(f"duplicate channel: {name}")
-        variables[name] = scalar(value)
+        if name == "active_chamber":
+            chamber = value.strip().upper()
+            if chamber not in {"PL", "MT", "NONE"}:
+                raise ValueError("active_chamber must be PL, MT, or NONE")
+            variables[name] = chamber
+            continue
+        parsed = scalar(value)
+        # NaN is LabVIEW's unavailable-sensor marker. It cannot be represented
+        # in strict JSON or published to Convene, so omit only that reading.
+        if parsed is not None:
+            variables[name] = parsed
     if not variables:
         raise ValueError("empty record")
     return variables
@@ -66,6 +78,9 @@ def records(path: Path) -> Iterator[dict[str, Any]]:
 
 
 def inferred_chamber(variables: dict[str, Any]) -> str:
+    declared = variables.get("active_chamber")
+    if declared in {"PL", "MT", "NONE"}:
+        return str(declared)
     if any(variables.get(name) is True for name in (
         "PL_preprocess", "PL_process", "PL_postprocess"
     )):
@@ -90,13 +105,19 @@ def replay(
     sent = 0
     with socket.create_connection((host, port), timeout=5) as connection:
         for variables in records(path):
-            chamber = inferred_chamber(variables) if active_chamber == "auto" else active_chamber
+            payload = dict(variables)
+            declared_chamber = payload.pop("active_chamber", None)
+            if active_chamber == "auto":
+                chamber = (str(declared_chamber) if declared_chamber is not None
+                           else inferred_chamber(payload))
+            else:
+                chamber = active_chamber
             frame = {
                 "source_id": source_id,
                 "cycle_id": cycle_id,
                 "source_op_state": source_op_state,
                 "active_chamber": chamber,
-                "vars": variables,
+                "vars": payload,
             }
             connection.sendall(
                 (json.dumps(frame, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")

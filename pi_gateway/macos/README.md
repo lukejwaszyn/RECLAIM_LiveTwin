@@ -32,15 +32,19 @@ Required health/config state:
 ## Built-in scenarios
 
 ```bash
-pi_gateway/macos/start-rehearsal-scenario.sh nominal
-pi_gateway/macos/start-rehearsal-scenario.sh power-outage
-pi_gateway/macos/start-rehearsal-scenario.sh lunar
-pi_gateway/macos/start-rehearsal-scenario.sh loss-of-data
+pi_gateway/macos/start-rehearsal-scenario.sh start nominal PL
+pi_gateway/macos/start-rehearsal-scenario.sh start power-outage MT
+pi_gateway/macos/start-rehearsal-scenario.sh status
+pi_gateway/macos/start-rehearsal-scenario.sh stop
 ```
 
-The launcher refuses unless health reports `harness` or `replay`. For bounded
-checks, set `RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to
-accelerate playback.
+The same command starts, reports, and stops the one allowed scenario process.
+Every start requires an explicit `PL` or `MT`; the generated sensor bank,
+`active_chamber`, cycle identity, PL process flag, and shared microwave-power
+attribution all follow that selection. The launcher refuses unless health
+reports `harness` or `replay`. For bounded checks, set
+`RECLAIM_SCENARIO_MAX_FRAMES`; use `RECLAIM_SCENARIO_SPEED` to accelerate
+playback. Use `run` in place of `start` only when a foreground process is useful.
 
 ## Windows capture replay
 
@@ -48,11 +52,15 @@ The supplied comma-separated `name: value` capture format is replayed with:
 
 ```bash
 .venv-macbook/bin/python tools/replay_windows_data_stream.py \
-  "/path/to/data_stream.txt" --max-frames 100 --speed 10
+  "/path/to/data_stream.txt" --active-chamber MT --max-frames 100 --speed 10
 ```
 
 The replayer preserves exact channel names and scalar values. It labels unknown
 sequencer state `S_Unknown`; it never claims the file is current physical data.
+With the default `--active-chamber auto`, a record-level `active_chamber: PL`
+or `active_chamber: MT` is promoted into the scenario envelope. Explicit command
+selection overrides it. LabVIEW `NaN` sensor readings are omitted because they
+are unavailable values and are invalid in the strict JSON/Convene contract.
 
 ## Acceptance
 
