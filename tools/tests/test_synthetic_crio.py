@@ -16,11 +16,18 @@ for path in (str(ROOT / "tools"), str(ROOT / "cloud_engine")):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from synthetic_crio import build_channels, build_raw_frame, plant_frames  # noqa: E402
+from synthetic_crio import (build_channels, build_raw_frame, emission_frames,
+                            plant_frames)  # noqa: E402
 from labview_map import looks_like_labview, normalize  # noqa: E402
 from push_ingest_dual import DualPushEngine, TELEMETRY_SCHEMA  # noqa: E402
+from reclaim_predictive_engine.config import ENVIRONMENTS  # noqa: E402
+from reclaim_predictive_engine.service import SCENARIOS  # noqa: E402
 
 C_TO_K = 273.15
+MACBOOK_PROFILE_SPEEDS = {
+    "power_outage": 2700.0 / 210.0,
+    "lunar": 4500.0 / 300.0,
+}
 
 
 def _envelope(raw, mode="harness", seq=1):
@@ -114,6 +121,76 @@ def test_frames_stream_from_the_real_harness():
                for f in frames)
     # Temperatures advance rather than repeating a constant.
     assert len({f["vars"]["PL_bottom1"] for f in frames}) > 1
+
+
+@pytest.mark.parametrize(
+    ("scenario_name", "environment_name", "speed", "expected_wall_seconds"),
+    [
+        ("power_outage", "earth_lab", MACBOOK_PROFILE_SPEEDS["power_outage"], 210.0),
+        ("lunar_surface_process", "lunar_surface", MACBOOK_PROFILE_SPEEDS["lunar"], 300.0),
+    ],
+)
+def test_priority_scenarios_finish_below_five_minutes_by_default(
+    scenario_name, environment_name, speed, expected_wall_seconds
+):
+    scenario = SCENARIOS[scenario_name](ENVIRONMENTS[environment_name])
+    wall_seconds = scenario.duration / speed
+    assert wall_seconds == pytest.approx(expected_wall_seconds)
+    assert wall_seconds <= 300.0
+
+
+def test_power_outage_emits_one_frame_per_second_for_three_and_half_minutes():
+    selected = list(emission_frames(
+        plant_frames("power_outage", "earth_lab", active_chamber="MT"),
+        speed=MACBOOK_PROFILE_SPEEDS["power_outage"],
+        emit_hz=1.0,
+    ))
+    times = [t for t, _frame, _dt in selected]
+    states = [frame["source_op_state"] for _t, frame, _dt in selected]
+    assert times[0] == 0.0
+    assert times[-1] == 2700.0
+    assert len(selected) == 211
+    assert (len(selected) - 1) == 210
+    assert "S_PowerInterrupted" in states
+    assert "S_Restart" in states
+    assert states[-1] == "S_Cooldown"
+    temperatures_c = [frame["vars"]["MT_bottom"] for _t, frame, _dt in selected]
+    assert max(temperatures_c) >= 660.0
+    assert selected[-1][1]["vars"]["MW_power"] == 0.0
+
+
+def test_lunar_emits_one_frame_per_second_for_five_minutes():
+    lunar_env = ENVIRONMENTS["lunar_surface"]
+    assert lunar_env.convection is False
+    assert lunar_env.p_atm == pytest.approx(3.0e-10)
+    assert lunar_env.h_conv(500.0) == 0.0
+    selected = list(emission_frames(
+        plant_frames("lunar_surface_process", "lunar_surface", active_chamber="PL"),
+        speed=MACBOOK_PROFILE_SPEEDS["lunar"],
+        emit_hz=1.0,
+    ))
+    times = [t for t, _frame, _dt in selected]
+    assert times[0] == 0.0
+    assert times[-1] == 4500.0
+    assert len(selected) == 301
+    assert (len(selected) - 1) == 300
+    temperatures_c = [frame["vars"]["PL_bottom1"] for _t, frame, _dt in selected]
+    assert max(temperatures_c) == pytest.approx(450.0, abs=15.0)
+    # The 45-minute heat is a continuous ramp, not an early plateau that looks
+    # like a frozen File Watch value for most of the five-minute rehearsal.
+    assert temperatures_c[120] > temperatures_c[60] + 100.0
+    assert temperatures_c[179] > temperatures_c[120] + 100.0
+    assert selected[-1][1]["vars"]["MW_power"] == 0.0
+    pressures_torr = [frame["vars"]["PL_chamber_pressure"]
+                      for _t, frame, _dt in selected]
+    output_pressures_torr = [frame["vars"]["PL_output_pressure"]
+                             for _t, frame, _dt in selected]
+    assert min(pressures_torr) >= 48.66
+    assert max(pressures_torr) <= 53.42
+    assert len(set(pressures_torr)) > 250
+    assert min(output_pressures_torr) >= 58.181
+    assert max(output_pressures_torr) <= 64.978
+    assert len(set(output_pressures_torr)) > 250
 
 
 def test_mt_frames_stream_from_the_real_harness():

@@ -23,6 +23,7 @@ FORBIDDEN_SUFFIXES = {
     ".zip",
 }
 FORBIDDEN_PARTS = {".venv", "__pycache__", ".pytest_cache", "artifacts", "test-results"}
+FORBIDDEN_NAME_FRAGMENTS = ("handoff", "handover", "prompt")
 TOKEN_PATTERNS = {
     "AWS access key": re.compile(rb"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     "GitHub token": re.compile(rb"\bgh[pousr]_[A-Za-z0-9_]{30,}\b"),
@@ -49,6 +50,10 @@ def main() -> int:
 
         if lowered_parts & FORBIDDEN_PARTS:
             findings.append((str(relative), "runtime/build directory is tracked"))
+        if "past_deprecated" in lowered_parts:
+            findings.append((str(relative), "deprecated archive is tracked"))
+        if any(fragment in name for fragment in FORBIDDEN_NAME_FRAGMENTS):
+            findings.append((str(relative), "session handoff/prompt artifact is tracked"))
         if path.suffix.lower() in FORBIDDEN_SUFFIXES:
             findings.append((str(relative), "forbidden secret/state/archive suffix is tracked"))
         if name == ".env" or (name.startswith(".env.") and not name.endswith(".example")):

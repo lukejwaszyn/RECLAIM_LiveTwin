@@ -1,9 +1,8 @@
 # RECLAIM Integrated Remediation Architecture and Working-Session Plan
 
-> **Gateway supersession 2026-08-23:** the edge gateway is now the MacBook and
-> uses the macOS runtime/`launchd` contract in `pi_gateway/macos/README.md`.
-> Windows gateway task/path examples below are design history; Windows Server
-> 2025 VM instructions remain current.
+> **Closure note 2026-08-27:** this proposed plan is retained as design evidence.
+> The final architecture uses the Windows 10 desktop for live telemetry and the
+> MacBook only for loopback scenarios; the root README is authoritative.
 
 **Date:** 2026-08-16
 **Status:** Proposed implementation architecture — no runtime changes made by this document
@@ -30,10 +29,12 @@ Non-negotiable constraints:
 This plan is the integration point for:
 
 - [Predictive engine red-team assessment](../PREDICTIVE_ENGINE_RED_TEAM_ASSESSMENT.md): `RT-01` through `RT-08`
-- [Gateway deployment red-team assessment](../GATEWAY_DEPLOYMENT_RED_TEAM_ASSESSMENT.md): `GW-01` through `GW-10`
-- [Archived CI/CD red-team integration handoff](../Past_Deprecated/deployment/retired-2026-08-24-convene-routing/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md): historical `CD-01` through `CD-10` evidence only
 - [Predictive-engine remediation and command-authority plan](RECLAIM_Predictive_Engine_RedTeam_Remediation.md)
 - [Live telemetry architecture](RECLAIM_Live_Telemetry_Architecture.md)
+- [CI/CD implementation baseline](RECLAIM_CI_CD_IMPLEMENTATION_BASELINE.md)
+
+Superseded gateway and CI/CD handoff assessments were removed at project closure
+and remain available through Git history only.
 
 Any implementation PR must cite the finding IDs it closes and add the named regression evidence in §10.
 

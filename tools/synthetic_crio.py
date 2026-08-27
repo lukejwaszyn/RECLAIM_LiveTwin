@@ -73,6 +73,7 @@ def _now_iso() -> str:
 def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                    p_refl_W: float, p_chamber_kPa: float | None = None,
                    active_chamber: str = "PL",
+                   p_output_kPa: float | None = None,
                    ) -> Dict[str, Any]:
     """The raw LabVIEW channel block, in the cRIO's own names and units.
 
@@ -107,6 +108,9 @@ def build_channels(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
     if (active_chamber == "PL" and p_chamber_kPa is not None
             and math.isfinite(p_chamber_kPa)):
         channels["PL_chamber_pressure"] = round(_kpa_to_torr(p_chamber_kPa), 4)
+    if (active_chamber == "PL" and p_output_kPa is not None
+            and math.isfinite(p_output_kPa)):
+        channels["PL_output_pressure"] = round(_kpa_to_torr(p_output_kPa), 4)
     return channels
 
 
@@ -115,7 +119,8 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
                     p_chamber_kPa: float | None = None,
                     cycle_id: str = "synthetic-scenario",
                     source_id: str = "reclaim-synthetic-scenario",
-                    active_chamber: str = "PL") -> Dict[str, Any]:
+                    active_chamber: str = "PL",
+                    p_output_kPa: float | None = None) -> Dict[str, Any]:
     """One line on the wire, in the shape the gateway's receiver requires.
 
     Network input is stricter than the framer's direct-caller API: `parse_line`
@@ -131,7 +136,7 @@ def build_raw_frame(t_bed_K: float, t_wall_K: float, p_fwd_W: float,
         "cycle_id": cycle_id,
         "vars": build_channels(
             t_bed_K, t_wall_K, p_fwd_W, p_refl_W, p_chamber_kPa,
-            active_chamber,
+            active_chamber, p_output_kPa,
         ),
     }
 
@@ -148,9 +153,38 @@ def plant_frames(scenario_name: str, env_name: str, cycle: int = 1,
     for t, z, p_fwd, p_refl, _x in truth.stream():
         op_state = scenario.op_state_fn(t) if scenario.op_state_fn else "S_MicrowaveHeating"
         p_chamber = scenario.pressure_fn(t) if scenario.pressure_fn else None
+        p_output = (scenario.downstream_pressure_fn(t)
+                    if scenario.downstream_pressure_fn else None)
         yield t, build_raw_frame(float(z[0]), float(z[1]), float(p_fwd),
                                  float(p_refl), op_state, p_chamber,
-                                 cycle_id, source_id, active_chamber), scenario.dt
+                                 cycle_id, source_id, active_chamber,
+                                 p_output), scenario.dt
+
+
+def emission_frames(
+    frames: Iterator[tuple[float, Dict[str, Any], float]],
+    speed: float,
+    emit_hz: float,
+) -> Iterator[tuple[float, Dict[str, Any], float]]:
+    """Downsample simulated frames to a fixed wall-clock transmission cadence.
+
+    ``speed`` controls simulated seconds per wall second. ``emit_hz`` controls
+    how many complete frames are sent per wall second. The plant still advances
+    through every simulation step; only the external telemetry cadence is
+    reduced. This lets a 900 s scenario finish at 4x in 225 s while publishing
+    one current frame per second.
+    """
+    if speed <= 0:
+        raise ValueError("speed must be positive")
+    if emit_hz <= 0:
+        raise ValueError("emit_hz must be positive")
+    simulated_seconds_per_emit = speed / emit_hz
+    next_emit_t = 0.0
+    for t, frame, dt in frames:
+        if t + 1e-9 < next_emit_t:
+            continue
+        yield t, frame, dt
+        next_emit_t += simulated_seconds_per_emit
 
 
 class SyntheticCrio:
@@ -209,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="gateway receiver host")
     parser.add_argument("--port", type=int, default=9070, help="gateway receiver port")
     parser.add_argument("--speed", type=float, default=2.0, help="sim s per wall s")
+    parser.add_argument("--emit-hz", type=float, default=1.0,
+                        help="complete telemetry frames sent per wall second")
     parser.add_argument("--cycles", type=int, default=0, help="0 = loop forever")
     parser.add_argument("--max-frames", type=int, default=0, help="0 = unlimited")
     parser.add_argument("--dry-run", action="store_true",
@@ -216,8 +252,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    log.info("synthetic cRIO: chamber=%s scenario=%s env=%s speed=%sx -> %s:%d%s",
-             args.active_chamber, args.scenario, args.env, args.speed, args.host, args.port,
+    if args.speed <= 0 or args.emit_hz <= 0:
+        parser.error("--speed and --emit-hz must be positive")
+    log.info("synthetic cRIO: chamber=%s scenario=%s env=%s speed=%sx emit=%sHz -> %s:%d%s",
+             args.active_chamber, args.scenario, args.env, args.speed, args.emit_hz,
+             args.host, args.port,
              "  [DRY RUN, no socket]" if args.dry_run else "")
     log.info("scenario path: local source -> MacBook -> atomic Convene File Watch text")
 
@@ -230,18 +269,21 @@ def main(argv: list[str] | None = None) -> int:
     try:
         while True:
             cycle += 1
-            for t, frame, dt in plant_frames(
-                args.scenario, args.env, cycle, args.active_chamber
-            ):
+            frames = plant_frames(args.scenario, args.env, cycle, args.active_chamber)
+            cycle_started = time.monotonic()
+            emission_index = 0
+            for t, frame, _dt in emission_frames(frames, args.speed, args.emit_hz):
+                deadline = cycle_started + emission_index / args.emit_hz
+                time.sleep(max(0.0, deadline - time.monotonic()))
                 if args.dry_run:
                     print(json.dumps(frame))
                 else:
                     crio.send(frame)
                 sent += 1
+                emission_index += 1
                 if args.max_frames and sent >= args.max_frames:
                     log.info("reached --max-frames %d; stopping", args.max_frames)
                     return 0
-                time.sleep(max(0.0, dt / max(args.speed, 1e-6)))
             log.info("cycle %d complete (%d frames sent)", cycle, sent)
             if args.cycles and cycle >= args.cycles:
                 return 0

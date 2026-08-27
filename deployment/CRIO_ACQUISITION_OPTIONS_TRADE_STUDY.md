@@ -10,7 +10,6 @@ been inspected.
 
 **Status:** Decision support updated with the proven USB log seam. The selected
 direction and deployment gates are in
-`CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md` and
 `CRIO_SOURCE_RECORD_DECISION_RECORD.md`.
 No RT change or production source is approved by this document.
 

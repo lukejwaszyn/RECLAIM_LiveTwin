@@ -51,11 +51,13 @@ from .config import EngineConfig, ENVIRONMENTS, chamber_params
 from .engine import PredictiveEngine
 from .thread import StateStreamPublisher, default_manifest
 from .harness import (TruthPlant, runaway_scenario, nominal_scenario,
-                      power_outage_scenario, ramp_scenario, seal_leak_scenario, Scenario)
+                      power_outage_scenario, lunar_surface_process_scenario,
+                      ramp_scenario, seal_leak_scenario, Scenario)
 
 SCENARIOS = {"runaway": runaway_scenario, "nominal": nominal_scenario,
              "power_outage": power_outage_scenario, "ramp": ramp_scenario,
-             "seal_leak": seal_leak_scenario}
+             "seal_leak": seal_leak_scenario,
+             "lunar_surface_process": lunar_surface_process_scenario}
 
 
 class TwinStateService:
@@ -273,7 +275,7 @@ def driver(svc: TwinStateService, scenario_name: str, env_name: str,
                 extra = scenario.event_fn(t) if scenario.event_fn else None
                 pch = scenario.pressure_fn(t) if scenario.pressure_fn else None
                 out = eng.step(t, z, p_fwd, p_refl, op_state=op_state, extra_events=extra,
-                               p_chamber=pch)
+                               p_chamber=None if pch is None else pch * 1000.0)
                 combined.update({f"{ch}_{k}": v for k, v in out.frame.values.items()})
                 events += [f"{ch}:{e}" for e in out.frame.events]
                 if z[0] >= float(cfg.physical.t_limit):

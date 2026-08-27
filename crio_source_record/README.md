@@ -12,7 +12,8 @@ before the first supervised cRIO window.
 > The production direction (a bounded, lower-priority RT-side TCP client to
 > `<WINDOWS10_GATEWAY_IP>:9070`) is **NO-GO** until the controls-owned Gate 0/1 identity,
 > coherence, authority, and rollback gates pass. See
-> `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md`.
+> `deployment/CRIO_SOURCE_RECORD_DECISION_RECORD.md` and
+> `deployment/CRIO_GATE3_PRODUCER_REVIEW_CHECKLIST.md`.
 
 ## Modules
 

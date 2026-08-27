@@ -23,31 +23,55 @@ python_exe="$repository_root/.venv-macbook/bin/python"
 gateway_host=${RECLAIM_GATEWAY_HOST:-127.0.0.1}
 gateway_port=${RECLAIM_GATEWAY_PORT:-9070}
 status_base=${RECLAIM_STATUS_BASE:-http://127.0.0.1:9080}
-speed=${RECLAIM_SCENARIO_SPEED:-1}
+speed=${RECLAIM_SCENARIO_SPEED:-}
+emit_hz=${RECLAIM_SCENARIO_EMIT_HZ:-1}
 max_frames=${RECLAIM_SCENARIO_MAX_FRAMES:-0}
-cycles=${RECLAIM_SCENARIO_CYCLES:-0}
+cycles=${RECLAIM_SCENARIO_CYCLES:-1}
 state_dir=${RECLAIM_SCENARIO_STATE_DIR:-"$HOME/Library/Application Support/RECLAIM/scenarios"}
 pid_file="$state_dir/scenario.pid"
 log_file="$state_dir/scenario.log"
+lock_dir="$state_dir/start.lock"
+launch_plist="$state_dir/com.reclaim.scenario-runner.plist"
+launch_label="com.reclaim.scenario-runner"
+launch_domain="gui/$(id -u)"
+launch_helper="$script_dir/scenario_launch_service.py"
 
-is_running() {
+service_pid() {
+  "$python_exe" "$launch_helper" pid 2>/dev/null
+}
+
+current_pid() {
+  local pid
+  pid=$(service_pid || true)
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$pid"
+    return 0
+  fi
   [[ -f "$pid_file" ]] || return 1
-  local pid command
   pid=$(<"$pid_file")
   [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$pid"
+}
+
+is_running() {
+  local pid command
+  pid=$(current_pid) || return 1
   kill -0 "$pid" 2>/dev/null || return 1
   command=$(ps -p "$pid" -o command= 2>/dev/null || true)
   [[ "$command" == *"tools/synthetic_crio.py"* ]]
 }
 
 stop_scenario() {
-  if [[ ! -f "$pid_file" ]]; then
+  local pid command
+  pid=$(current_pid || true)
+  if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
+    "$python_exe" "$launch_helper" stop 2>/dev/null || true
+    rm -f "$pid_file"
     echo "No MacBook scenario is running."
     return 0
   fi
-  local pid command
-  pid=$(<"$pid_file")
-  if [[ ! "$pid" =~ ^[0-9]+$ ]] || ! kill -0 "$pid" 2>/dev/null; then
+  if ! kill -0 "$pid" 2>/dev/null; then
+    "$python_exe" "$launch_helper" stop 2>/dev/null || true
     rm -f "$pid_file"
     echo "Removed a stale scenario PID file; no scenario was running."
     return 0
@@ -57,7 +81,11 @@ stop_scenario() {
     echo "Refusing to stop PID $pid because it is not a RECLAIM scenario process." >&2
     return 1
   fi
-  kill -TERM "$pid"
+  if launchctl print "$launch_domain/$launch_label" >/dev/null 2>&1; then
+    "$python_exe" "$launch_helper" stop
+  else
+    kill -TERM "$pid"
+  fi
   for _ in {1..100}; do
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.1
@@ -79,7 +107,7 @@ fi
 if [[ "$action" == "status" ]]; then
   [[ $# -eq 1 ]] || usage
   if is_running; then
-    echo "MacBook scenario is running (PID $(<"$pid_file"))."
+    echo "MacBook scenario is running (PID $(current_pid))."
     curl --fail --silent --max-time 5 "$status_base/latest" || true
     echo
     exit 0
@@ -112,8 +140,20 @@ if mode not in {"harness", "replay"}:
     raise SystemExit(f"MacBook must be scenario-only (harness/replay), got {mode!r}")
 '
 
+cleanup_start_lock() {
+  rmdir "$lock_dir" 2>/dev/null || true
+}
+if [[ "$action" == "start" ]]; then
+  mkdir -p "$state_dir"
+  if ! mkdir "$lock_dir" 2>/dev/null; then
+    echo "A MacBook scenario start is already in progress; duplicate command ignored." >&2
+    exit 1
+  fi
+  trap cleanup_start_lock EXIT
+fi
+
 if is_running; then
-  echo "A MacBook scenario is already running (PID $(<"$pid_file")). Stop it first." >&2
+  echo "A MacBook scenario is already running (PID $(current_pid)). Stop it first." >&2
   exit 1
 fi
 if /usr/sbin/lsof -nP -iTCP:"$gateway_port" -sTCP:ESTABLISHED 2>/dev/null | tail -n +2 | grep -q .; then
@@ -130,6 +170,7 @@ case "$profile" in
     scenario=power_outage
     ;;
   lunar)
+    scenario=lunar_surface_process
     environment=lunar_surface
     ;;
   loss-of-data)
@@ -142,6 +183,20 @@ case "$profile" in
     ;;
 esac
 
+if [[ -z "$speed" ]]; then
+  case "$profile" in
+    power-outage)
+      speed=12.857142857142858 # 2700 simulated seconds -> about 210 wall seconds
+      ;;
+    lunar)
+      speed=15                 # 4500 simulated seconds -> about 300 wall seconds
+      ;;
+    *)
+      speed=4
+      ;;
+  esac
+fi
+
 args=(
   "$repository_root/tools/synthetic_crio.py"
   --scenario "$scenario"
@@ -150,6 +205,7 @@ args=(
   --host "$gateway_host"
   --port "$gateway_port"
   --speed "$speed"
+  --emit-hz "$emit_hz"
 )
 if [[ "$cycles" -gt 0 ]]; then
   args+=(--cycles "$cycles")
@@ -160,18 +216,31 @@ fi
 
 echo "RECLAIM MacBook scenario: $profile, active chamber $active_chamber"
 echo "Path: synthetic source -> $gateway_host:$gateway_port -> atomic Convene File Watch text"
+if [[ "$cycles" -gt 0 ]]; then
+  echo "Playback: ${speed}x, telemetry: ${emit_hz}Hz, cycles: $cycles"
+else
+  echo "Playback: ${speed}x, telemetry: ${emit_hz}Hz, cycles: repeat until stopped"
+fi
 
 if [[ "$action" == "run" ]]; then
   echo "Foreground run; stop with Ctrl+C."
   exec "$python_exe" "${args[@]}"
 fi
 
-mkdir -p "$state_dir"
-nohup "$python_exe" "${args[@]}" >>"$log_file" 2>&1 &
-scenario_pid=$!
-printf '%s\n' "$scenario_pid" >"$pid_file"
+"$python_exe" "$launch_helper" stop 2>/dev/null || true
+rm -f "$pid_file"
+"$python_exe" "$launch_helper" start --plist "$launch_plist" --log "$log_file" \
+  -- "$python_exe" "${args[@]}"
 sleep 0.5
+scenario_pid=$(service_pid || true)
+if [[ ! "$scenario_pid" =~ ^[0-9]+$ ]]; then
+  echo "Scenario service did not report a PID. Recent log output:" >&2
+  tail -n 20 "$log_file" >&2 || true
+  exit 1
+fi
+printf '%s\n' "$scenario_pid" >"$pid_file"
 if ! is_running; then
+  "$python_exe" "$launch_helper" stop 2>/dev/null || true
   rm -f "$pid_file"
   echo "Scenario failed to stay running. Recent log output:" >&2
   tail -n 20 "$log_file" >&2 || true
