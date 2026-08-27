@@ -3,8 +3,8 @@
 > **Role boundary — 2026-08-24:** The Windows 10 desktop is the sole live-data client/gateway. The MacBook is loopback-only and scenario-only; do not execute any contrary MacBook cRIO, OT-network, direct-cloud, or live-cutover instruction retained below. See `deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
 
 > **Current role:** diagnostic engineering fallback, not the selected production
-> source. See `deployment/CRIO_ACQUISITION_PATH_FORWARD_HANDOFF.md` for the proven
-> USB record seam and the authoritative path forward.
+> source. See `deployment/CRIO_SOURCE_RECORD_DECISION_RECORD.md` for the proven
+> USB record seam and final source decision.
 
 This adapter uses the installed 32-bit NI DataSocket COM client to subscribe to
 an explicit input-module allowlist on `<CRIO_SOURCE_IP>`. It has no runtime resource
@@ -21,7 +21,7 @@ required before any of these scan values can become a `PL_*` or `MT_*` model
 input.
 
 The POC allowlist is limited to the candidate `Mod2/TC0..TC7` and
-`Mod3/AI0..AI2` resources recorded in the controls handoff. Its current source
+`Mod3/AI0..AI2` resources recorded in the retained controls evidence. Its current source
 profile is exactly eight audit-only `scan_Mod2_TCn_degC` values plus three
 module-level `scan_Mod3_AIn_raw` values. It emits no canonical `PL_*`, `MT_*`,
 or `MW_*` process field.

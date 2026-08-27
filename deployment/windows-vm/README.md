@@ -1,9 +1,9 @@
 # Cloud-engine VM: Convene-routed cutover
 
-This directory contains only the current VM audit and acceptance entry points.
+This directory contains only the final VM audit and acceptance entry points.
 The former Cloudflare quick tunnel, `RECLAIMStateBridge`, `sim_vars.json`, direct
-Convene variable publisher, and pinned-release deployment scripts are archived
-under `Past_Deprecated/retired-2026-08-24-convene-direct-routing/`.
+Convene variable publisher, and superseded deployment scripts were removed from
+the final tree.
 
 Run these from an elevated PowerShell session after logging onto the VM:
 

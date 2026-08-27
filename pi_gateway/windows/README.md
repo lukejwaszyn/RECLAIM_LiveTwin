@@ -14,8 +14,8 @@ Convene internal route -> cloud stochastic engine -> Convene sim_*
 The gateway must use `transport: console`, an empty direct-ingest token,
 `convene_enabled: true`, and exact source names with no manufactured `gw_`
 prefix. It must never emit `sim_*`. Start from
-`pi_gateway/config.crio-live.example.yaml` and the sole current pickup document,
-`deployment/CURRENT_CONVENE_ROUTED_SYSTEM_HANDOFF.md`.
+`pi_gateway/config.crio-live.example.yaml`, the root `README.md`, and
+`deployment/LIVE_GATEWAY_AND_SCENARIO_HOST_DECISION.md`.
 
 The receiver binds only the dedicated cRIO-facing interface after controls and
 network approval. Status port `9080` remains loopback-only. The engine generates
@@ -38,8 +38,8 @@ or inferred as retained fresh measurements.
 
 ## Removed competing paths
 
-The former direct gateway-to-VM finalizer and commissioning senders are archived
-under `Past_Deprecated/retired-2026-08-24-convene-direct-routing/`. No active
-Windows script puts a VM ingest URL/token on the live gateway.
+The former direct gateway-to-VM finalizer and commissioning senders were removed
+from the final tree. No active Windows script puts a VM ingest URL/token on the
+live gateway.
 
 All predictive output remains advisory and disconnected from actuation.

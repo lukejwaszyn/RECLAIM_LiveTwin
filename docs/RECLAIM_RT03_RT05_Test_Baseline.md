@@ -1,8 +1,8 @@
 # RECLAIM RT-03 / RT-05 Failing Regression Baseline
 
-> **Platform note 2026-08-23:** the edge gateway is the MacBook. Windows gateway
-> service/task references in this historical test baseline are superseded;
-> cloud-engine algorithm and Windows VM evidence remain applicable.
+> **Closure note 2026-08-27:** this is a historical failing-baseline record.
+> The final architecture uses the Windows 10 desktop for live telemetry and the
+> MacBook only for loopback scenarios; see the root README.
 
 **Session date:** 2026-08-16
 **Repository path:** `/Users/lukewaszyn/RECLAIM_LiveTwin`
@@ -69,12 +69,13 @@ modified intentionally.
 
 Required documents read in full:
 
-1. `docs/RECLAIM_Integrated_Handoff_Evaluation.md`
-2. `docs/RECLAIM_Integrated_Remediation_Architecture.md`
-3. `PREDICTIVE_ENGINE_RED_TEAM_ASSESSMENT.md`
-4. `docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md`
-5. `docs/RECLAIM_Live_Telemetry_Architecture.md`
-6. `Past_Deprecated/deployment/retired-2026-08-24-convene-routing/CI_CD_RED_TEAM_INTEGRATION_HANDOFF.md` (historical evidence only)
+1. `docs/RECLAIM_Integrated_Remediation_Architecture.md`
+2. `PREDICTIVE_ENGINE_RED_TEAM_ASSESSMENT.md`
+3. `docs/RECLAIM_Predictive_Engine_RedTeam_Remediation.md`
+4. `docs/RECLAIM_Live_Telemetry_Architecture.md`
+
+Superseded handoff and integration-evaluation documents used during the original
+session were removed when the project closed; Git history preserves them.
 
 Required runtime and state-owning sources inspected:
 
